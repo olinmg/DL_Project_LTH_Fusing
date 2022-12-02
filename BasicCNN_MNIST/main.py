@@ -1,5 +1,5 @@
 from parameters import get_parameters
-from base_convNN import CNN
+from base_convNN import get_model
 import torch
 from fusion import fusion
 from sklearn.model_selection import train_test_split
@@ -33,7 +33,7 @@ def get_pretrained_models(args, num_models):
 
     for idx in range(num_models):
         state = torch.load("models/base_cnn_model_dict_weak_{}.pth".format(idx))
-        model = CNN()
+        model = get_model(args.model_name)
         model.load_state_dict(state)
         if args.gpu_id != -1:
             model = model.cuda(args.gpu_id)

@@ -1,3 +1,4 @@
+import copy
 import torch
 from sklearn.model_selection import train_test_split
 from torchvision import datasets
@@ -59,7 +60,7 @@ def get_data_loaders(num_models):
 class CNN(nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
-        bias = False # Fusion only works without bias (for the time being)
+        bias = True
         self.conv1 = nn.Sequential(         
             nn.Conv2d(
                 in_channels=1,              
@@ -89,6 +90,30 @@ class CNN(nn.Module):
         output = self.out(x)
         return output, x    # return x for visualization
 
+# 3. defining a basic CNN model
+class MLP(nn.Module):
+    def __init__(self):
+        super(MLP, self).__init__()
+        bias = True 
+
+        self.lin1 = nn.Sequential(
+            nn.Linear(28*28, 128, bias=bias),
+            nn.ReLU(),  
+        )
+        self.lin2 = nn.Sequential(
+            nn.Linear(128, 512, bias=bias),
+            nn.ReLU(),  
+        )
+        # fully connected layer, output 10 classes
+        self.out = nn.Linear(512, 10, bias=bias)
+    
+    def forward(self, x):
+
+        x = self.lin1(x.view(-1, 28*28))
+        x = self.lin2(x)  
+        output = self.out(x)
+        return output, x    # return x for visualization
+
 
 
 # 4. instantiating necessary objects: putting the pieces together
@@ -97,9 +122,9 @@ loss_func = nn.CrossEntropyLoss()
 
 # 5. define the training function
 num_epochs = 10
-def train(num_epochs, cnn_model, loaders, args):
-    optimizer = optim.Adam(cnn_model.parameters(), lr = 0.01)
-    cnn_model.train()
+def train(num_epochs, model, loaders, args):
+    optimizer = optim.Adam(model.parameters(), lr = 0.01)
+    model.train()
         
     # Train the model
     total_step = len(loaders['train'])
@@ -111,7 +136,7 @@ def train(num_epochs, cnn_model, loaders, args):
             # gives batch data, normalize x when iterate train_loader
             b_x = Variable(images)   # batch x
             b_y = Variable(labels)   # batch y
-            output = cnn_model(b_x)[0]               
+            output = model(b_x)[0]               
             loss = loss_func(output, b_y)
             
             # clear gradients for this training step   
@@ -146,6 +171,14 @@ def test(model, args):
     return accuracy_accumulated/total
 
 
+def get_model(model_name):
+    if model_name == "cnn":
+        return CNN()
+    elif model_name == "mlp":
+        return MLP()
+    else:
+        print("Invalid model name. Using CNN instead.")
+        return CNN()
 
 # 7. actually execute the training and testing
 if __name__ == '__main__':
@@ -153,8 +186,9 @@ if __name__ == '__main__':
     num_models = args.num_models
     loaders = get_data_loaders(num_models)
     
+    model_parent = get_model(args.model_name)
     for idx in range(num_models):
-        model = CNN()
+        model = copy.deepcopy(model_parent) if not args.diff_weight_init else get_model(args.model_name)
         if args.gpu_id != -1:
             model = model.cuda(args.gpu_id)
         train(num_epochs, model, {"train": loaders["train"][idx], "test": loaders["test"]}, args)
