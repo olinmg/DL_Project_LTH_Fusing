@@ -26,8 +26,8 @@ def compute_euclidian_distance_matrix(x, y, p=2, squared=True): # For some reaso
 # if bias is present, the bias will be appended to the weight matrix and subsequently used to calculate the cost
 # cost matrix is based on the weights, not the activations
 def get_ground_metric(coordinates1, coordinates2, bias1, bias2):
-    if bias1 != None: # and bias2 == None
-        assert bias2 == None
+    if bias1 != None: # and bias2 != None
+        assert bias2 != None
         coordinates1 = torch.cat((coordinates1, bias1.view(bias1.shape[0], -1)), 1)
         coordinates2 = torch.cat((coordinates2, bias2.view(bias2.shape[0], -1)), 1)
     coordinates1 = normalize_vector(coordinates1)
