@@ -1,14 +1,10 @@
-from parameters import get_parameters
-from base_convNN import get_model
+from parameters import get_parameters_main
+from models import get_model
 import torch
 from fusion import fusion
 from sklearn.model_selection import train_test_split
 from torchvision import datasets
 from torchvision.transforms import ToTensor
-from torch.utils.data import DataLoader
-import torch.nn as nn
-from torch import optim
-from torch.autograd import Variable
 
 
 def get_data_loader(args):
@@ -32,8 +28,8 @@ def get_pretrained_models(args, num_models):
     models = []
 
     for idx in range(num_models):
-        state = torch.load("models/base_cnn_model_dict_weak_{}.pth".format(idx))
-        model = get_model(args.model_name)
+        state = torch.load("models/model_{}_{}.pth".format(args.model_name, idx))
+        model = get_model(args)
         model.load_state_dict(state)
         if args.gpu_id != -1:
             model = model.cuda(args.gpu_id)
@@ -58,23 +54,22 @@ def test(model, loaders, args):
 
 
 if __name__ == '__main__':
-    args = get_parameters()
+    args = get_parameters_main()
     num_models = args.num_models
-
-    assert num_models == 2 # Only temporary, later we can extend to more layers
 
     models = get_pretrained_models(args, num_models)
 
     fused_model = fusion(models, args)
 
     loaders = get_data_loader(args)
-    accuracy_0 = test(models[0], loaders, args)
-    accuracy_1 = test(models[1], loaders, args)
-    accuracy_fused = test(fused_model, loaders, args)
+    results = [test(models[i], loaders, args) for i in range(len(models))]
+    result_fused = test(fused_model, loaders, args)
 
-    print('Test Accuracy of the model 0: %.2f' % accuracy_0)
-    print('Test Accuracy of the model 1: %.2f' % accuracy_1)
-    print('Test Accuracy of the model fused: %.2f' % accuracy_fused)
+    for i in range(len(models)):
+        print('Test Accuracy of the model %d: %.2f' % (i, results[i]))
+    print('Test Accuracy of the fused model: %.2f' % result_fused)
+
+    torch.save(fused_model.state_dict(), "result/model_fused_{}.pth".format(fused_model.name)) if args.save_result else None
 
 
 

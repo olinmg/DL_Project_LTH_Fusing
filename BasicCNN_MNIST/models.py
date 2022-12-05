@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 import torch.nn as nn
 from torch import optim
 from torch.autograd import Variable
-from parameters import get_parameters
+from parameters import get_parameters_models
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
@@ -58,9 +58,10 @@ def get_data_loaders(num_models):
 
 # 3. defining a basic CNN model
 class CNN(nn.Module):
-    def __init__(self):
+    def __init__(self, bias):
         super(CNN, self).__init__()
-        bias = True
+        self.name = "cnn"
+        self.bias = bias
         self.conv1 = nn.Sequential(         
             nn.Conv2d(
                 in_channels=1,              
@@ -68,19 +69,19 @@ class CNN(nn.Module):
                 kernel_size=5,              
                 stride=1,                   
                 padding=2,
-                bias = bias # Needs to change later!                  
+                bias = self.bias # Needs to change later!                  
                 ),                              
             nn.ReLU(),                      
             nn.MaxPool2d(kernel_size=2),    
         )
 
         self.conv2 = nn.Sequential(         
-            nn.Conv2d(16, 32, 5, 1, 2, bias=bias),     
+            nn.Conv2d(16, 32, 5, 1, 2, bias=self.bias),     
             nn.ReLU(),                      
             nn.MaxPool2d(2),          
         )
         # fully connected layer, output 10 classes
-        self.out = nn.Linear(32 * 7 * 7, 10, bias=bias)
+        self.out = nn.Linear(32 * 7 * 7, 10, bias=self.bias)
     
     def forward(self, x):
         x = self.conv1(x)
@@ -92,20 +93,21 @@ class CNN(nn.Module):
 
 # 3. defining a basic CNN model
 class MLP(nn.Module):
-    def __init__(self):
+    def __init__(self, bias):
         super(MLP, self).__init__()
-        bias = True 
+        self.name = "mlp"
+        self.bias = bias
 
         self.lin1 = nn.Sequential(
-            nn.Linear(28*28, 128, bias=bias),
+            nn.Linear(28*28, 128, bias=self.bias),
             nn.ReLU(),  
         )
         self.lin2 = nn.Sequential(
-            nn.Linear(128, 512, bias=bias),
+            nn.Linear(128, 512, bias=self.bias),
             nn.ReLU(),  
         )
         # fully connected layer, output 10 classes
-        self.out = nn.Linear(512, 10, bias=bias)
+        self.out = nn.Linear(512, 10, bias=self.bias)
     
     def forward(self, x):
 
@@ -171,22 +173,24 @@ def test(model, args):
     return accuracy_accumulated/total
 
 
-def get_model(model_name):
-    if model_name == "cnn":
-        return CNN()
-    elif model_name == "mlp":
-        return MLP()
+def get_model(args):
+    bias = not args.no_bias
+    if args.model_name == "cnn":
+        return CNN(bias)
+    elif args.model_name == "mlp":
+        return MLP(bias)
     else:
         print("Invalid model name. Using CNN instead.")
-        return CNN()
+        return CNN(bias)
 
 # 7. actually execute the training and testing
 if __name__ == '__main__':
-    args = get_parameters()
+    args = get_parameters_models()
     num_models = args.num_models
     loaders = get_data_loaders(num_models)
     
-    model_parent = get_model(args.model_name)
+    model_parent = get_model(args)
+    print("Creating {} models with bias set to {}".format(model_parent.name.upper(), not args.no_bias))
     for idx in range(num_models):
         model = copy.deepcopy(model_parent) if not args.diff_weight_init else get_model(args.model_name)
         if args.gpu_id != -1:
@@ -196,5 +200,5 @@ if __name__ == '__main__':
 
         print('Test Accuracy of the model %d: %.2f' % (idx, accuracy))
         # 8. store the trained model and performance
-        torch.save(model.state_dict(), "models/base_cnn_model_dict_weak_{}.pth".format(idx))
+        torch.save(model.state_dict(), "models/model_{}_{}.pth".format(model_parent.name, idx))
 

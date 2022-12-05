@@ -2,7 +2,7 @@ import itertools
 import torch
 import numpy as np
 import ot
-from base_convNN import CNN, get_model
+from models import get_model
 #from scipy.optimize import linear_sum_assignment # Could accomplish the same as OT with Hungarian Algorithm
 
 # get_histogram creates uniform historgram, i.e. [1/cardinality, 1/cardinality, ...]
@@ -30,13 +30,16 @@ def get_ground_metric(coordinates1, coordinates2, bias1, bias2):
         assert bias2 != None
         coordinates1 = torch.cat((coordinates1, bias1.view(bias1.shape[0], -1)), 1)
         coordinates2 = torch.cat((coordinates2, bias2.view(bias2.shape[0], -1)), 1)
+    else:
+        assert bias2 == None
+
     coordinates1 = normalize_vector(coordinates1)
     coordinates2 = normalize_vector(coordinates2)
     return compute_euclidian_distance_matrix(coordinates1, coordinates2)
 
 # create_network_from_params creates a network given the list of weights
 def create_network_from_params(args, param_list):
-    model = get_model(args.model_name)
+    model = get_model(args)
 
     assert len(list(model.parameters())) == len(param_list) # Assumption: We are fusing into a model of same architecture
 
@@ -54,137 +57,151 @@ def create_network_from_params(args, param_list):
 
     return model
 
+def update_iterators(iterators):
+    for iter in iterators:
+        next(iter)
+
+
 # fusion fuses two models with cost matrix based on weights, NOT ACTIVATIONS
 def fusion(networks, args, eps=1e-7):
-    assert len(networks) == 2 # Temporary assert. Later we can do more models
-
-    if args.gpu_id==-1:
-        device = torch.device('cpu')
-    else:
-        device = torch.device('cuda:{}'.format(args.gpu_id))
+    #assert len(networks) == 2 # Temporary assert. Later we can do more models
     
     num_layers = len(list(zip(networks[0].parameters(), networks[1].parameters())))
-    
+    num_models = args.num_models
 
     avg_aligned_layers = []
-    T_var = None
+    T_var_list = [None]*num_models
     bias = False
-    bias0_weight, bias1_weight = (None, None)
+    bias_weight = None
+    avg_bias_weight = None
+    layer_iters = [networks[i].named_parameters() for i in range(num_models)]
 
-    for idx, ((layer0_name, fc_layer0_weight), (layer1_name, fc_layer1_weight)) in \
-            enumerate(zip(networks[0].named_parameters(), networks[1].named_parameters())):
-        
+    for idx in range(num_layers):
         if bias:
             # If in the last layer we detected bias, this layer will be the bias layer we handled before, so we can just skip it
             bias=False
+            update_iterators(layer_iters)
             continue
-
-        # Check if this current layer has a bias
+        
         if (idx != num_layers-1):
-            next_layer0, next_layer1 = next(itertools.islice(networks[0].named_parameters(), idx+1, None)), next(itertools.islice(networks[1].named_parameters(), idx+1, None))
-            bias = True if "bias" in next_layer0[0] else False
-            bias0_weight, bias1_weight = (next_layer0[1], next_layer1[1]) if bias else (None, None)
+            bias = True if "bias" in next(itertools.islice(networks[0].named_parameters(), idx+1, None))[0] else False
+            avg_bias_weight = next(itertools.islice(networks[0].named_parameters(), idx+1, None))[1] if bias else None
         else:
             bias = False
-        
-        print("idx {} and layer {}".format(idx, layer0_name))
-        print("Bias: {}".format(bias))
-        assert fc_layer0_weight.shape == fc_layer1_weight.shape
+            avg_bias_weight = None
 
-        mu_cardinality = fc_layer0_weight.shape[0]
-        nu_cardinality = fc_layer1_weight.shape[0]
-
-        layer_shape = fc_layer0_weight.shape
-
-        if len(layer_shape) > 2:
-            is_conv = True
-            # For convolutional layers, it is (#out_channels, #in_channels, height, width)
-            # fc_layer0_weight_data has shape: (*out_channels, #in_channels, height*width)
-            fc_layer0_weight_data = fc_layer0_weight.data.view(fc_layer0_weight.shape[0], fc_layer0_weight.shape[1], -1)
-            fc_layer1_weight_data = fc_layer1_weight.data.view(fc_layer1_weight.shape[0], fc_layer1_weight.shape[1], -1)
-        else:
-            is_conv = False
-            fc_layer0_weight_data = fc_layer0_weight.data
-            fc_layer1_weight_data = fc_layer1_weight.data
-
-        if idx == 0:
-            if is_conv:
-                # input to ground_metric has shape: (#out_channels, #in_channels*height*width)
-                fc_layer0_flattened = fc_layer0_weight_data.view(fc_layer0_weight_data.shape[0], -1)
-                fc_layer1_flattened =fc_layer1_weight_data.view(fc_layer1_weight_data.shape[0], -1)
-                M = get_ground_metric(fc_layer0_flattened,
-                                fc_layer1_flattened, bias0_weight, bias1_weight)
-            else:
-                M = get_ground_metric(fc_layer0_weight_data, fc_layer1_weight_data, bias0_weight, bias1_weight)
-
-            aligned_wt = fc_layer0_weight_data
-        else:
-            if is_conv:
-                T_var_conv = T_var.unsqueeze(0).repeat(fc_layer0_weight_data.shape[2], 1, 1)
-                aligned_wt = torch.bmm(fc_layer0_weight_data.permute(2, 0, 1), T_var_conv).permute(1, 2, 0)
-                
-                M = get_ground_metric(
-                    aligned_wt.contiguous().view(aligned_wt.shape[0], -1),
-                    fc_layer1_weight_data.view(fc_layer1_weight_data.shape[0], -1), 
-                    bias0_weight, bias1_weight
-                )
-            else:
-                if fc_layer0_weight.data.shape[1] != T_var.shape[0]:
-                    # Handles the switch from convolutional layers to fc layers
-                    fc_layer0_unflattened = fc_layer0_weight.data.view(fc_layer0_weight.shape[0], T_var.shape[0], -1).permute(2, 0, 1)
-                    aligned_wt = torch.bmm(
-                        fc_layer0_unflattened,
-                        T_var.unsqueeze(0).repeat(fc_layer0_unflattened.shape[0], 1, 1)
-                    ).permute(1, 2, 0)
-                    aligned_wt = aligned_wt.contiguous().view(aligned_wt.shape[0], -1)
-
-                else:
-                    aligned_wt = torch.matmul(fc_layer0_weight.data, T_var)
-                M = get_ground_metric(aligned_wt, fc_layer1_weight, bias0_weight, bias1_weight)
-
-
+        avg_layer_name, avg_layer = next(layer_iters[0])
+        layer_shape = avg_layer.shape
+        mu_cardinality = avg_layer.shape[0]
         mu = get_histogram(mu_cardinality)
-        nu = get_histogram(nu_cardinality)
+        is_conv = len(layer_shape) > 2
 
-        cpuM = M.data.cpu().numpy() # POT does not accept array on GPU
-
-        T = ot.emd(mu, nu, cpuM)
-
-        if args.gpu_id!=-1:
-            T_var = torch.from_numpy(T).cuda(args.gpu_id).float()
-        else:
-            T_var = torch.from_numpy(T).float()
+        print("idx {} and layer {}".format(idx, avg_layer_name))
+        print("Bias: {}".format(bias))
         
+        
+        for idx_model in range(1, num_models): # We skip the first model because we align our models according to the first model
+            T_var = T_var_list[idx_model]
+            _, layer = next(layer_iters[idx_model])
 
-        # ----- Assumption: correction = TRUE, proper_marginals = FALSE ---------
-        if args.gpu_id != -1:
-            marginals = torch.ones(T_var.shape[0]).cuda(args.gpu_id) / T_var.shape[0]
-        else:
-            marginals = torch.ones(T_var.shape[0]) / T_var.shape[0]
-        marginals = torch.diag(1.0/(marginals + eps))  # take inverse
-        T_var = torch.matmul(T_var, marginals)
+            bias_weight = next(itertools.islice(networks[idx_model].named_parameters(), idx+1, None))[1] if bias else None
 
-        # -----------------------------------------------------------------------
 
-        # ---- Assumption: Past correction = True (Anything else doesn't really make sense?)
-        t_fc0_model = torch.matmul(T_var.t(), aligned_wt.contiguous().view(aligned_wt.shape[0], -1))
+            assert avg_layer.shape == layer.shape
 
-        # ---------------------------------------------------------------------------------
-        # t_fc0_model corresponds to aligned weights according to weights of model 1
+            nu_cardinality = layer.shape[0]
 
-        # Averaging of aligned weights (Could potentially also favor one model over the other)
-        geometric_fc = (t_fc0_model+ fc_layer1_weight_data.view(fc_layer1_weight_data.shape[0], -1))/2
+            if is_conv:
+                # For convolutional layers, it is (#out_channels, #in_channels, height, width)
+                # fc_layer0_weight_data has shape: (*out_channels, #in_channels, height*width)
+                avg_layer_data = avg_layer.data.view(avg_layer.shape[0], avg_layer.shape[1], -1)
+                layer_data = layer.data.view(layer.shape[0], layer.shape[1], -1)
+            else:
+                avg_layer_data = avg_layer.data
+                layer_data = layer.data
 
-        if is_conv and layer_shape != geometric_fc.shape:
-            geometric_fc = geometric_fc.view(layer_shape)
+            if idx == 0:
+                if is_conv:
+                    # input to ground_metric has shape: (#out_channels, #in_channels*height*width)
+                    avg_layer_flattened = avg_layer_data.view(avg_layer_data.shape[0], -1)
+                    layer_flattened = layer_data.view(layer_data.shape[0], -1)
+                    M = get_ground_metric(layer_flattened,avg_layer_flattened, bias_weight, avg_bias_weight)
+                else:
+                    M = get_ground_metric(layer_data, avg_layer_data, bias_weight, avg_bias_weight)
 
-        avg_aligned_layers.append(geometric_fc)
+                aligned_wt = layer_data
+            else:
+                if is_conv:
+                    T_var_conv = T_var.unsqueeze(0).repeat(layer_data.shape[2], 1, 1)
+                    aligned_wt = torch.bmm(layer_data.permute(2, 0, 1), T_var_conv).permute(1, 2, 0)
+                    
+                    M = get_ground_metric(
+                        aligned_wt.contiguous().view(aligned_wt.shape[0], -1),
+                        avg_layer_data.view(avg_layer_data.shape[0], -1), 
+                        bias_weight, avg_bias_weight
+                    )
+                else:
+                    if layer.data.shape[1] != T_var.shape[0]:
+                        # Handles the switch from convolutional layers to fc layers
+                        layer_unflattened = layer.data.view(layer.shape[0], T_var.shape[0], -1).permute(2, 0, 1)
+                        aligned_wt = torch.bmm(
+                            layer_unflattened,
+                            T_var.unsqueeze(0).repeat(layer_unflattened.shape[0], 1, 1)
+                        ).permute(1, 2, 0)
+                        aligned_wt = aligned_wt.contiguous().view(aligned_wt.shape[0], -1)
+
+                    else:
+                        aligned_wt = torch.matmul(layer, T_var)
+                    M = get_ground_metric(aligned_wt, avg_layer.data, bias_weight, avg_bias_weight)
+            
+            nu = get_histogram(nu_cardinality)
+
+            cpuM = M.data.cpu().numpy() # POT does not accept array on GPU
+
+            T = ot.emd(mu, nu, cpuM)
+
+            if args.gpu_id!=-1:
+                T_var = torch.from_numpy(T).cuda(args.gpu_id).float()
+            else:
+                T_var = torch.from_numpy(T).float()
+            
+            # ----- Assumption: correction = TRUE, proper_marginals = FALSE ---------
+            if args.gpu_id != -1:
+                marginals = torch.ones(T_var.shape[0]).cuda(args.gpu_id) / T_var.shape[0]
+            else:
+                marginals = torch.ones(T_var.shape[0]) / T_var.shape[0]
+            marginals = torch.diag(1.0/(marginals + eps))  # take inverse
+            T_var = torch.matmul(T_var, marginals)
+
+            # -----------------------------------------------------------------------
+
+            # ---- Assumption: Past correction = True (Anything else doesn't really make sense?)
+            t_model = torch.matmul(T_var.t(), aligned_wt.contiguous().view(aligned_wt.shape[0], -1))
+
+            # ---------------------------------------------------------------------------------
+            # t_model corresponds to aligned weights according to weights of model 1
+
+            # Averaging of aligned weights (Could potentially also favor one model over the other)
+            avg_layer = (t_model + avg_layer_data.view(avg_layer_data.shape[0], -1)*idx_model)/(idx_model+1)
+
+            if is_conv and layer_shape != avg_layer.shape:
+                avg_layer = avg_layer.view(layer_shape)
+
+            if bias:
+                t_bias_aligned = torch.matmul(T_var.t(), bias_weight.view(bias_weight.shape[0], -1)).flatten()
+                avg_bias_weight = (t_bias_aligned + avg_bias_weight*idx_model)/(idx_model+1)
+
+            T_var_list[idx_model] = T_var
+        
+        avg_aligned_layers.append(avg_layer)
         if bias:
-            t_bias_aligned = torch.matmul(T_var.t(), bias0_weight.view(bias0_weight.shape[0], -1)).flatten()
-            geometric_bias = (t_bias_aligned + bias1_weight)/2
-            avg_aligned_layers.append(geometric_bias)
+            avg_aligned_layers.append(avg_bias_weight)
+        
+        cpuM = None 
+        M = None
+        T = None
+        avg_layer_data = None 
+        layer_data = None
 
-    
     return create_network_from_params(args, avg_aligned_layers)
-
 
