@@ -30,3 +30,14 @@ Trained networks have to be in the models folder.
 ```
 python main.py --num-models 2 --gpu-id 0 --model-name cnn
 ```
+
+### Sample workflow for fusing two MLPs
+1. Train two MLPs. The result will be saved in the models folder.
+```
+python base_convNN.py --num-models 2 --gpu-id 0 --model-name mlp
+```
+
+2. Fuse two MLPs. The accuracy of the individual models and the fused model will be printed to the terminal.
+```
+python main.py --num-models 2 --gpu-id 0 --model-name mlp
+```
