@@ -16,6 +16,9 @@ model.load_state_dict(torch.load(MODEL_FILE_NAME))
 model.eval()
 
 
+### TO-DO:
+### RETURN MODEL
+### RETRAIN AFTER PRUNING IN EACH STEP
 
 def prune_unstructured(net, prune_type, amount=0.2):
     parameters_to_prune = []
@@ -51,7 +54,10 @@ def prune_unstructured(net, prune_type, amount=0.2):
         raise ValueError("Prune type not supported")
 
 
-def prune_structured(net, example_inputs, out_features, prune_type, total_steps=5):
+#Example inputs: any inputs of the correct shape
+#Out features: the number of output features of the model
+#Train fct: a function that takes the model and the data loaders as input and trains the model
+def prune_structured(net, example_inputs, out_features, prune_type, total_steps=3, train_fct = None):
 
 
     ori_size = tp.utils.count_params(net)
@@ -94,8 +100,8 @@ def prune_structured(net, example_inputs, out_features, prune_type, total_steps=
         ch_sparsity=0.5, # channel sparsity
         ignored_layers=ignored_layers, # ignored_layers will not be pruned
     )
-
     for i in range(total_steps): # iterative pruning
+        print(i)
         pruner.step()
         print(
             "  Params: %.2f M => %.2f M"
@@ -103,11 +109,23 @@ def prune_structured(net, example_inputs, out_features, prune_type, total_steps=
         )
 
         #Potentially retrain the model
+        #The train function is a function that takes the model and does the training on it.
+        #It probably calls other training functions
+
+        if train_fct is not None:
+            train_fct(model)
+
+    #The model is returned, but the pruning is done in situ...
+    return model
+
 
 
 def test2():
 
     example_inputs = torch.randn(1,1, 28,28)
-    print(model(example_inputs))
-    prune_structured(model, example_inputs, 10, 'random', 0.2)
-    print(model)
+    print(model, tp.utils.count_params(model))
+    prune_structured(model, example_inputs, 10, 'random', 4)
+    print(model, tp.utils.count_params(model))
+
+
+
