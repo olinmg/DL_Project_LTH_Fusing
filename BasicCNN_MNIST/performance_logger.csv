@@ -1,0 +1,7 @@
+experiment_name;nn_description;data_description;pruning_description,fusion_description;original_network_performances;pruned_networks_performance;fused_network_performance;PaF_performance;FaP_performance
+;Two simple ConvNN implemented in CNN();MNIST;;;[0.9873999999999994, 0.9873999999999994];;;;
+original_test_manager;Two simple ConvNN implemented in CNN();MNIST;;;[0.9873999999999994, 0.9873999999999995];;;;
+fusion_test_manager;Two simple ConvNN implemented in CNN();MNIST;;First Fusion;;;0.9873999999999995;;
+FaP_test_manager;Two simple ConvNN implemented in CNN();MNIST;Unstructured Pruning:amount=0.2,prune_type=l1;First Fusion;;;0.9873999999999994;;0.9872999999999997
+fusion_test_manager;Two simple ConvNN implemented in CNN();MNIST;;First Fusion;;;0.9873999999999993;;
+FaP_test_manager;Two simple ConvNN implemented in CNN();MNIST;Unstructured Pruning:amount=0.2,prune_type=l1;First Fusion;;;0.9873999999999999;;0.9872999999999995

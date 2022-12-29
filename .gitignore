@@ -2,3 +2,4 @@
 __pycache__/
 *.py[cod]
 *$py.class
+BasicCNN_MNIST/data/cifar-10-python.tar.gz
