@@ -172,15 +172,13 @@ def PaF_test_manager(input_model_list, loaders, args, pruning_function, fusion_f
     pruned_models_accuracies = []
     for i, input_model in enumerate(input_model_list):
         input_model_copy = copy.deepcopy(input_model)
-        pruned_model, description_pruning = pruning_function(input_model=input_model_copy, para_dict=para_dict) #fuses in place
-        pruned_models.append(pruned_model)
-        acc_model_pruned = eval_function(input_model=pruned_model, loaders=loaders, args=args, para_dict=para_dict)
+        _, description_pruning = pruning_function(input_model=input_model_copy, para_dict=para_dict) #prunes in place
+        pruned_models.append(input_model_copy)
+        acc_model_pruned = eval_function(input_model=input_model_copy, loaders=loaders, args=args, para_dict=para_dict)
         pruned_models_accuracies.append(acc_model_pruned)
         print(f"Model {i} pruned:\t{acc_model_pruned}")
 
     # 2. Do a fusion of the pruned networks
-    print(type(pruned_models))
-    print(pruned_models)
     fused_model, description_fusion = fusion_function(pruned_models, args, para_dict)
     acc_model_fused = eval_function(input_model=fused_model, loaders=loaders, args=args, para_dict=para_dict)
     print(f"PaF model:\t{acc_model_fused}")
@@ -233,7 +231,7 @@ def wrapper_unstructured_pruning(input_model, para_dict):
     prune_type = para_dict.get("prune_type")
 
     # following does the actual pruning in place
-    prune_unstructured(net=input_model,amount=amount, prune_type=prune_type)
+    prune_unstructured(net=input_model, amount=amount, prune_type=prune_type)
     description = {"name": "Unstructured Pruning", "amount": amount, "prune_type":prune_type}
     return input_model, description
 
@@ -435,17 +433,22 @@ if __name__ == '__main__':
     # Setting the parameters of the pruning/fusion/evaluation functions
     amounts = [0.2, 0.3]
     prune_types = ["l1", "random"]
-    eps = [1e-9]
+    eps = [1e-7]
 
     # They are all collected in the para_dict. The wrapper function of a pruning/fusion/evaluation function handles the handover. 
     para_dict = {"amount": amounts[0], "prune_type": prune_types[0]}
 
     # What functions to use in the process of pruning and fusion
     pretrained_cnn_model_2 = copy.deepcopy(pretrained_cnn_model)
-    input_model_list_basic = [pretrained_cnn_model, pretrained_cnn_model_2]
-    input_model_list_resnet = [pretrained_resnet_model]
-    #fusion_function = wrapper_fake_fusion
-    fusion_function = wrapper_first_fusion
+    input_model_list_cnn = [pretrained_cnn_model, pretrained_cnn_model_2]
+    
+    pretrained_mlp_model_2 = copy.deepcopy(pretrained_mlp_model)
+    input_model_list_mlp = [pretrained_mlp_model, pretrained_mlp_model_2]
+
+    pretrained_resnet_model_2 = copy.deepcopy(pretrained_resnet_model)
+    input_model_list_resnet = [pretrained_resnet_model, pretrained_resnet_model_2]
+    fusion_function = wrapper_fake_fusion
+    #fusion_function = wrapper_first_fusion
     pruning_function = wrapper_unstructured_pruning
     # pruning_function = wrapper_structured_pruning      # still need to implement the structured pruning function
 
@@ -459,8 +462,8 @@ if __name__ == '__main__':
     #                                                eval_function=eval_function, para_dict=para_dict)
 
     experiment_parameters = {"nn_description":"Two simple ConvNN implemented in CNN()", 
-                            "data_description": "MNIST",
-                            "input_model_list":input_model_list_basic,
+                            "data_description":"MNIST",
+                            "input_model_list":input_model_list_mlp,
                             "loaders":loaders_mnist,
                             "args":args,
                             "pruning_function":pruning_function,
@@ -468,29 +471,49 @@ if __name__ == '__main__':
                             "eval_function":eval_function,
                             "para_dict":para_dict}
 
+    # PROBLEMS:
+    # CNN: PaF
+    # MLP: PaF
+
+    # Problem fixes:
+    # Mistake 1: parameters.py is set to return the wrong "model_name" (cnn vs mlp)
     
     experiment_to_execute = PaF_test_manager
-    result_str_original, partial_models, overall_model = create_csv_entry_from_experiment(experiment_to_execute, experiment_parameters)
-    add_experiment_to_csv(result_str_original)
-    print(result_str_original)
-
-    experiment_to_execute = fusion_test_manager
     result_str, partial_models, overall_model = create_csv_entry_from_experiment(experiment_to_execute, experiment_parameters)
     add_experiment_to_csv(result_str)
     print(result_str)
     
+    experiment_to_execute = fusion_test_manager
+    result_str, partial_models, overall_model = create_csv_entry_from_experiment(experiment_to_execute, experiment_parameters)
+    add_experiment_to_csv(result_str)
+    print(result_str)
+
+    experiment_to_execute = pruning_test_manager
+    result_str_original, partial_models, overall_model = create_csv_entry_from_experiment(experiment_to_execute, experiment_parameters)
+    add_experiment_to_csv(result_str_original)
+    print(result_str_original)
+    
+    experiment_to_execute = FaP_test_manager
+    result_str, partial_models, overall_model = create_csv_entry_from_experiment(experiment_to_execute, experiment_parameters)
+    add_experiment_to_csv(result_str)
+    print(result_str)
+
+    experiment_to_execute = PaF_test_manager
+    result_str, partial_models, overall_model = create_csv_entry_from_experiment(experiment_to_execute, experiment_parameters)
+    add_experiment_to_csv(result_str)
+    print(result_str)
+
+    
     print("INTERESTING STUFF DONE!")
-
-    print(type(input_model_list_basic))
-    print(input_model_list_basic)
-
-    fusion(networks=input_model_list_basic, args=args) # this does not throw an error -> there needs to be a bug in my calling the fusion function!
+    
+    fusion(input_model_list_mlp, args, eps=1e-7)
 
     print("ConvNN - Eval PaF")
     del experiment_parameters["nn_description"]
     del experiment_parameters["data_description"]
 
-    pruned_models, PaF_model, pruned_models_accs, PaF_model_acc, description_pruning, description_fusion = fusion_test_manager(**experiment_parameters)
+
+    pruned_models, PaF_model, pruned_models_accs, PaF_model_acc, description_pruning, description_fusion = PaF_test_manager(**experiment_parameters)
     
     print("ConvNN - Eval FaP")
     fused_model, FaP_model, fused_model_acc, FaP_model_acc, description_fusion, description_pruning = FaP_test_manager(**experiment_parameters)

@@ -5,3 +5,29 @@ fusion_test_manager;Two simple ConvNN implemented in CNN();MNIST;;First Fusion;;
 FaP_test_manager;Two simple ConvNN implemented in CNN();MNIST;Unstructured Pruning:amount=0.2,prune_type=l1;First Fusion;;;0.9873999999999994;;0.9872999999999997
 fusion_test_manager;Two simple ConvNN implemented in CNN();MNIST;;First Fusion;;;0.9873999999999993;;
 FaP_test_manager;Two simple ConvNN implemented in CNN();MNIST;Unstructured Pruning:amount=0.2,prune_type=l1;First Fusion;;;0.9873999999999999;;0.9872999999999995
+PaF_test_manager;Two simple ConvNN implemented in CNN();MNIST;Unstructured Pruning:amount=0.2,prune_type=l1;Fake fusion, no paras.;;[0.9872999999999993, 0.9872999999999996];;0.9872999999999995;
+original_test_manager;Two simple MLPs implemented in MLP();MNIST;;;[0.970099999999999, 0.9700999999999995];;;;
+original_test_manager;Two simple MLPs implemented in MLP();MNIST;;;[0.9700999999999991, 0.9700999999999995];;;;
+original_test_manager;Two simple MLPs implemented in MLP();MNIST;;;[0.9700999999999992, 0.9700999999999991];;;;
+fusion_test_manager;Two simple MLPs implemented in MLP();MNIST;;First Fusion;;;0.9700999999999993;;
+fusion_test_manager;Two simple MLPs implemented in MLP();MNIST;;First Fusion;;;0.9701;;
+pruning_test_manager;Two simple MLPs implemented in MLP();MNIST;Unstructured Pruning:amount=0.2,prune_type=l1;;;[0.9872999999999996, 0.9872999999999996];;;
+original_test_manager;Two simple MLPs implemented in MLP();MNIST;;;[0.9873999999999991, 0.9873999999999995];;;;
+original_test_manager;Two simple MLPs implemented in MLP();MNIST;;;[0.9873999999999994, 0.9873999999999994];;;;
+fusion_test_manager;Two simple MLPs implemented in MLP();MNIST;;First Fusion;;;0.9873999999999996;;
+pruning_test_manager;Two simple MLPs implemented in MLP();MNIST;Unstructured Pruning:amount=0.2,prune_type=l1;;;[0.9872999999999991, 0.9872999999999996];;;
+FaP_test_manager;Two simple MLPs implemented in MLP();MNIST;Unstructured Pruning:amount=0.2,prune_type=l1;First Fusion;;;0.9873999999999994;;0.9872999999999991
+original_test_manager;Two simple MLPs implemented in MLP();MNIST;;;[0.9700999999999991, 0.9700999999999995];;;;
+fusion_test_manager;Two simple MLPs implemented in MLP();MNIST;;First Fusion;;;0.9700999999999993;;
+original_test_manager;Two simple MLPs implemented in MLP();MNIST;;;[0.9700999999999993, 0.9701];;;;
+fusion_test_manager;Two simple MLPs implemented in MLP();MNIST;;First Fusion;;;0.9700999999999996;;
+pruning_test_manager;Two simple MLPs implemented in MLP();MNIST;Unstructured Pruning:amount=0.2,prune_type=l1;;;[0.9702999999999996, 0.9702999999999993];;;
+FaP_test_manager;Two simple MLPs implemented in MLP();MNIST;Unstructured Pruning:amount=0.2,prune_type=l1;First Fusion;;;0.9700999999999997;;0.9702999999999998
+FaP_test_manager;Two simple ConvNN implemented in CNN();MNIST;Unstructured Pruning:amount=0.2,prune_type=l1;First Fusion;;;0.9873999999999998;;0.9875999999999994
+original_test_manager;Two simple ConvNN implemented in CNN();MNIST;;;[0.9700999999999997, 0.9700999999999993];;;;
+fusion_test_manager;Two simple ConvNN implemented in CNN();MNIST;;Fake fusion, no paras.;;;0.9700999999999993;;
+PaF_test_manager;Two simple ConvNN implemented in CNN();MNIST;Unstructured Pruning:amount=0.2,prune_type=l1;Fake fusion, no paras.;;[0.9702999999999993, 0.9702999999999996];;0.9702999999999996;
+fusion_test_manager;Two simple ConvNN implemented in CNN();MNIST;;Fake fusion, no paras.;;;0.9700999999999995;;
+pruning_test_manager;Two simple ConvNN implemented in CNN();MNIST;Unstructured Pruning:amount=0.2,prune_type=l1;;;[0.9702999999999993, 0.9702999999999993];;;
+FaP_test_manager;Two simple ConvNN implemented in CNN();MNIST;Unstructured Pruning:amount=0.2,prune_type=l1;Fake fusion, no paras.;;;0.9700999999999995;;0.9702999999999997
+PaF_test_manager;Two simple ConvNN implemented in CNN();MNIST;Unstructured Pruning:amount=0.2,prune_type=l1;Fake fusion, no paras.;;[0.9702999999999998, 0.9702999999999995];;0.9702999999999998;

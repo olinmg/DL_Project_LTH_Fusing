@@ -22,8 +22,9 @@ model.eval()
 
 def prune_unstructured(net, prune_type, amount=0.2):
     parameters_to_prune = []
-    for _q, module in net.named_modules():
-            if isinstance(module, nn.Conv2d):
+    for _q, module in net.named_modules() :
+            # TODO: Attention! Here all the layer-types that are contained in the networks should be contained
+            if isinstance(module, nn.Conv2d) or isinstance(module, nn.Linear):
                 parameters_to_prune.append((module, 'weight'))
 
     if prune_type == 'random':
