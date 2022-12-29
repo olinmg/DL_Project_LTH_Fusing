@@ -31,3 +31,9 @@ fusion_test_manager;Two simple ConvNN implemented in CNN();MNIST;;Fake fusion, n
 pruning_test_manager;Two simple ConvNN implemented in CNN();MNIST;Unstructured Pruning:amount=0.2,prune_type=l1;;;[0.9702999999999993, 0.9702999999999993];;;
 FaP_test_manager;Two simple ConvNN implemented in CNN();MNIST;Unstructured Pruning:amount=0.2,prune_type=l1;Fake fusion, no paras.;;;0.9700999999999995;;0.9702999999999997
 PaF_test_manager;Two simple ConvNN implemented in CNN();MNIST;Unstructured Pruning:amount=0.2,prune_type=l1;Fake fusion, no paras.;;[0.9702999999999998, 0.9702999999999995];;0.9702999999999998;
+PaF_test_manager;Two simple ConvNN implemented in CNN();MNIST;Unstructured Pruning:amount=0.2,prune_type=l1;Fake fusion, no paras.;;[0.9702999999999995, 0.9702999999999998];;0.9703000000000002;
+pruning_test_manager;Two simple ConvNN implemented in CNN();MNIST;Structured Pruning:num_epochs=1,prune_type=random;;;[0.9529000000000003, 0.9594999999999998];;;
+pruning_test_manager;Two simple ConvNN implemented in CNN();MNIST;Structured Pruning:num_epochs=1,prune_type=random;;;[0.9634999999999995, 0.9535999999999999];;;
+fusion_test_manager;Two simple ConvNN implemented in CNN();MNIST;;First Fusion;;;0.9700999999999997;;
+pruning_test_manager;Two simple ConvNN implemented in CNN();MNIST;Structured Pruning:num_epochs=1,prune_type=random;;;[0.9599999999999997, 0.9565];;;
+FaP_test_manager;Two simple ConvNN implemented in CNN();MNIST;Structured Pruning:num_epochs=1,prune_type=random;First Fusion;;;0.9700999999999997;;0.9577000000000002

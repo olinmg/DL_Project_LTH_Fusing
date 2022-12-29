@@ -1,6 +1,6 @@
 import torch
 from parameters import get_parameters
-from pruning import prune_unstructured
+from pruning_modified import prune_unstructured
 #import main #from main import get_data_loader, test
 from base_convNN import CNN, MLP
 from torchvision import datasets
@@ -215,7 +215,7 @@ def description_to_label(dict):
 
 
 ################################### THIS IS WHAT NEEDS TO BE IMPLEMENTED TO MAKE USE OF THE PERFORMANCE EVALUATION FUNCTIONS ####################################
-from pruning import prune_unstructured
+from pruning_modified import prune_unstructured
 def wrapper_unstructured_pruning(input_model, para_dict):
     '''
     This is an example for how a pruning function should be build. It takes a single model and a dictionary of parameters (para_dict).
@@ -236,13 +236,88 @@ def wrapper_unstructured_pruning(input_model, para_dict):
     return input_model, description
 
 
+############################ WORK IN PROGRESS - STRUCTURED PRUNING ##########################
+from torch import optim
+from torch.autograd import Variable
+import torch.nn as nn
+def train_during_pruning(model, loaders, num_epochs, args):
+    '''
+    Has to be a function that loads a dataset. 
+
+    A given model and an amount of epochs of training will be given.
+    '''
+
+    loss_func = nn.CrossEntropyLoss()   
+    optimizer = optim.Adam(model.parameters(), lr = 0.01)
+    model.train()
+        
+    # Train the model
+    total_step = len(loaders['train'])
+        
+    val_acc_per_epoch = []
+    for epoch in range(num_epochs):
+        for i, (images, labels) in enumerate(loaders['train']):
+            if args.gpu_id != -1:
+                images, labels = images.cuda(), labels.cuda()
+            # gives batch data, normalize x when iterate train_loader
+            b_x = Variable(images)   # batch x
+            b_y = Variable(labels)   # batch y
+
+            predictions, _ = model(b_x)
+            loss = loss_func(predictions, b_y)
+            
+            # clear gradients for this training step   
+            optimizer.zero_grad()           
+            
+            # backpropagation, compute gradients 
+            loss.backward()    
+            # apply gradients             
+            optimizer.step()                
+            
+            if (i+1) % 100 == 0:
+                print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'.format(epoch + 1, num_epochs, i + 1, total_step, loss.item()))
+        
+        this_epoch_acc = evaluate_performance_simple(input_model=model, loaders=loaders, args=args, para_dict={})
+        val_acc_per_epoch.append(this_epoch_acc)
+    return model, val_acc_per_epoch
+
+
+from pruning_modified import prune_structured
 def wrapper_structured_pruning(input_model, para_dict):
     '''
     A function that makes the structured pruning function available.
 
     Special: it needs to provide a "retrain function" as parameter to the structured pruning function. 
     '''
-    pass
+
+    assert "loaders" in para_dict.keys()
+    assert "num_epochs" in para_dict.keys()
+    assert "args" in para_dict.keys()
+    assert "example_input" in para_dict.keys()
+    assert "out_features" in para_dict.keys()
+    assert "prune_type" in para_dict.keys()
+
+
+    loaders = para_dict.get("loaders")
+    num_epochs = para_dict.get("num_epochs")
+    args = para_dict.get("args")
+    example_input = para_dict.get("example_input")
+    out_features = para_dict.get("out_features")
+    prune_type = para_dict.get("prune_type")
+
+    if "total_steps" in para_dict.keys():
+        total_steps = para_dict.get("total_steps")
+        pruned_model = prune_structured(net=input_model, loaders=loaders, num_epochs=num_epochs, args=args, example_inputs=example_input,
+                    out_features=out_features, prune_type=prune_type, total_steps=total_steps, train_fct=train_during_pruning)
+    else:
+        pruned_model = prune_structured(net=input_model, loaders=loaders, num_epochs=num_epochs, args=args, example_inputs=example_input,
+                    out_features=out_features, prune_type=prune_type, train_fct=train_during_pruning)
+
+    description = {"name": "Structured Pruning", "num_epochs": num_epochs, "prune_type":prune_type}
+
+    return pruned_model, description
+########################################################################################
+
 
 
 def wrapper_fake_fusion(list_of_models, args, para_dict):
@@ -404,7 +479,7 @@ def add_experiment_to_csv(result_string, FILE_PATH = "performance_logger.csv"):
         with open("./"+FILE_PATH,'a') as logger:
             logger.write(result_string+"\n")
 
-
+############################ TRYING TO USE THE PERFORMANCE ASSESSMENT CODE #######################
 
 from base_resNet import get_untrained_resnet
 
@@ -436,7 +511,9 @@ if __name__ == '__main__':
     eps = [1e-7]
 
     # They are all collected in the para_dict. The wrapper function of a pruning/fusion/evaluation function handles the handover. 
-    para_dict = {"amount": amounts[0], "prune_type": prune_types[0]}
+    para_dict = {"amount": amounts[0], "prune_type": prune_types[1], "num_epochs": 1, "args": args, 
+                "example_input": torch.randn(1,1, 28,28),
+                "out_features": 10, "loaders": loaders_mnist}
 
     # What functions to use in the process of pruning and fusion
     pretrained_cnn_model_2 = copy.deepcopy(pretrained_cnn_model)
@@ -447,10 +524,10 @@ if __name__ == '__main__':
 
     pretrained_resnet_model_2 = copy.deepcopy(pretrained_resnet_model)
     input_model_list_resnet = [pretrained_resnet_model, pretrained_resnet_model_2]
-    fusion_function = wrapper_fake_fusion
-    #fusion_function = wrapper_first_fusion
-    pruning_function = wrapper_unstructured_pruning
-    # pruning_function = wrapper_structured_pruning      # still need to implement the structured pruning function
+    #fusion_function = wrapper_fake_fusion
+    fusion_function = wrapper_first_fusion
+    #pruning_function = wrapper_unstructured_pruning
+    pruning_function = wrapper_structured_pruning      # still need to implement the structured pruning function
 
     eval_function = evaluate_performance_simple
 
@@ -461,15 +538,15 @@ if __name__ == '__main__':
     #original_model_accuracies = original_test_manager(input_model_list=input_model_list_resnet, loaders=loaders_cifar, args=args,
     #                                                eval_function=eval_function, para_dict=para_dict)
 
-    experiment_parameters = {"nn_description":"Two simple ConvNN implemented in CNN()", 
-                            "data_description":"MNIST",
-                            "input_model_list":input_model_list_mlp,
-                            "loaders":loaders_mnist,
-                            "args":args,
-                            "pruning_function":pruning_function,
-                            "fusion_function":fusion_function,
-                            "eval_function":eval_function,
-                            "para_dict":para_dict}
+    experiment_parameters = {"nn_description": "Two simple ConvNN implemented in CNN()", 
+                            "data_description": "MNIST",
+                            "input_model_list": input_model_list_mlp,
+                            "loaders": loaders_mnist,
+                            "args": args,
+                            "pruning_function": pruning_function,
+                            "fusion_function": fusion_function,
+                            "eval_function": eval_function,
+                            "para_dict": para_dict}
 
     # PROBLEMS:
     # CNN: PaF
@@ -478,7 +555,7 @@ if __name__ == '__main__':
     # Problem fixes:
     # Mistake 1: parameters.py is set to return the wrong "model_name" (cnn vs mlp)
     
-    experiment_to_execute = PaF_test_manager
+    experiment_to_execute = pruning_test_manager
     result_str, partial_models, overall_model = create_csv_entry_from_experiment(experiment_to_execute, experiment_parameters)
     add_experiment_to_csv(result_str)
     print(result_str)

@@ -58,7 +58,7 @@ def prune_unstructured(net, prune_type, amount=0.2):
 #Example inputs: any inputs of the correct shape
 #Out features: the number of output features of the model
 #Train fct: a function that takes the model and the data loaders as input and trains the model
-def prune_structured(net, example_inputs, out_features, prune_type, total_steps=3, train_fct = None):
+def prune_structured(net, loaders, num_epochs, args, example_inputs, out_features, prune_type, total_steps=3, train_fct=None):
 
 
     ori_size = tp.utils.count_params(net)
@@ -87,7 +87,7 @@ def prune_structured(net, example_inputs, out_features, prune_type, total_steps=
 
 
     ignored_layers = []
-
+    model = net #Correct????
     for m in model.modules():
         if isinstance(m, torch.nn.Linear) and m.out_features == out_features:
             ignored_layers.append(m)
@@ -114,10 +114,56 @@ def prune_structured(net, example_inputs, out_features, prune_type, total_steps=
         #It probably calls other training functions
 
         if train_fct is not None:
-            train_fct(model)
+            model, val_acc_per_epoch = train_fct(model, loaders, num_epochs, args)
 
     #The model is returned, but the pruning is done in situ...
     return model
+
+
+
+from torch.autograd import Variable
+from torch import optim
+
+def train_during_pruning(model, loaders, num_epochs, args):
+    '''
+    Has to be a function that loads a dataset. 
+
+    A given model and an amount of epochs of training will be given.
+    '''
+
+    loss_func = nn.CrossEntropyLoss()   
+    optimizer = optim.Adam(model.parameters(), lr = 0.01)
+    model.train()
+        
+    # Train the model
+    total_step = len(loaders['train'])
+        
+    val_acc_per_epoch = []
+    for epoch in range(num_epochs):
+        for i, (images, labels) in enumerate(loaders['train']):
+            if args.gpu_id != -1:
+                images, labels = images.cuda(), labels.cuda()
+            # gives batch data, normalize x when iterate train_loader
+            b_x = Variable(images)   # batch x
+            b_y = Variable(labels)   # batch y
+
+            predictions = model(b_x)
+            loss = loss_func(predictions, b_y)
+            
+            # clear gradients for this training step   
+            optimizer.zero_grad()           
+            
+            # backpropagation, compute gradients 
+            loss.backward()    
+            # apply gradients             
+            optimizer.step()                
+            
+            if (i+1) % 100 == 0:
+                print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'.format(epoch + 1, num_epochs, i + 1, total_step, loss.item()))
+        
+        this_epoch_acc = evaluate_performance_simple(input_model=model, loaders=loaders, args=args, para_dict={})
+        val_acc_per_epoch.append(this_epoch_acc)
+    return model, val_acc_per_epoch
 
 
 

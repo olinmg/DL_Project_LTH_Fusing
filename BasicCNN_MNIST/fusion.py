@@ -17,6 +17,8 @@ def normalize_vector(coordinates, eps=1e-9):
 def compute_euclidian_distance_matrix(x, y, p=2, squared=True): # For some reason TA prefers squared to be True
     x_col = x.unsqueeze(1)
     y_lin = y.unsqueeze(0)
+    print(x_col)
+    print(y_lin)
     c = torch.sum((torch.abs(x_col - y_lin)) ** p, 2)
     if not squared:
         c = c ** (1/2)
