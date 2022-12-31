@@ -3,10 +3,12 @@ import torch
 from sklearn.model_selection import train_test_split
 from torchvision import datasets
 from torchvision.transforms import ToTensor
+from torchvision import models
 from torch.utils.data import DataLoader
 import torch.nn as nn
 from torch import optim
 from torch.autograd import Variable
+from vgg import vgg11, vgg13
 from parameters import get_parameters
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -41,9 +43,9 @@ loaders = {
 }
 
 # returns the DataLoader for test and train data, where the train data is split into the amount of models specified
-def get_data_loaders(num_models):
+def get_data_loaders(num_models, args):
     fraction = 1/num_models
-    train_data_split = torch.utils.data.random_split(train_data, [fraction]*num_models)
+    train_data_split = torch.utils.data.random_split(train_data, [fraction]*num_models) if not args.diff_weight_init else [train_data]*num_models
     
     return {
         "train": [torch.utils.data.DataLoader(train_data_subset, 
@@ -92,20 +94,20 @@ class CNN(nn.Module):
 
 # 3. defining a basic CNN model
 class MLP(nn.Module):
-    def __init__(self):
+    def __init__(self, sparsity=1.0):
         super(MLP, self).__init__()
         bias = True 
-
+        self.sparsity=sparsity
         self.lin1 = nn.Sequential(
-            nn.Linear(28*28, 128, bias=bias),
+            nn.Linear(28*28, int(128*self.sparsity), bias=bias),
             nn.ReLU(),  
         )
         self.lin2 = nn.Sequential(
-            nn.Linear(128, 512, bias=bias),
+            nn.Linear(int(128*self.sparsity), int(512*self.sparsity), bias=bias),
             nn.ReLU(),  
         )
         # fully connected layer, output 10 classes
-        self.out = nn.Linear(512, 10, bias=bias)
+        self.out = nn.Linear(int(512*self.sparsity), 10, bias=bias)
     
     def forward(self, x):
 
@@ -113,8 +115,6 @@ class MLP(nn.Module):
         x = self.lin2(x)  
         output = self.out(x)
         return output, x    # return x for visualization
-
-
 
 # 4. instantiating necessary objects: putting the pieces together
 loss_func = nn.CrossEntropyLoss()   
@@ -171,11 +171,15 @@ def test(model, args):
     return accuracy_accumulated/total
 
 
-def get_model(model_name):
+def get_model(model_name, sparsity=1.0):
     if model_name == "cnn":
         return CNN()
     elif model_name == "mlp":
-        return MLP()
+        return MLP(sparsity)
+    elif model_name == "vgg11":
+        return vgg11()
+    elif model_name == "vgg13":
+        return vgg13()
     else:
         print("Invalid model name. Using CNN instead.")
         return CNN()
@@ -184,11 +188,13 @@ def get_model(model_name):
 if __name__ == '__main__':
     args = get_parameters()
     num_models = args.num_models
-    loaders = get_data_loaders(num_models)
+    loaders = get_data_loaders(num_models, args)
+
+    sparsity = 1.0
     
     model_parent = get_model(args.model_name)
     for idx in range(num_models):
-        model = copy.deepcopy(model_parent) if not args.diff_weight_init else get_model(args.model_name)
+        model = copy.deepcopy(model_parent) if not args.diff_weight_init else get_model(args.model_name, sparsity=1.0 if idx==0 else sparsity)
         if args.gpu_id != -1:
             model = model.cuda(args.gpu_id)
         train(num_epochs, model, {"train": loaders["train"][idx], "test": loaders["test"]}, args)
@@ -196,5 +202,5 @@ if __name__ == '__main__':
 
         print('Test Accuracy of the model %d: %.2f' % (idx, accuracy))
         # 8. store the trained model and performance
-        torch.save(model.state_dict(), "models/base_cnn_model_dict_weak_{}.pth".format(idx))
+        torch.save(model.state_dict(), "models/{}_diff_weight_init_{}_{}.pth".format(args.model_name, args.diff_weight_init, idx))
 

@@ -11,6 +11,7 @@
 
 import torch
 from torchvision import models
+import torchvision.transforms as transforms
 from torchvision import datasets
 from torchvision.transforms import ToTensor
 from parameters import get_parameters
@@ -57,6 +58,14 @@ def get_untrained_resnet():
     resnet.fc = nn.Linear(in_features=512, out_features=10, bias=True)
     return resnet
 
+def get_untrained_vgg16(args):
+    vgg16 = models.vgg16(pretrained=False)
+    if args.gpu_id != -1:
+            vgg16 = vgg16.cuda(args.gpu_id)
+    vgg16.fc = nn.Linear(in_features=512, out_features=10, bias=True)
+    return vgg16
+
+
 
 def evaluate_performance_simple(input_model, loaders, args):
     '''
@@ -71,7 +80,10 @@ def evaluate_performance_simple(input_model, loaders, args):
         for images, labels in loaders['test']:
             if args.gpu_id != -1:
                 images, labels = images.cuda(), labels.cuda()
-            test_output, _ = input_model(images)        # TODO: WHY DOES THIS RETURN TWO VALUES?!
+            try:
+                test_output, _ = input_model(images)    # TODO: WHY DOES THIS RETURN TWO VALUES?!
+            except:
+                test_output = input_model(images)        # TODO: WHY DOES THIS RETURN TWO VALUES?!
             pred_y = torch.max(test_output, 1)[1].data.squeeze()
             accuracy = (pred_y == labels).sum().item() / float(labels.size(0))
             accuracy_accumulated += accuracy 
@@ -111,22 +123,21 @@ def train(num_epochs, model, loaders, args):
             if (i+1) % 100 == 0:
                 print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'.format(epoch + 1, num_epochs, i + 1, total_step, loss.item()))
         
-        this_epoch_acc = evaluate_performance_simple(input_model=model, loaders=loaders, args=args, para_dict={})
+        this_epoch_acc = evaluate_performance_simple(input_model=model, loaders=loaders, args=args)
+        print("epoch accuracy: ", this_epoch_acc)
         val_acc_per_epoch.append(this_epoch_acc)
     return model, val_acc_per_epoch
 
 
-def train_resnet_on_cifar10(num_epochs):
+def train_on_cifar10(args, model, num_epochs):
 
     cifar_loader = get_cifar_data_loader()
-    resnet_model = get_untrained_resnet()
-    args = get_parameters()
 
     # need to modify resnet, since its written to predict ImageNet (1000 Classes), not Cifar10 (10 classes)
     #resnet_model.fc = nn.Linear(in_features=512, out_features=10, bias=True)
-    trained_model, val_acc_per_epoch = train(num_epochs, resnet_model, cifar_loader, args)
+    trained_model, val_acc_per_epoch = train(num_epochs, model, cifar_loader, args)
 
-    return resnet_model, val_acc_per_epoch
+    return model, val_acc_per_epoch
 
 
 def test_model_on_cifar10(model):
@@ -138,10 +149,18 @@ def test_model_on_cifar10(model):
 if __name__ == '__main__':
     # get an untrained resnet model
     num_epochs = 25
-    trained_resnet, val_acc_per_epoch = train_resnet_on_cifar10(num_epochs=num_epochs)
+    num_models = 2
+    args = get_parameters()
 
-    # Store the trained resnet
-    torch.save(trained_resnet.state_dict(), "resnet_cifar10_model_dict_25new.pth")
+    for i in range(num_models):
+        model = get_untrained_vgg16(args)
+        for idx, (layer0_name, fc_layer0_weight) in \
+            enumerate(model.named_parameters()):
+            print(layer0_name)
+        trained_model, val_acc_per_epoch = train_on_cifar10(args, model=model, num_epochs=num_epochs)
+
+        # Store the trained resnet
+        torch.save(trained_model.state_dict(), "models/{}_diff_weight_init_{}_{}.pth".format("vgg16", True, i))
 
     # Evaluate the performance of the trained resnet
     print(val_acc_per_epoch)

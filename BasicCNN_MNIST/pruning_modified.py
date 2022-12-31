@@ -58,9 +58,9 @@ def prune_unstructured(net, prune_type, amount=0.2):
 #Example inputs: any inputs of the correct shape
 #Out features: the number of output features of the model
 #Train fct: a function that takes the model and the data loaders as input and trains the model
-def prune_structured(net, loaders, num_epochs, args, example_inputs, out_features, prune_type, total_steps=3, train_fct=None):
+def prune_structured(net, loaders, num_epochs, example_inputs, out_features, prune_type, gpu_id, sparsity=0.5, total_steps=3,train_fct=None):
 
-
+    print(f"Structured pruning with type {prune_type} and channel sparsity {sparsity}")
     ori_size = tp.utils.count_params(net)
     imp = None
 
@@ -98,7 +98,7 @@ def prune_structured(net, loaders, num_epochs, args, example_inputs, out_feature
         example_inputs,
         importance=imp,
         total_steps=total_steps, # number of iterations
-        ch_sparsity=0.5, # channel sparsity
+        ch_sparsity=sparsity, # channel sparsity
         ignored_layers=ignored_layers, # ignored_layers will not be pruned
     )
     for i in range(total_steps): # iterative pruning
@@ -114,7 +114,7 @@ def prune_structured(net, loaders, num_epochs, args, example_inputs, out_feature
         #It probably calls other training functions
 
         if train_fct is not None:
-            model, val_acc_per_epoch = train_fct(model, loaders, num_epochs, args)
+            model, val_acc_per_epoch = train_fct(model, loaders, num_epochs, gpu_id)
 
     #The model is returned, but the pruning is done in situ...
     return model
@@ -124,7 +124,7 @@ def prune_structured(net, loaders, num_epochs, args, example_inputs, out_feature
 from torch.autograd import Variable
 from torch import optim
 
-def train_during_pruning(model, loaders, num_epochs, args):
+def train_during_pruning(model, loaders, num_epochs, gpu_id):
     '''
     Has to be a function that loads a dataset. 
 
@@ -141,7 +141,7 @@ def train_during_pruning(model, loaders, num_epochs, args):
     val_acc_per_epoch = []
     for epoch in range(num_epochs):
         for i, (images, labels) in enumerate(loaders['train']):
-            if args.gpu_id != -1:
+            if gpu_id != -1:
                 images, labels = images.cuda(), labels.cuda()
             # gives batch data, normalize x when iterate train_loader
             b_x = Variable(images)   # batch x
@@ -161,7 +161,7 @@ def train_during_pruning(model, loaders, num_epochs, args):
             if (i+1) % 100 == 0:
                 print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'.format(epoch + 1, num_epochs, i + 1, total_step, loss.item()))
         
-        this_epoch_acc = evaluate_performance_simple(input_model=model, loaders=loaders, args=args, para_dict={})
+        this_epoch_acc = evaluate_performance_simple(input_model=model, loaders=loaders, gpu_id=gpu_id)
         val_acc_per_epoch.append(this_epoch_acc)
     return model, val_acc_per_epoch
 

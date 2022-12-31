@@ -1,0 +1,15 @@
+{
+    "FaP": true,
+    "PaF": true,
+    "models": [
+        {
+            "name": "cnn"
+    }],
+    "prune_type": "l1",
+    "sparsity": 0.8,
+    "num_models": 3,
+    "num_epochs": 2,
+    "diff_weight_init": true,
+    "gpu_id": 0,
+    "dataset": "mnist"
+}

@@ -1,0 +1,38 @@
+{
+    "experiment_parameters": {
+        "FaP": true,
+        "PaF": true,
+        "models": [
+            {
+                "name": "cnn"
+            }
+        ],
+        "prune_type": "l1",
+        "sparsity": 0.8,
+        "num_models": 3,
+        "num_epochs": 2,
+        "diff_weight_init": true,
+        "gpu_id": 0,
+        "dataset": "mnist"
+    },
+    "cnn": {
+        "accuracy_PaF": 0.972,
+        "accuracy_FaP": 0.971,
+        "accuracy_fused": 0.986,
+        "model_0": {
+            "accuracy_original": 0.983,
+            "accuracy_pruned": 0.969,
+            "accuracy_pruned_and_fused": 0.976
+        },
+        "model_1": {
+            "accuracy_original": 0.982,
+            "accuracy_pruned": 0.98,
+            "accuracy_pruned_and_fused": 0.981
+        },
+        "model_2": {
+            "accuracy_original": 0.983,
+            "accuracy_pruned": 0.976,
+            "accuracy_pruned_and_fused": 0.981
+        }
+    }
+}

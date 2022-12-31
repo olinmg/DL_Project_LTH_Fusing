@@ -1,7 +1,8 @@
+from collections import OrderedDict
 from parameters import get_parameters
 from base_convNN import get_model
 import torch
-from fusion import fusion
+from fusion import fusion, fusion_old
 from sklearn.model_selection import train_test_split
 from torchvision import datasets
 from torchvision.transforms import ToTensor
@@ -28,15 +29,26 @@ def get_data_loader(args):
     return loaders
 
 
-def get_pretrained_models(args, num_models):
+def get_pretrained_models(model_name, diff_weight_init, gpu_id, num_models):
     models = []
 
     for idx in range(num_models):
-        state = torch.load("models/base_cnn_model_dict_weak_{}.pth".format(idx))
-        model = get_model(args.model_name)
-        model.load_state_dict(state)
-        if args.gpu_id != -1:
-            model = model.cuda(args.gpu_id)
+        state = torch.load(f"models/{model_name}_diff_weight_init_{diff_weight_init}_{idx}.pth")
+        model = get_model(model_name)
+        if "vgg" in model_name:
+            new_state_dict = OrderedDict()
+            for k, v in state.items():
+                print(k)
+                name = k
+                name = name.replace(".module", "")
+                print("new name is: ", name)
+                new_state_dict[name] = v
+            print(new_state_dict.keys())
+            model.load_state_dict(new_state_dict)
+        else:
+            model.load_state_dict(state)
+        if gpu_id != -1:
+            model = model.cuda(gpu_id)
         models.append(model)
     return models
 
@@ -63,9 +75,9 @@ if __name__ == '__main__':
 
     assert num_models == 2 # Only temporary, later we can extend to more layers
 
-    models = get_pretrained_models(args, num_models)
+    models = get_pretrained_models(args.model_name, args.diff_weight_init, args.gpu_id, args.num_models)
 
-    fused_model = fusion(models, args)
+    fused_model = fusion_old(models, args)
 
     loaders = get_data_loader(args)
     accuracy_0 = test(models[0], loaders, args)
