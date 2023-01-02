@@ -6,15 +6,6 @@ import torch.nn.utils.prune as prune
 import torch.nn.functional as F
 import torch_pruning as tp
 
-from base_convNN import CNN, train, test, loaders
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-MODEL_FILE_NAME = "./base_cnn_model_dict.pth"
-
-model = CNN()
-model.load_state_dict(torch.load(MODEL_FILE_NAME))
-model.eval()
-
 
 ### TO-DO:
 ### RETURN MODEL

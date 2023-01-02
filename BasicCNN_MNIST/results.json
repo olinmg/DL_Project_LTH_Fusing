@@ -4,35 +4,40 @@
         "PaF": true,
         "models": [
             {
-                "name": "cnn"
+                "name": "vgg11"
             }
         ],
         "prune_type": "l1",
         "sparsity": 0.8,
-        "num_models": 3,
-        "num_epochs": 2,
+        "num_models": 4,
+        "num_epochs": 5,
         "diff_weight_init": true,
         "gpu_id": 0,
-        "dataset": "mnist"
+        "dataset": "cifar"
     },
-    "cnn": {
-        "accuracy_PaF": 0.972,
-        "accuracy_FaP": 0.971,
-        "accuracy_fused": 0.986,
+    "vgg11": {
+        "accuracy_PaF": 0.72,
+        "accuracy_FaP": 0.706,
+        "accuracy_fused": 0.824,
         "model_0": {
-            "accuracy_original": 0.983,
-            "accuracy_pruned": 0.969,
-            "accuracy_pruned_and_fused": 0.976
+            "accuracy_original": 0.824,
+            "accuracy_pruned": 0.713,
+            "accuracy_pruned_and_fused": 0.731
         },
         "model_1": {
-            "accuracy_original": 0.982,
-            "accuracy_pruned": 0.98,
-            "accuracy_pruned_and_fused": 0.981
+            "accuracy_original": 0.832,
+            "accuracy_pruned": 0.676,
+            "accuracy_pruned_and_fused": 0.718
         },
         "model_2": {
-            "accuracy_original": 0.983,
-            "accuracy_pruned": 0.976,
-            "accuracy_pruned_and_fused": 0.981
+            "accuracy_original": 0.833,
+            "accuracy_pruned": 0.683,
+            "accuracy_pruned_and_fused": 0.696
+        },
+        "model_3": {
+            "accuracy_original": 0.828,
+            "accuracy_pruned": 0.714,
+            "accuracy_pruned_and_fused": 0.722
         }
     }
 }

@@ -1,9 +1,9 @@
 import torch
-from main import get_pretrained_models
+from models import get_pretrained_models
 from parameters import get_parameters
 from pruning_modified import prune_unstructured
 #import main #from main import get_data_loader, test
-from base_convNN import CNN, MLP, get_model
+from models import get_model
 from torchvision import datasets
 from torchvision.transforms import ToTensor
 import torchvision.transforms as transforms
@@ -59,7 +59,7 @@ def get_cifar_data_loader():
     }
 
 
-def evaluate_performance_simple(input_model, loaders, gpu_id):
+def evaluate_performance_simple(input_model, loaders, gpu_id, prune=True):
     '''
     Computes the accuracy of a given model (input_model) on a given dataset (loaders["test"]).
     '''
@@ -74,16 +74,14 @@ def evaluate_performance_simple(input_model, loaders, gpu_id):
             if gpu_id != -1:
                 images, labels = images.cuda(), labels.cuda()
             
-            try:
-                test_output, _ = input_model(images)    # TODO: WHY DOES THIS RETURN TWO VALUES?!
-            except:
-                test_output = input_model(images)
+            test_output = input_model(images)
 
             pred_y = torch.max(test_output, 1)[1].data.squeeze()
             accuracy = (pred_y == labels).sum().item() / float(labels.size(0))
             accuracy_accumulated += accuracy 
             total += 1
-    input_model.cpu()
+    if prune:
+        input_model.cpu()
     return accuracy_accumulated / total
 
 
@@ -134,6 +132,7 @@ def pruning_test_manager(input_model_list, loaders, pruning_function, fusion_fun
         input_model_copy = copy.deepcopy(input_model)
         # Prune the individual networks (in place)
         _, description_pruning = pruning_function(input_model=input_model_copy, prune_params=prune_params)
+        input_model_copy,_ = train_during_pruning(model=input_model_copy, loaders=loaders, num_epochs=5, gpu_id = gpu_id, prune=False)
         pruned_models.append(input_model_copy)
         # Evaluate the performance on the given data (loaders)
         acc_model_pruned = eval_function(input_model=pruned_models[i], loaders=loaders, gpu_id=gpu_id)
@@ -149,7 +148,7 @@ def fusion_test_manager(input_model_list, loaders, pruning_function, fusion_func
     '''
     
     fused_model, description_fusion = fusion_function(input_model_list, args)
-    fused_model,_ = train_during_pruning(model=fused_model, loaders=loaders, num_epochs=num_epochs, gpu_id = gpu_id)
+    fused_model,_ = train_during_pruning(model=fused_model, loaders=loaders, num_epochs=num_epochs, gpu_id = gpu_id, prune=False)
     acc_model_fused = eval_function(input_model=fused_model, loaders=loaders, gpu_id = gpu_id)
     print(f"Fused model:\t{acc_model_fused}")
 
@@ -249,15 +248,18 @@ def wrapper_unstructured_pruning(input_model, para_dict):
 from torch import optim
 from torch.autograd import Variable
 import torch.nn as nn
-def train_during_pruning(model, loaders, num_epochs, gpu_id):
+def train_during_pruning(model, loaders, num_epochs, gpu_id, prune=True):
     '''
     Has to be a function that loads a dataset. 
 
     A given model and an amount of epochs of training will be given.
     '''
 
+    if gpu_id != -1:
+        model = model.cuda(gpu_id)
+
     loss_func = nn.CrossEntropyLoss()   
-    optimizer = optim.Adam(model.parameters(), lr = 0.01)
+    #optimizer = optim.Adam(model.parameters(), lr = 0.01)
     optimizer = optim.SGD(model.parameters(), lr=0.05,
                                 momentum=0.9)
     model.train()
@@ -268,14 +270,13 @@ def train_during_pruning(model, loaders, num_epochs, gpu_id):
     val_acc_per_epoch = []
     for epoch in range(num_epochs):
         for i, (images, labels) in enumerate(loaders['train']):
-            if next(model.parameters()).is_cuda:
-                images, labels = images.cuda(), labels.cuda()
+            if gpu_id != -1 and not next(model.parameters()).is_cuda:
+                model = model.cuda(gpu_id)
+            if gpu_id != -1:
+                images, labels = images.cuda(gpu_id), labels.cuda(gpu_id)
             # gives batch data, normalize x when iterate train_loader
 
-            try:
-                predictions, _ = model(images)    # TODO: WHY DOES THIS RETURN TWO VALUES?!
-            except:
-                predictions = model(images)
+            predictions = model(images)
             loss = loss_func(predictions, labels)
             
             # clear gradients for this training step   
@@ -289,8 +290,11 @@ def train_during_pruning(model, loaders, num_epochs, gpu_id):
             if (i+1) % 100 == 0:
                 print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'.format(epoch + 1, num_epochs, i + 1, total_step, loss.item()))
         
-        this_epoch_acc = evaluate_performance_simple(input_model=model, loaders=loaders, gpu_id=gpu_id)
+        this_epoch_acc = evaluate_performance_simple(input_model=model, loaders=loaders, gpu_id=gpu_id, prune=False)
         val_acc_per_epoch.append(this_epoch_acc)
+    
+    if prune:
+        model.cpu()
     return model, val_acc_per_epoch
 
 
@@ -321,10 +325,10 @@ def wrapper_structured_pruning(input_model, prune_params):
     if "total_steps" in prune_params.keys():
         total_steps = prune_params.get("total_steps")
         pruned_model = prune_structured(net=input_model, loaders=loaders, num_epochs=num_epochs, gpu_id=gpu_id, example_inputs=example_input,
-                    out_features=out_features, prune_type=prune_type, sparsity=sparsity, total_steps=total_steps, train_fct=train_during_pruning)
+                    out_features=out_features, prune_type=prune_type, sparsity=sparsity, total_steps=total_steps, train_fct=None)
     else:
         pruned_model = prune_structured(net=input_model, loaders=loaders, num_epochs=num_epochs, gpu_id=gpu_id, example_inputs=example_input,
-                    out_features=out_features, prune_type=prune_type, sparsity=sparsity, train_fct=train_during_pruning)
+                    out_features=out_features, prune_type=prune_type, sparsity=sparsity, train_fct=None)
 
     description = {"name": "Structured Pruning", "num_epochs": num_epochs, "prune_type":prune_type}
 
@@ -344,7 +348,7 @@ def wrapper_fake_fusion(list_of_models, args, para_dict):
     return list_of_models[0], {"name":"Fake fusion, no paras."}
 
 
-from fusion import fusion
+from fusion import fusion, fusion_old, fusion_old2
 def wrapper_first_fusion(list_of_models, args):
     '''
     Uses the first simple fusion approach created by Alex in fusion.py.

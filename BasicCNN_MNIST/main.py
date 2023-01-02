@@ -1,15 +1,73 @@
 from collections import OrderedDict
 from parameters import get_parameters
-from base_convNN import get_model
+from train import get_model
 import torch
 from fusion import fusion, fusion_old
 from sklearn.model_selection import train_test_split
-from torchvision import datasets
 from torchvision.transforms import ToTensor
 from torch.utils.data import DataLoader
 import torch.nn as nn
 from torch import optim
 from torch.autograd import Variable
+from torchvision import datasets
+import torchvision.transforms as transforms
+import models as m
+
+
+def get_cifar_data_loader():
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
+
+    train_loader = torch.utils.data.DataLoader(
+        datasets.CIFAR10(root='./data', train=True, transform=transforms.Compose([
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomCrop(32, 4),
+            transforms.ToTensor(),
+            normalize,
+        ]), download=True),
+        batch_size=128, shuffle=True,
+        num_workers=4, pin_memory=True)
+
+    val_loader = torch.utils.data.DataLoader(
+        datasets.CIFAR10(root='./data', train=False, transform=transforms.Compose([
+            transforms.ToTensor(),
+            normalize,
+        ])),
+        batch_size=128, shuffle=False,
+        num_workers=4, pin_memory=True)
+    
+    return {
+        "train" : train_loader,
+        "test" : val_loader
+    }
+
+
+def evaluate_performance_simple(input_model, loaders, gpu_id):
+    '''
+    Computes the accuracy of a given model (input_model) on a given dataset (loaders["test"]).
+    '''
+    if gpu_id != -1:
+        input_model = input_model.cuda(gpu_id)
+    input_model.eval()
+
+    accuracy_accumulated = 0
+    total = 0
+    with torch.no_grad():
+        for images, labels in loaders['test']:
+            if gpu_id != -1:
+                images, labels = images.cuda(), labels.cuda()
+            
+            try:
+                test_output, _ = input_model(images)    # TODO: WHY DOES THIS RETURN TWO VALUES?!
+            except:
+                test_output = input_model(images)
+
+            pred_y = torch.max(test_output, 1)[1].data.squeeze()
+            accuracy = (pred_y == labels).sum().item() / float(labels.size(0))
+            accuracy_accumulated += accuracy 
+            total += 1
+    input_model.cpu()
+    return accuracy_accumulated / total
 
 
 def get_data_loader(args):
@@ -77,12 +135,26 @@ if __name__ == '__main__':
 
     models = get_pretrained_models(args.model_name, args.diff_weight_init, args.gpu_id, args.num_models)
 
-    fused_model = fusion_old(models, args)
+    """
+    model0 = m.ResNet18(linear_bias=False, use_batchnorm=False)
+    for idx, ((layer0_name, fc_layer0_weight), (layer1_name, fc_layer1_weight)) in \
+            enumerate(zip(model0.named_parameters(), model0.named_parameters())):
+        print(f"{layer0_name} : {fc_layer0_weight.shape}")
+    checkpoint = torch.load("models/resnet_models/model_0/best.checkpoint", map_location = "cpu")
+    model0.load_state_dict(checkpoint['model_state_dict'])
 
-    loaders = get_data_loader(args)
-    accuracy_0 = test(models[0], loaders, args)
-    accuracy_1 = test(models[1], loaders, args)
-    accuracy_fused = test(fused_model, loaders, args)
+    model1 = m.ResNet18(linear_bias=False, use_batchnorm=False)
+    checkpoint = torch.load("models/resnet_models/model_1/best.checkpoint", map_location = "cpu")
+    model1.load_state_dict(checkpoint['model_state_dict'])
+    models=[model0, model1]"""
+
+    
+    fused_model = fusion_old(models, args, resnet = "resnet" in args.model_name)
+
+    loaders = get_cifar_data_loader()
+    accuracy_0 = evaluate_performance_simple(models[0], loaders, 0)
+    accuracy_1 = evaluate_performance_simple(models[1], loaders, 0)
+    accuracy_fused = evaluate_performance_simple(fused_model, loaders, 0)
 
     print('Test Accuracy of the model 0: %.2f' % accuracy_0)
     print('Test Accuracy of the model 1: %.2f' % accuracy_1)

@@ -3,13 +3,13 @@
     "PaF": true,
     "models": [
         {
-            "name": "cnn"
+            "name": "vgg11"
     }],
     "prune_type": "l1",
     "sparsity": 0.8,
-    "num_models": 3,
-    "num_epochs": 2,
+    "num_models": 4,
+    "num_epochs": 5,
     "diff_weight_init": true,
     "gpu_id": 0,
-    "dataset": "mnist"
+    "dataset": "cifar"
 }
