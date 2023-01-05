@@ -252,7 +252,7 @@ def fusion(networks, args, accuracies=None, importance=None, eps=1e-7):
 
             if bias:
                 t_bias_aligned = torch.matmul(T_var.t(), bias_weight.view(bias_weight.shape[0], -1)).flatten()
-                avg_bias_weight = (t_bias_aligned + avg_bias_weight*idx_model)/(idx_model+1)
+                avg_bias_weight = (t_bias_aligned*importance[idx_model] + avg_bias_weight*torch.sum(importance[:idx_model]))/(torch.sum(importance[:idx_model])+importance[idx_model])
 
             T_var_list[idx_model] = T_var
         

@@ -711,6 +711,8 @@ if __name__ == '__main__':
                 for idx, accuracy in enumerate(epoch_accuracy):
                     result[name]["accuracy_PaF"][idx] = float_format(accuracy)
             
+            # PaF_all does the following: fuses following networks: pruned_model[0], original_model[0], original_model[1], ..., original_model[-1]
+            # PaF_all achieves higher accuracy than PaF, but when we finetune PaF achieves higher accuracy
             if experiment_params["PaF_all"]:
                 paf_all_model, paf_all_model_accuracy,_ = fusion_test_manager(input_model_list=[*models_original, pruned_models[0]], **params, num_epochs = experiment_params["num_epochs"], args=fusion_params, accuracies=[*original_model_accuracies, pruned_model_accuracies[0]])
                 m,epoch_accuracy = train_during_pruning(paf_all_model, loaders=loaders, num_epochs=experiment_params["num_epochs"], gpu_id =experiment_params["gpu_id"], prune=False)
