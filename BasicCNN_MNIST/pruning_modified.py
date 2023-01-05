@@ -70,7 +70,7 @@ def prune_structured(net, loaders, num_epochs, example_inputs, out_features, pru
     elif prune_type ==  'bnscale':
         imp = tp.importance.BNScaleImportance()
     elif prune_type ==  'structural':
-        imp = tp.importance.StructuralImportance()
+        imp = tp.importance.StrcuturalImportance
     elif prune_type ==  'lamp':
         imp = tp.importance.LAMPImportance()
     else:

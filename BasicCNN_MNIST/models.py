@@ -110,7 +110,7 @@ def get_model(model_name, sparsity=1.0):
     elif model_name == "mlp":
         return MLP(sparsity)
     elif model_name == "vgg11":
-        return vgg11()
+        return vgg11(bias=True)
     elif model_name == "vgg13":
         return vgg13()
     elif model_name == "vgg16":

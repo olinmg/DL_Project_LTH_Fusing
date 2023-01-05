@@ -99,11 +99,18 @@ def comparator(model0_args, model1_args):
 
 
 
-#fuses arbitrary many networks
-def fusion(networks, args, accuracies=None,eps=1e-7):
-    num_layers = len(list(zip(networks[0].parameters(), networks[1].parameters())))
-    num_models = args.num_models
+def fusion(networks, args, accuracies=None, importance=None, eps=1e-7):
+    """
+    fusion fuses arbitrary many models into the model that is the smallest
 
+    :param networks: A list of networks to be fused
+    :param accuracies: A list of accuracies of the networks. The code will order the networks with respect to the accuracies for optimal accuracy
+    :param importance: A list of floats. If importance = [0.9, 0.1], then linear combination of weights will be: network[0]*0.9 + network[1]*0.1
+    :return: the fused model
+    """ 
+    num_layers = len(list(zip(networks[0].parameters(), networks[1].parameters())))
+
+    num_models = len(networks)
     avg_aligned_layers = []
     T_var_list = [None]*num_models
     bias = False
@@ -114,17 +121,16 @@ def fusion(networks, args, accuracies=None,eps=1e-7):
         accuracies = [0]*num_models
     print("accuracies are: ", accuracies)
     print(list(zip(networks, accuracies)))
-    
-    networks_zip = sorted(list(zip(networks, accuracies)), key=functools.cmp_to_key(comparator))
-    networks = [network_zip[0] for network_zip in networks_zip]
 
-    """
-    smallest_model_idx = find_smallest_model(networks)
-    print(smallest_model_idx)
-    if smallest_model_idx != None: 
-        change_model = networks[0]
-        networks[0] = networks[smallest_model_idx]
-        networks[smallest_model_idx] = change_model"""
+    importance = [1]*num_models if importance == None else importance
+    networks_zip = sorted(list(zip(networks, accuracies, importance)), key=functools.cmp_to_key(comparator))
+    networks = [network_zip[0] for network_zip in networks_zip]
+    importance = [network_zip[2] for network_zip in networks_zip]
+    importance = torch.tensor(importance)
+    sum = torch.sum(importance)
+    print("sum is: ", sum)
+    importance = importance *(importance.shape[0]/sum)
+    print("importance: ", importance)
 
     layer_iters = [networks[i].named_parameters() for i in range(num_models)]
         
@@ -239,7 +245,7 @@ def fusion(networks, args, accuracies=None,eps=1e-7):
             # t_model corresponds to aligned weights according to weights of model 1
 
             # Averaging of aligned weights (Could potentially also favor one model over the other)
-            avg_layer = (t_model + avg_layer_data.view(avg_layer_data.shape[0], -1)*idx_model)/(idx_model+1)
+            avg_layer = (t_model*importance[idx_model] + avg_layer_data.view(avg_layer_data.shape[0], -1)*torch.sum(importance[:idx_model]))/(torch.sum(importance[:idx_model])+importance[idx_model])
 
             if is_conv and layer_shape != avg_layer.shape:
                 avg_layer = avg_layer.view(layer_shape)
