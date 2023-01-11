@@ -1,14 +1,17 @@
 {
     "FaP": true,
     "PaF": true,
+    "PaF_all": false,
+    "SSF": false,
+    "MSF": false,
     "models": [
         {
             "name": "vgg11"
     }],
-    "prune_type": "l1",
-    "sparsity": 0.8,
-    "num_models": 4,
-    "num_epochs": 5,
+    "prune_type": ["l1"],
+    "sparsity": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+    "num_models": 2,
+    "num_epochs": 75,
     "diff_weight_init": true,
     "gpu_id": 0,
     "dataset": "cifar"

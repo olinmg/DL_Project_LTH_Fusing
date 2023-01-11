@@ -87,22 +87,25 @@ cfg = {
     'E': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256, 'M', 512, 512, 512, 512, 'M', 
           512, 512, 512, 512, 'M'],
 }
-def vgg11(bias=False):
+def vgg11(bias=False, sparsity=1.0):
     """VGG 11-layer model (configuration "A")"""
-    return VGG(make_layers(cfg['A'], bias=bias), bias=bias)
+    params = cfg["A"]
+    params = [int(i*sparsity) if isinstance(i, int) else i for i in params]
+    print(params)
+    return VGG(make_layers(params, bias=bias), bias=bias, sparsity=sparsity)
 
 
-def vgg13():
+def vgg13(bias=True):
     """VGG 13-layer model (configuration "B")"""
-    return VGG(make_layers(cfg['B']))
+    return VGG(make_layers(cfg['B'], bias=bias), bias=bias)
 
-def vgg16():
+def vgg16(bias=True):
     """VGG 16-layer model (configuration "D")"""
-    return VGG(make_layers(cfg['D']))
+    return VGG(make_layers(cfg['D'], bias=bias), bias=bias)
 
-def vgg19():
+def vgg19(bias=False):
     """VGG 19-layer model (configuration "E")"""
-    return VGG(make_layers(cfg['E']))
+    return VGG(make_layers(cfg['E'], bias=bias), bias=bias)
 
 def get_model(model_name, sparsity=1.0):
     if model_name == "cnn":
@@ -110,7 +113,7 @@ def get_model(model_name, sparsity=1.0):
     elif model_name == "mlp":
         return MLP(sparsity)
     elif model_name == "vgg11":
-        return vgg11(bias=True)
+        return vgg11(bias=False, sparsity=sparsity)
     elif model_name == "vgg13":
         return vgg13()
     elif model_name == "vgg16":

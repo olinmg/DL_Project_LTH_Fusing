@@ -16,17 +16,17 @@ class VGG(nn.Module):
     '''
     VGG model 
     '''
-    def __init__(self, features, bias=True):
+    def __init__(self, features, bias=True, sparsity=1.0):
         super(VGG, self).__init__()
         self.features = features
         self.classifier = nn.Sequential(
             nn.Dropout(),
-            nn.Linear(512, 512, bias=bias),
+            nn.Linear(int(512*sparsity), int(512*sparsity), bias=bias),
             nn.ReLU(True),
             nn.Dropout(),
-            nn.Linear(512, 512, bias=bias),
+            nn.Linear(int(512*sparsity), int(512*sparsity), bias=bias),
             nn.ReLU(True),
-            nn.Linear(512, 10, bias=bias),
+            nn.Linear(int(512*sparsity), 10, bias=bias),
         )
          # Initialize weights
         """

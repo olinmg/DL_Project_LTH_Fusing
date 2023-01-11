@@ -65,30 +65,30 @@ def get_cifar_data_loader(num_models, args):
 def train(model, loaders, num_epochs, gpu_id):
     '''
     Has to be a function that loads a dataset. 
-
     A given model and an amount of epochs of training will be given.
     '''
 
     loss_func = nn.CrossEntropyLoss()   
-    #optimizer = optim.Adam(model.parameters(), lr = 0.01)
-    optimizer = optim.SGD(model.parameters(), lr=0.05,
-                                momentum=0.9)
+    #optimizer = optim.Adam(model.parameters(), lr = 0.05)
+    optimizer = optim.SGD(model.parameters(), lr=0.05,momentum=0.9)
     model.train()
         
     # Train the model
     total_step = len(loaders['train'])
         
     val_acc_per_epoch = []
+    best_model = model
+    best_model_accuracy = -1
+    lr = 0.05
     for epoch in range(num_epochs):
+        optimizer = optim.SGD(model.parameters(), lr=lr * (0.5 ** (epoch // 30)),
+                                momentum=0.9)
         for i, (images, labels) in enumerate(loaders['train']):
             if next(model.parameters()).is_cuda:
                 images, labels = images.cuda(), labels.cuda()
             # gives batch data, normalize x when iterate train_loader
 
-            try:
-                predictions, _ = model(images)    # TODO: WHY DOES THIS RETURN TWO VALUES?!
-            except:
-                predictions = model(images)
+            predictions = model(images)
             loss = loss_func(predictions, labels)
             
             # clear gradients for this training step   
@@ -101,9 +101,15 @@ def train(model, loaders, num_epochs, gpu_id):
             
             if (i+1) % 100 == 0:
                 print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'.format(epoch + 1, num_epochs, i + 1, total_step, loss.item()))
+            
         
         this_epoch_acc = test(model, loaders=loaders, gpu_id=gpu_id)
         val_acc_per_epoch.append(this_epoch_acc)
+        if this_epoch_acc > best_model_accuracy:
+            best_model = copy.deepcopy(model)
+            best_model_accuracy = this_epoch_acc
+    
+    return best_model, best_model_accuracy
 
 
 
@@ -134,19 +140,17 @@ if __name__ == '__main__':
         loaders = get_cifar_data_loader(num_models, args)
     else:
         loaders = get_mnist_data_loader(num_models, args)
-
-    sparsity = 1.0
-    
+  
     model_parent = get_model(args.model_name)
     for idx, ((layer0_name, fc_layer0_weight), (layer1_name, fc_layer1_weight)) in \
             enumerate(zip(model_parent.named_parameters(), model_parent.named_parameters())):
         print(f"{layer0_name} : {fc_layer0_weight.shape}")
 
     for idx in range(num_models):
-        model = copy.deepcopy(model_parent) if not args.diff_weight_init else get_model(args.model_name, sparsity=1.0 if idx==0 else sparsity)
+        model = copy.deepcopy(model_parent) if not args.diff_weight_init else get_model(args.model_name)
         if args.gpu_id != -1:
             model = model.cuda(args.gpu_id)
-        train(model, {"train": loaders["train"][idx], "test": loaders["test"]}, args.num_epochs, args.gpu_id)
+        model,_ = train(model, {"train": loaders["train"][idx], "test": loaders["test"]}, args.num_epochs, args.gpu_id)
         accuracy = test(model, loaders, args.gpu_id)
 
         print('Test Accuracy of the model %d: %.2f' % (idx, accuracy))

@@ -9,9 +9,9 @@
             }
         ],
         "prune_type": "l1",
-        "sparsity": 0.8,
+        "sparsity": 0.6,
         "num_models": 2,
-        "num_epochs": 2,
+        "num_epochs": 1,
         "diff_weight_init": true,
         "gpu_id": 0,
         "dataset": "cifar"

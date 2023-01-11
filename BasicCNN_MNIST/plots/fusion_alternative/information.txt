@@ -1,0 +1,12 @@
+We create VGG11 models and take out 10-90% of its weights at every layer. Then, we train these networks in parallel with a VGG11 network that has all its weights.
+We then fuse the VGG11 model into the models that have less weights and finetune them. So for example we fuse the VGG11 that has all its weights, fuse it into the network
+that only has 10% of the weights, and finetune them.
+
+Labels:
+    Original: VGG11 models who only have a fraction of their weights (without fusing)
+    fused: VGG11 models who only have a fraction of their weights after we fuse the big VGG11 model into it and finetune
+    Pruned: The models from the conventional pruning process (Train a VGG11, prune x% of its weights, finetune)
+    SSF: See plots in folder fusion_preprocessing for an explanation
+
+Conclusion:
+    Fused performs slightly better than Pruned, but not better than SSF

@@ -1,0 +1,43 @@
+{
+    "experiment_parameters": {
+        "FaP": true,
+        "PaF": true,
+        "models": [
+            {
+                "name": "vgg11"
+            }
+        ],
+        "prune_type": "l1",
+        "sparsity": 0.5,
+        "num_models": 4,
+        "num_epochs": 5,
+        "diff_weight_init": true,
+        "gpu_id": 0,
+        "dataset": "cifar"
+    },
+    "vgg11": {
+        "accuracy_PaF": 0.787,
+        "accuracy_FaP": 0.818,
+        "accuracy_fused": 0.776,
+        "model_0": {
+            "accuracy_original": 0.824,
+            "accuracy_pruned": 0.797,
+            "accuracy_pruned_and_fused": 0.805
+        },
+        "model_1": {
+            "accuracy_original": 0.832,
+            "accuracy_pruned": 0.799,
+            "accuracy_pruned_and_fused": 0.807
+        },
+        "model_2": {
+            "accuracy_original": 0.833,
+            "accuracy_pruned": 0.803,
+            "accuracy_pruned_and_fused": 0.786
+        },
+        "model_3": {
+            "accuracy_original": 0.828,
+            "accuracy_pruned": 0.808,
+            "accuracy_pruned_and_fused": 0.799
+        }
+    }
+}

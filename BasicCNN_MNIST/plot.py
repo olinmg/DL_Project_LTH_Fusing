@@ -1,6 +1,8 @@
+import json
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
+import numpy as np
 
 
 """
@@ -41,3 +43,32 @@ def plot(lines, x, labels, xlabel, ylabel):
     ax.legend(title_fontsize = 13)
     #plt.show()
     plt.savefig("./plots/example.svg", dpi=1200)
+
+
+if __name__ == '__main__':
+    with open('./results_big_SSF.json', 'r') as f:
+                results = json.load(f)
+    
+    results = results["results"]
+ 
+    x = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+    accuracy_pruned = np.zeros(len(x))
+    accuracy_SSF = np.zeros(len(x))
+
+    for idx, result in enumerate(results):
+        accuracy_pruned[idx] = result["vgg11"]["model_0"]["accuracy_pruned"]["76"]
+        accuracy_SSF[idx] = result["vgg11"]["model_0"]["accuracy_pruned_and_fused"]["76"]
+    
+    with open('./results_big_SSF_more_training.json', 'r') as f:
+                results = json.load(f)
+    
+    results = results["results"]
+    for idx, result in enumerate(results):
+        idx+=6
+        if idx > 8:
+            break
+
+        accuracy_pruned[idx] = result["vgg11"]["model_0"]["accuracy_pruned"]["151"]
+
+    plot([accuracy_pruned, accuracy_SSF], x, ["Pruned", "SSF"], "Sparsity", "Accuracy")
+

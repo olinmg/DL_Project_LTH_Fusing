@@ -82,6 +82,7 @@ def find_smallest_model(networks):
 def comparator(model0_args, model1_args):
     model0, model1 = model0_args[0], model1_args[0]
     accuracy0, accuracy1 = model0_args[1], model1_args[1]
+    importance0, importance1 = model0_args[2], model1_args[2]
 
     for _, ((_, layer0_weight), (_, layer1_weight)) in \
             enumerate(zip(model0.named_parameters(), model1.named_parameters())):
@@ -89,6 +90,11 @@ def comparator(model0_args, model1_args):
             return -1
         elif layer0_weight.shape[0] > layer1_weight.shape[0]:
             return 1
+    
+    if importance0 > importance1:
+        return -1
+    elif importance0 < importance1:
+        return 1
     
     if accuracy0 > accuracy1:
         return -1
@@ -120,6 +126,7 @@ def fusion(networks, args, accuracies=None, importance=None, eps=1e-7):
     if accuracies == None:
         accuracies = [0]*num_models
     print("accuracies are: ", accuracies)
+    print("importance beginning is: ", importance)
     print(list(zip(networks, accuracies)))
 
     importance = [1]*num_models if importance == None else importance

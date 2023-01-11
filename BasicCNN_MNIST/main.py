@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from performance_tester import train_during_pruning
 from parameters import get_parameters
 from train import get_model
 import torch
@@ -12,6 +13,7 @@ from torch.autograd import Variable
 from torchvision import datasets
 import torchvision.transforms as transforms
 import models as m
+import json
 
 
 def get_cifar_data_loader():
@@ -70,7 +72,7 @@ def evaluate_performance_simple(input_model, loaders, gpu_id):
     return accuracy_accumulated / total
 
 
-def get_data_loader(args):
+def get_data_loader():
     test_data = datasets.MNIST(
         root = 'data', 
         train = False, 
@@ -87,12 +89,12 @@ def get_data_loader(args):
     return loaders
 
 
-def get_pretrained_models(model_name, diff_weight_init, gpu_id, num_models):
+def get_pretrained_models(model_name, diff_weight_init, gpu_id, num_models, sparsity=[1.0, 1.0]):
     models = []
 
     for idx in range(num_models):
-        state = torch.load(f"models/{model_name}_diff_weight_init_{diff_weight_init}_{idx}.pth")
-        model = get_model(model_name)
+        state = torch.load(f"models/vgg_alternative/{model_name}_diff_weight_init_{diff_weight_init}_{int(sparsity[idx]*10)}.pth")
+        model = get_model(model_name, sparsity=sparsity[idx]/10)
         if "vgg" in model_name:
             new_state_dict = OrderedDict()
             for k, v in state.items():
@@ -108,6 +110,7 @@ def get_pretrained_models(model_name, diff_weight_init, gpu_id, num_models):
         if gpu_id != -1:
             model = model.cuda(gpu_id)
         models.append(model)
+    
     return models
 
 def test(model, loaders, args):
@@ -130,38 +133,84 @@ def test(model, loaders, args):
 if __name__ == '__main__':
     args = get_parameters()
     num_models = args.num_models
+    dict = {}
+    it = 9
 
-    assert num_models == 2 # Only temporary, later we can extend to more layers
+    while True:
+        models = get_pretrained_models(args.model_name, args.diff_weight_init, args.gpu_id, args.num_models, [1, 2])
 
-    models = get_pretrained_models(args.model_name, args.diff_weight_init, args.gpu_id, args.num_models)
+        """
+        model0 = m.ResNet18(linear_bias=False, use_batchnorm=False)
+        for idx, ((layer0_name, fc_layer0_weight), (layer1_name, fc_layer1_weight)) in \
+                enumerate(zip(model0.named_parameters(), model0.named_parameters())):
+            print(f"{layer0_name} : {fc_layer0_weight.shape}")
+        checkpoint = torch.load("models/resnet_models/model_0/best.checkpoint", map_location = "cpu")
+        model0.load_state_dict(checkpoint['model_state_dict'])
 
-    """
-    model0 = m.ResNet18(linear_bias=False, use_batchnorm=False)
-    for idx, ((layer0_name, fc_layer0_weight), (layer1_name, fc_layer1_weight)) in \
-            enumerate(zip(model0.named_parameters(), model0.named_parameters())):
-        print(f"{layer0_name} : {fc_layer0_weight.shape}")
-    checkpoint = torch.load("models/resnet_models/model_0/best.checkpoint", map_location = "cpu")
-    model0.load_state_dict(checkpoint['model_state_dict'])
-
-    model1 = m.ResNet18(linear_bias=False, use_batchnorm=False)
-    checkpoint = torch.load("models/resnet_models/model_1/best.checkpoint", map_location = "cpu")
-    model1.load_state_dict(checkpoint['model_state_dict'])
-    models=[model0, model1]"""
-
-    
-    fused_model = fusion_old(models, args, resnet = "resnet" in args.model_name)
-
-    loaders = get_cifar_data_loader()
-    accuracy_0 = evaluate_performance_simple(models[0], loaders, 0)
-    accuracy_1 = evaluate_performance_simple(models[1], loaders, 0)
-    accuracy_fused = evaluate_performance_simple(fused_model, loaders, 0)
-
-    print('Test Accuracy of the model 0: %.2f' % accuracy_0)
-    print('Test Accuracy of the model 1: %.2f' % accuracy_1)
-    print('Test Accuracy of the model fused: %.2f' % accuracy_fused)
+        model1 = m.ResNet18(linear_bias=False, use_batchnorm=False)
+        checkpoint = torch.load("models/resnet_models/model_1/best.checkpoint", map_location = "cpu")
+        model1.load_state_dict(checkpoint['model_state_dict'])
+        models=[model0, model1]"""
+        loaders = None
+        if "vgg" not in args.model_name and "resnet" not in args.model_name:
+            loaders = get_data_loader()
+        else:
+            loaders = get_cifar_data_loader()
+        
+        accuracies_orig = []
+        for model in models:
+            accuracies_orig.append(evaluate_performance_simple(model, loaders, 0))
 
 
+        imp = 0.0
+        accuracies = []
+        #fused_model = fusion(models, args, accuracies=accuracies_orig)
 
-    
+        fused_model = fusion(models, args)
+        fused_model,_ = train_during_pruning(fused_model, loaders, 20, 0, prune=False)
+        accuracy_fused = evaluate_performance_simple(fused_model, loaders, 0)
+        accuracies.append((accuracy_fused, imp))
+
+        print("---- Model 0 Parameters ------")
+        for idx, (layer0_name, fc_layer0_weight) in \
+                enumerate(models[0].named_parameters()):
+            print(f"{layer0_name} : {fc_layer0_weight.shape}")
+        
+        print("---- Model 1 Parameters ------")
+        for idx, (layer0_name, fc_layer0_weight) in \
+                enumerate(models[1].named_parameters()):
+            print(f"{layer0_name} : {fc_layer0_weight.shape}")
+        
+        print("---- Model Fused Parameters ------")
+        for idx, (layer0_name, fc_layer0_weight) in \
+                enumerate(fused_model.named_parameters()):
+            print(f"{layer0_name} : {fc_layer0_weight.shape}")
+
+        
+        for accuracy in accuracies:
+            print('Test Accuracy of the model fused: %.2f' % accuracy[0])
+            print(accuracy[1])
+            print("-----------------------")
+        
+        for accuracy in accuracies_orig:
+            print('Test Accuracy of the model original: %.2f' % accuracy)
+        
+        dict[str(it/10)] = {
+            "accuracy_original": accuracies_orig[0],
+            "accuracy_fused": accuracy_fused
+        }
+        print(dict)
+
+        break
+
+
+    print(dict)
+    with open("results_fusion_alternative_whatever.json", "w") as outfile:
+        json.dump(dict, outfile, indent=4)
+
+
+
+
+        
 
 

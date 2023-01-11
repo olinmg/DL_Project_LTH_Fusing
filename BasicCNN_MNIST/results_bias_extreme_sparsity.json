@@ -1,0 +1,654 @@
+{
+    "experiment_parameters": {
+        "FaP": false,
+        "PaF": false,
+        "PaF_all": false,
+        "models": [
+            {
+                "name": "vgg11"
+            }
+        ],
+        "prune_type": [
+            "l1"
+        ],
+        "sparsity": [
+            0.1,
+            0.15,
+            0.2,
+            0.25,
+            0.3,
+            0.35,
+            0.4,
+            0.45,
+            0.5,
+            0.55,
+            0.6,
+            0.65,
+            0.7,
+            0.75,
+            0.8,
+            0.85,
+            0.9,
+            0.95
+        ],
+        "num_models": 2,
+        "num_epochs": 0,
+        "diff_weight_init": true,
+        "gpu_id": 0,
+        "dataset": "cifar"
+    },
+    "results": [
+        {
+            "sparsity": 0.1,
+            "prune_type": "l1",
+            "vgg11": {
+                "accuracy_PaF": {},
+                "accuracy_FaP": {},
+                "accuracy_PaF_all": {},
+                "accuracy_fused": 0.308,
+                "model_0": {
+                    "accuracy_original": 0.854,
+                    "accuracy_pruned": {
+                        "0": 0.828
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.834
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.834
+                    }
+                },
+                "model_1": {
+                    "accuracy_original": 0.862,
+                    "accuracy_pruned": {
+                        "0": 0.848
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.856
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.856
+                    }
+                }
+            }
+        },
+        {
+            "sparsity": 0.15,
+            "prune_type": "l1",
+            "vgg11": {
+                "accuracy_PaF": {},
+                "accuracy_FaP": {},
+                "accuracy_PaF_all": {},
+                "accuracy_fused": 0.308,
+                "model_0": {
+                    "accuracy_original": 0.854,
+                    "accuracy_pruned": {
+                        "0": 0.808
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.815
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.815
+                    }
+                },
+                "model_1": {
+                    "accuracy_original": 0.862,
+                    "accuracy_pruned": {
+                        "0": 0.829
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.837
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.837
+                    }
+                }
+            }
+        },
+        {
+            "sparsity": 0.2,
+            "prune_type": "l1",
+            "vgg11": {
+                "accuracy_PaF": {},
+                "accuracy_FaP": {},
+                "accuracy_PaF_all": {},
+                "accuracy_fused": 0.308,
+                "model_0": {
+                    "accuracy_original": 0.854,
+                    "accuracy_pruned": {
+                        "0": 0.757
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.75
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.745
+                    }
+                },
+                "model_1": {
+                    "accuracy_original": 0.862,
+                    "accuracy_pruned": {
+                        "0": 0.803
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.809
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.801
+                    }
+                }
+            }
+        },
+        {
+            "sparsity": 0.25,
+            "prune_type": "l1",
+            "vgg11": {
+                "accuracy_PaF": {},
+                "accuracy_FaP": {},
+                "accuracy_PaF_all": {},
+                "accuracy_fused": 0.308,
+                "model_0": {
+                    "accuracy_original": 0.854,
+                    "accuracy_pruned": {
+                        "0": 0.681
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.634
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.632
+                    }
+                },
+                "model_1": {
+                    "accuracy_original": 0.862,
+                    "accuracy_pruned": {
+                        "0": 0.757
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.744
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.741
+                    }
+                }
+            }
+        },
+        {
+            "sparsity": 0.3,
+            "prune_type": "l1",
+            "vgg11": {
+                "accuracy_PaF": {},
+                "accuracy_FaP": {},
+                "accuracy_PaF_all": {},
+                "accuracy_fused": 0.308,
+                "model_0": {
+                    "accuracy_original": 0.854,
+                    "accuracy_pruned": {
+                        "0": 0.633
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.492
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.487
+                    }
+                },
+                "model_1": {
+                    "accuracy_original": 0.862,
+                    "accuracy_pruned": {
+                        "0": 0.677
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.604
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.604
+                    }
+                }
+            }
+        },
+        {
+            "sparsity": 0.35,
+            "prune_type": "l1",
+            "vgg11": {
+                "accuracy_PaF": {},
+                "accuracy_FaP": {},
+                "accuracy_PaF_all": {},
+                "accuracy_fused": 0.308,
+                "model_0": {
+                    "accuracy_original": 0.854,
+                    "accuracy_pruned": {
+                        "0": 0.495
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.38
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.333
+                    }
+                },
+                "model_1": {
+                    "accuracy_original": 0.862,
+                    "accuracy_pruned": {
+                        "0": 0.601
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.456
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.425
+                    }
+                }
+            }
+        },
+        {
+            "sparsity": 0.4,
+            "prune_type": "l1",
+            "vgg11": {
+                "accuracy_PaF": {},
+                "accuracy_FaP": {},
+                "accuracy_PaF_all": {},
+                "accuracy_fused": 0.308,
+                "model_0": {
+                    "accuracy_original": 0.854,
+                    "accuracy_pruned": {
+                        "0": 0.449
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.282
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.217
+                    }
+                },
+                "model_1": {
+                    "accuracy_original": 0.862,
+                    "accuracy_pruned": {
+                        "0": 0.517
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.354
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.268
+                    }
+                }
+            }
+        },
+        {
+            "sparsity": 0.45,
+            "prune_type": "l1",
+            "vgg11": {
+                "accuracy_PaF": {},
+                "accuracy_FaP": {},
+                "accuracy_PaF_all": {},
+                "accuracy_fused": 0.308,
+                "model_0": {
+                    "accuracy_original": 0.854,
+                    "accuracy_pruned": {
+                        "0": 0.38
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.197
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.178
+                    }
+                },
+                "model_1": {
+                    "accuracy_original": 0.862,
+                    "accuracy_pruned": {
+                        "0": 0.431
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.242
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.207
+                    }
+                }
+            }
+        },
+        {
+            "sparsity": 0.5,
+            "prune_type": "l1",
+            "vgg11": {
+                "accuracy_PaF": {},
+                "accuracy_FaP": {},
+                "accuracy_PaF_all": {},
+                "accuracy_fused": 0.308,
+                "model_0": {
+                    "accuracy_original": 0.854,
+                    "accuracy_pruned": {
+                        "0": 0.348
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.155
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.139
+                    }
+                },
+                "model_1": {
+                    "accuracy_original": 0.862,
+                    "accuracy_pruned": {
+                        "0": 0.387
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.173
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.134
+                    }
+                }
+            }
+        },
+        {
+            "sparsity": 0.55,
+            "prune_type": "l1",
+            "vgg11": {
+                "accuracy_PaF": {},
+                "accuracy_FaP": {},
+                "accuracy_PaF_all": {},
+                "accuracy_fused": 0.308,
+                "model_0": {
+                    "accuracy_original": 0.854,
+                    "accuracy_pruned": {
+                        "0": 0.238
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.133
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.125
+                    }
+                },
+                "model_1": {
+                    "accuracy_original": 0.862,
+                    "accuracy_pruned": {
+                        "0": 0.297
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.127
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.105
+                    }
+                }
+            }
+        },
+        {
+            "sparsity": 0.6,
+            "prune_type": "l1",
+            "vgg11": {
+                "accuracy_PaF": {},
+                "accuracy_FaP": {},
+                "accuracy_PaF_all": {},
+                "accuracy_fused": 0.308,
+                "model_0": {
+                    "accuracy_original": 0.854,
+                    "accuracy_pruned": {
+                        "0": 0.153
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.108
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.103
+                    }
+                },
+                "model_1": {
+                    "accuracy_original": 0.862,
+                    "accuracy_pruned": {
+                        "0": 0.207
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.106
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.101
+                    }
+                }
+            }
+        },
+        {
+            "sparsity": 0.65,
+            "prune_type": "l1",
+            "vgg11": {
+                "accuracy_PaF": {},
+                "accuracy_FaP": {},
+                "accuracy_PaF_all": {},
+                "accuracy_fused": 0.308,
+                "model_0": {
+                    "accuracy_original": 0.854,
+                    "accuracy_pruned": {
+                        "0": 0.123
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.101
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.101
+                    }
+                },
+                "model_1": {
+                    "accuracy_original": 0.862,
+                    "accuracy_pruned": {
+                        "0": 0.168
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.101
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.101
+                    }
+                }
+            }
+        },
+        {
+            "sparsity": 0.7,
+            "prune_type": "l1",
+            "vgg11": {
+                "accuracy_PaF": {},
+                "accuracy_FaP": {},
+                "accuracy_PaF_all": {},
+                "accuracy_fused": 0.308,
+                "model_0": {
+                    "accuracy_original": 0.854,
+                    "accuracy_pruned": {
+                        "0": 0.101
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.101
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.101
+                    }
+                },
+                "model_1": {
+                    "accuracy_original": 0.862,
+                    "accuracy_pruned": {
+                        "0": 0.101
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.101
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.101
+                    }
+                }
+            }
+        },
+        {
+            "sparsity": 0.75,
+            "prune_type": "l1",
+            "vgg11": {
+                "accuracy_PaF": {},
+                "accuracy_FaP": {},
+                "accuracy_PaF_all": {},
+                "accuracy_fused": 0.308,
+                "model_0": {
+                    "accuracy_original": 0.854,
+                    "accuracy_pruned": {
+                        "0": 0.101
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.101
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.101
+                    }
+                },
+                "model_1": {
+                    "accuracy_original": 0.862,
+                    "accuracy_pruned": {
+                        "0": 0.104
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.101
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.101
+                    }
+                }
+            }
+        },
+        {
+            "sparsity": 0.8,
+            "prune_type": "l1",
+            "vgg11": {
+                "accuracy_PaF": {},
+                "accuracy_FaP": {},
+                "accuracy_PaF_all": {},
+                "accuracy_fused": 0.308,
+                "model_0": {
+                    "accuracy_original": 0.854,
+                    "accuracy_pruned": {
+                        "0": 0.101
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.101
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.101
+                    }
+                },
+                "model_1": {
+                    "accuracy_original": 0.862,
+                    "accuracy_pruned": {
+                        "0": 0.101
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.101
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.101
+                    }
+                }
+            }
+        },
+        {
+            "sparsity": 0.85,
+            "prune_type": "l1",
+            "vgg11": {
+                "accuracy_PaF": {},
+                "accuracy_FaP": {},
+                "accuracy_PaF_all": {},
+                "accuracy_fused": 0.308,
+                "model_0": {
+                    "accuracy_original": 0.854,
+                    "accuracy_pruned": {
+                        "0": 0.101
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.101
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.101
+                    }
+                },
+                "model_1": {
+                    "accuracy_original": 0.862,
+                    "accuracy_pruned": {
+                        "0": 0.101
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.101
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.101
+                    }
+                }
+            }
+        },
+        {
+            "sparsity": 0.9,
+            "prune_type": "l1",
+            "vgg11": {
+                "accuracy_PaF": {},
+                "accuracy_FaP": {},
+                "accuracy_PaF_all": {},
+                "accuracy_fused": 0.308,
+                "model_0": {
+                    "accuracy_original": 0.854,
+                    "accuracy_pruned": {
+                        "0": 0.101
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.101
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.101
+                    }
+                },
+                "model_1": {
+                    "accuracy_original": 0.862,
+                    "accuracy_pruned": {
+                        "0": 0.101
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.101
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.101
+                    }
+                }
+            }
+        },
+        {
+            "sparsity": 0.95,
+            "prune_type": "l1",
+            "vgg11": {
+                "accuracy_PaF": {},
+                "accuracy_FaP": {},
+                "accuracy_PaF_all": {},
+                "accuracy_fused": 0.308,
+                "model_0": {
+                    "accuracy_original": 0.854,
+                    "accuracy_pruned": {
+                        "0": 0.101
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.101
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.101
+                    }
+                },
+                "model_1": {
+                    "accuracy_original": 0.862,
+                    "accuracy_pruned": {
+                        "0": 0.101
+                    },
+                    "accuracy_pruned_and_fused": {
+                        "0": 0.101
+                    },
+                    "accuracy_pruned_and_fused_multiple_sparsities": {
+                        "0": 0.101
+                    }
+                }
+            }
+        }
+    ]
+}
