@@ -20,7 +20,7 @@ Have a look at the parameters.py file in order to see all available training arg
 
 ### Recreate Figure 1: Data-Free Processing comparison between MSF, SSF, and the original pruned model
 Set experiment_parameters.json to:
-
+<br />
 {
     "FaP": false,
     "PaF": false,
@@ -38,15 +38,15 @@ Set experiment_parameters.json to:
     "diff_weight_init": true,
     "gpu_id": 0,
     "dataset": "cifar"
-}
-Make sure your model is located in the models folder and has name: vgg11_diff_weight_init_True_0.pth
+}<br />
+Make sure your model is located in the models folder and has name: vgg11_diff_weight_init_True_0.pth<br />
 Run:
 ```
 python performance_tester.py
 ```
-Results will be saved in results.json
+Results will be saved in results.json<br />
 ### Recreate Figure 2: Data-Aware Processing comparison between SSF, and the original pruned model
-Set experiment_parameters.json to:
+Set experiment_parameters.json to:<br />
 
 {
     "FaP": false,
@@ -65,8 +65,8 @@ Set experiment_parameters.json to:
     "diff_weight_init": true,
     "gpu_id": 0,
     "dataset": "cifar"
-}
-Make sure your model is located in the models folder and has name: vgg11_diff_weight_init_True_0.pth
+}<br />
+Make sure your model is located in the models folder and has name: vgg11_diff_weight_init_True_0.pth<br />
 Run:
 ```
 python performance_tester.py
