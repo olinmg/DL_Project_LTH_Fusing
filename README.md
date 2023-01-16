@@ -94,7 +94,7 @@ Set experiment_parameters.json to:<br />
 This will create performance measurements that are stored in the folder ../results_and_plots/fullDict_results_non_retrained_vgg/. From there code plot_non_retrained.py can be used to generate the plots seen in the paper.
 Run:
 ```
-python performance_tester_varyingWeightsAndSparsity
+python performance_tester_varyingWeightsAndSparsity.py
 ```
 
 
