@@ -91,7 +91,11 @@ Set experiment_parameters.json to:<br />
     "gpu_id": -1,
     "dataset": "cifar"
 }<br />
-This will create performance measurements that are stored in the folder results_and_plots. From there code plot_non_retrained.py can be used to generate the plots seen in the paper.
+This will create performance measurements that are stored in the folder ../results_and_plots/fullDict_results_non_retrained_vgg/. From there code plot_non_retrained.py can be used to generate the plots seen in the paper.
+Run:
+```
+python performance_tester_varyingWeightsAndSparsity
+```
 
 
 ### Recreate Figure 5 or 7: PaF vs FaP vs pruned models when finetuning is enabled
