@@ -73,6 +73,27 @@ python performance_tester.py
 ```
 Results will be saved in results.json
 
+### Recreate Figure 4 and 8 to 12: PaF vs FaP vs pruned models when finetuning is disabled
+Set experiment_parameters.json to:<br />
+{
+    "FaP": true,
+    "PaF": true,
+    "PaF_all": false,
+    "models": [
+        {
+            "name": "vgg11"
+    }],
+    "prune_type": "l1",
+    "sparsity": 0.3,
+    "num_models": 2,
+    "num_epochs": 0,
+    "diff_weight_init": true,
+    "gpu_id": -1,
+    "dataset": "cifar"
+}<br />
+This will create performance measurements that are stored in the folder results_and_plots. From there code plot_non_retrained.py can be used to generate the plots seen in the paper.
+
+
 ### Recreate Figure 5 or 7: PaF vs FaP vs pruned models when finetuning is enabled
 Set experiment_parameters.json to:<br />
 
