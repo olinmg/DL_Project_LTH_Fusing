@@ -6,3 +6,70 @@
     - plot_non_retrained.py: run this to generate the plots shown in the paper for FaP and PaF at different sparsities and fusion importances. The experiment results will be sourced from "fullDict_results_non_retrained" and the resulting plots will be stored to "plots_non_retrained".
     - plot_retrained.py: run this to generated the plots shown in the paper for FaP and PaF with retraining. The experiment results will be sourced from "fullDict_results_non_retrained" and the resulting plots will be stored to "plots_non_retrained".
     
+### How to Train Models
+#### Training two VGG11s using different weight initializations
+Train.py file is located in the experiments folder. Run the following commands when you are in the experiments folder. Results will be saved in the models folder.
+```
+python train.py --num-models 2 --gpu-id 0 --model-name vgg11 --diff-weight-init
+```
+#### Training two VGG11s using same weight initializations but different data
+```
+python train.py --num-models 2 --gpu-id 0 --model-name vgg11
+```
+Have a look at the parameters.py file in order to see all available training arguments.
+
+### Recreate Figure 1: Data-Free Processing comparison between MSF, SSF, and the original pruned model
+Set experiment_parameters.json to:
+
+{
+    "FaP": false,
+    "PaF": false,
+    "PaF_all": false,
+    "SSF": true,
+    "MSF": true,
+    "models": [
+        {
+            "name": "vgg11"
+    }],
+    "prune_type": ["l1"],
+    "sparsity": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+    "num_models": 1,
+    "num_epochs": 0,
+    "diff_weight_init": true,
+    "gpu_id": 0,
+    "dataset": "cifar"
+}
+Make sure your model is located in the models folder and has name: vgg11_diff_weight_init_True_0.pth
+Run:
+```
+python performance_tester.py
+```
+Results will be saved in results.json
+### Recreate Figure 2: Data-Aware Processing comparison between SSF, and the original pruned model
+Set experiment_parameters.json to:
+
+{
+    "FaP": false,
+    "PaF": false,
+    "PaF_all": false,
+    "SSF": true,
+    "MSF": false,
+    "models": [
+        {
+            "name": "vgg11"
+    }],
+    "prune_type": ["l1"],
+    "sparsity": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+    "num_models": 1,
+    "num_epochs": 75,
+    "diff_weight_init": true,
+    "gpu_id": 0,
+    "dataset": "cifar"
+}
+Make sure your model is located in the models folder and has name: vgg11_diff_weight_init_True_0.pth
+Run:
+```
+python performance_tester.py
+```
+Results will be saved in results.json
+
