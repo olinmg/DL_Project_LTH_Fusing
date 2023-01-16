@@ -91,7 +91,7 @@ Set experiment_parameters.json to:<br />
     "gpu_id": -1,
     "dataset": "cifar"
 }<br />
-From the experiments folder run:
+In the script performance_tester_varyingWeightsAndSparsity.py it can be adjusted what should be explored. Multiple sparsities or multiple fusion importances (and which ones). From the experiments folder run the following to execute the experiments:
 ```
 python performance_tester_varyingWeightsAndSparsity.py
 ```
