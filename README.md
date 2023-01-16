@@ -39,7 +39,7 @@ Set experiment_parameters.json to:
     "gpu_id": 0,
     "dataset": "cifar"
 }<br />
-Make sure your model is located in the models folder and has name: vgg11_diff_weight_init_True_0.pth<br />
+Models were trained using learning rate = 0.05, Optimizer = SGD, momentum=0.9. Make sure your model is located in the models folder and has name: vgg11_diff_weight_init_True_0.pth<br />
 Run:
 ```
 python performance_tester.py
@@ -66,10 +66,37 @@ Set experiment_parameters.json to:<br />
     "gpu_id": 0,
     "dataset": "cifar"
 }<br />
-Make sure your model is located in the models folder and has name: vgg11_diff_weight_init_True_0.pth<br />
+Models were trained using the training hyperparameters specified in the appendix. Make sure your model is located in the models folder and has name: vgg11_diff_weight_init_True_0.pth<br />
 Run:
 ```
 python performance_tester.py
 ```
 Results will be saved in results.json
 
+### Recreate Figure 5 or 7: PaF vs FaP vs pruned models when finetuning is enabled
+Set experiment_parameters.json to:<br />
+
+{
+    "FaP": true,
+    "PaF": true,
+    "PaF_all": false,
+    "SSF": false,
+    "MSF": false,
+    "models": [
+        {
+            "name": "vgg11"
+    }],
+    "prune_type": ["l1"],
+    "sparsity": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.925, 0.95, 0.975],
+    "num_models": 2,
+    "num_epochs": 75,
+    "diff_weight_init": true,
+    "gpu_id": 0,
+    "dataset": "cifar"
+}<br />
+Models were trained using the training hyperparameters specified in the appendix. Make sure your models located in the models folder and have names: vgg11_diff_weight_init_True_0.pth, vgg11_diff_weight_init_True_1.pth<br />
+Run:
+```
+python performance_tester.py
+```
+Results will be saved in results.json
