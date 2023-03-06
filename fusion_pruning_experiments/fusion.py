@@ -36,13 +36,13 @@ def get_ground_metric(coordinates1, coordinates2, bias1, bias2):
     return compute_euclidian_distance_matrix(coordinates1, coordinates2)
 
 # create_network_from_params creates a network given the list of weights
-def create_network_from_params(args, reference_model, param_list, sparsity=1.0):
+def create_network_from_params(reference_model, param_list, gpu_id = -1,sparsity=1.0):
     model = copy.deepcopy(reference_model)
 
     assert len(list(model.parameters())) == len(param_list) # Assumption: We are fusing into a model of same architecture
 
-    if args.gpu_id != -1:
-        model = model.cuda(args.gpu_id)
+    if gpu_id != -1:
+        model = model.cuda(gpu_id)
     
     layer_idx = 0
     model_state_dict = model.state_dict()
@@ -105,7 +105,7 @@ def comparator(model0_args, model1_args):
 
 
 
-def fusion(networks, args, accuracies=None, importance=None, eps=1e-7):
+def fusion(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7, resnet=False):
     """
     fusion fuses arbitrary many models into the model that is the smallest
 
@@ -114,11 +114,18 @@ def fusion(networks, args, accuracies=None, importance=None, eps=1e-7):
     :param importance: A list of floats. If importance = [0.9, 0.1], then linear combination of weights will be: network[0]*0.9 + network[1]*0.1
     :return: the fused model
     """ 
+
+    print("RESNET IS: ", resnet)
     num_layers = len(list(zip(networks[0].parameters(), networks[1].parameters())))
 
     num_models = len(networks)
     avg_aligned_layers = []
     T_var_list = [None]*num_models
+    skip_T_var_list = [None]*num_models
+    skip_T_var_idx_list = [-1]*num_models
+    residual_T_var_list = [None]*num_models
+    residual_T_var_idx_list = [-1]*num_models
+
     bias = False
     bias_weight = None
     avg_bias_weight = None
@@ -168,6 +175,10 @@ def fusion(networks, args, accuracies=None, importance=None, eps=1e-7):
         
         for idx_model in range(1, num_models): # We skip the first model because we align our models according to the first model
             T_var = T_var_list[idx_model]
+            skip_T_var = skip_T_var_list[idx_model]
+            skip_T_var_idx = skip_T_var_idx_list[idx_model]
+            residual_T_var = residual_T_var_list[idx_model]
+            residual_T_var_idx = residual_T_var_idx_list[idx_model]
             _, layer = next(layer_iters[idx_model])
 
             bias_weight = next(itertools.islice(networks[idx_model].named_parameters(), idx+1, None))[1] if bias else None
@@ -198,6 +209,28 @@ def fusion(networks, args, accuracies=None, importance=None, eps=1e-7):
                 aligned_wt = layer_data
             else:
                 if is_conv:
+                    if resnet:
+                        assert len(layer_shape) == 4
+                        # save skip_level transport map if there is block ahead
+                        if layer_shape[1] != layer_shape[0]:
+                            if not (layer_shape[2] == 1 and layer_shape[3] == 1):
+                                print(f'saved skip T_var at layer {idx} with shape {layer_shape}')
+                                skip_T_var = T_var.clone()
+                                skip_T_var_idx = idx
+                            else:
+                                print(
+                                    f'utilizing skip T_var saved from layer layer {skip_T_var_idx} with shape {skip_T_var.shape}')
+                                # if it's a shortcut (128, 64, 1, 1)
+                                residual_T_var = T_var.clone()
+                                residual_T_var_idx = idx  # use this after the skip
+                                T_var = skip_T_var
+                            print("shape of previous transport map now is", T_var.shape)
+                        else:
+                            if residual_T_var is not None and (residual_T_var_idx == (idx - 1)):
+                                T_var = (T_var + residual_T_var) / 2
+                                print("averaging multiple T_var's")
+                            else:
+                                print("doing nothing for skips")
                     T_var_conv = T_var.unsqueeze(0).repeat(layer_data.shape[2], 1, 1)
                     aligned_wt = torch.bmm(layer_data.permute(2, 0, 1), T_var_conv).permute(1, 2, 0)
                     
@@ -229,14 +262,14 @@ def fusion(networks, args, accuracies=None, importance=None, eps=1e-7):
             print(nu.shape)
             T = ot.emd(nu, mu, cpuM)
 
-            if args.gpu_id!=-1:
-                T_var = torch.from_numpy(T).cuda(args.gpu_id).float()
+            if gpu_id != -1:
+                T_var = torch.from_numpy(T).cuda(gpu_id).float()
             else:
                 T_var = torch.from_numpy(T).float()
             
             # ----- Assumption: correction = TRUE, proper_marginals = FALSE ---------
-            if args.gpu_id != -1:
-                marginals = torch.ones(T_var.shape[1]).cuda(args.gpu_id) / T_var.shape[0]
+            if gpu_id != -1:
+                marginals = torch.ones(T_var.shape[1]).cuda(gpu_id) / T_var.shape[0]
             else:
                 marginals = torch.ones(T_var.shape[1]) / T_var.shape[0]
             marginals = torch.diag(1.0/(marginals + eps))  # take inverse
@@ -262,6 +295,10 @@ def fusion(networks, args, accuracies=None, importance=None, eps=1e-7):
                 avg_bias_weight = (t_bias_aligned*importance[idx_model] + avg_bias_weight*torch.sum(importance[:idx_model]))/(torch.sum(importance[:idx_model])+importance[idx_model])
 
             T_var_list[idx_model] = T_var
+            skip_T_var_list[idx_model] = skip_T_var
+            skip_T_var_idx_list[idx_model] = skip_T_var_idx
+            residual_T_var_list[idx_model] = residual_T_var
+            residual_T_var_idx_list[idx_model] = residual_T_var_idx
         
         avg_aligned_layers.append(avg_layer)
         if bias:
@@ -273,16 +310,16 @@ def fusion(networks, args, accuracies=None, importance=None, eps=1e-7):
         avg_layer_data = None 
         layer_data = None
 
-    return create_network_from_params(args=args, param_list=avg_aligned_layers, reference_model = networks[0])
+    return create_network_from_params(gpu_id=gpu_id, param_list=avg_aligned_layers, reference_model = networks[0])
 
 # fusion fuses two models with cost matrix based on weights, NOT ACTIVATIONS
-def fusion_old(networks, args, importance = [], eps=1e-7, resnet=False):
+def fusion_old(networks, args, gpu_id = -1, importance = [], eps=1e-7, resnet=False):
     assert len(networks) == 2 # Temporary assert. Later we can do more models
 
-    if args.gpu_id==-1:
+    if gpu_id:
         device = torch.device('cpu')
     else:
-        device = torch.device('cuda:{}'.format(args.gpu_id))
+        device = torch.device('cuda:{}'.format(gpu_id))
     
     num_layers = len(list(zip(networks[0].parameters(), networks[1].parameters())))
 
@@ -418,14 +455,14 @@ def fusion_old(networks, args, importance = [], eps=1e-7, resnet=False):
 
         T = ot.emd(mu, nu, cpuM)
 
-        if args.gpu_id!=-1:
-            T_var = torch.from_numpy(T).cuda(args.gpu_id).float()
+        if gpu_id!=-1:
+            T_var = torch.from_numpy(T).cuda(gpu_id).float()
         else:
             T_var = torch.from_numpy(T).float()
 
         # ----- Assumption: correction = TRUE, proper_marginals = FALSE ---------
-        if args.gpu_id != -1:
-            marginals = torch.ones(T_var.shape[1]).cuda(args.gpu_id) / T_var.shape[0]
+        if gpu_id != -1:
+            marginals = torch.ones(T_var.shape[1]).cuda(gpu_id) / T_var.shape[0]
         else:
             marginals = torch.ones(T_var.shape[1]) / T_var.shape[0]
         marginals = torch.diag(1.0/(marginals + eps))  # take inverse

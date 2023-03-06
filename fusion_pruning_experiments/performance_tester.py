@@ -127,13 +127,15 @@ def pruning_test_manager(input_model_list, loaders, pruning_function, fusion_fun
 
 # importance para not given
 # ATT: added importance para!
-def fusion_test_manager(input_model_list, loaders, pruning_function, fusion_function, eval_function, gpu_id, args, num_epochs, accuracies=None, importance=None):
+def fusion_test_manager(input_model_list, loaders, pruning_function, fusion_function, eval_function, gpu_id, num_epochs, accuracies=None, importance=None, name=""):
     #return input_model_list[0], 0, ""
     '''
     Does fusion of the models in input_model_list and evaluates the performance of the resulting model.
     '''
+
+    print("name is: ", name)
     
-    fused_model, description_fusion = fusion_function(input_model_list, args, accuracies=accuracies, importance=importance)
+    fused_model, description_fusion = fusion_function(input_model_list, gpu_id=gpu_id, accuracies=accuracies, importance=importance, name=name)
     #fused_model,_ = train_during_pruning(model=fused_model, loaders=loaders, num_epochs=num_epochs, gpu_id = gpu_id, prune=False)
     acc_model_fused = eval_function(input_model=fused_model, loaders=loaders, gpu_id = gpu_id)
     print(f"Fused model:\t{acc_model_fused}")
@@ -270,54 +272,20 @@ def wrapper_structured_pruning(input_model, prune_params):
     description = {"name": "Structured Pruning", "num_epochs": num_epochs, "prune_type":prune_type}
 
     return pruned_model, description
-########################################################################################
-
-
-
-def wrapper_fake_fusion(list_of_models, args, para_dict):
-    '''
-    This is an example for how a fusion function should be build. It takes a list of models and a dictionary of parameters (para_dict).
-
-    Checks if all arguments requiered for the wanted fusion function exist and then uses the fusion function accordingly.
-    
-    ! JUST A DUMMY FUNCTION !
-    '''
-    return list_of_models[0], {"name":"Fake fusion, no paras."}
-
 
 from fusion import fusion, fusion_old, fusion_old2
-def wrapper_first_fusion(list_of_models, args, accuracies=None, importance=None):
+def wrapper_first_fusion(list_of_models, gpu_id=-1, accuracies=None, importance=None, name=""):
     '''
     Uses the first simple fusion approach created by Alex in fusion.py.
     So far this can only handle two (simple -> CNN and MLP) networks in list_of_models.
     '''
 
-    #assert "eps" in para_dict.keys()   
-    name = "First Fusion"
 
-    fused_model = fusion(networks=list_of_models, args=args, accuracies=accuracies, importance=importance)
+    fused_model = fusion(networks=list_of_models, gpu_id=-1, accuracies=accuracies, importance=importance, resnet="resnet" in name)
 
     description = {"name": name}
 
     return fused_model, description
-
-
-def check_parameters(parameters):
-    error = False
-    message = ""
-    if parameters["sparsity"]>= 1.0 or parameters["sparsity"] <= 0.0:
-        error = True
-        message +="Sparsity out of range\n"
-    if len(parameters["models"]) == 0:
-        error = True
-        message += "At least one model required\n"
-    """
-    if parameters["num_models"] != 2:
-        error = True
-        message += "num models needs to be 2\n"
-        """
-    return error, message
-
 
 def get_result_skeleton(parameters):
     result_final = {
@@ -363,125 +331,11 @@ def get_result_skeleton(parameters):
 def float_format(number):
     return float("{:.3f}".format(number))
 
-def experimental(new_result, sparsity, models_original, original_model_accuracies, pruned_models, pruned_model_accuracies, args, loaders, gpu_id, name, params, original_fused_model):
-    all_models = []
-    max_pruned_acc = pruned_model_accuracies.index(max(pruned_model_accuracies))
-
-    for i in range(len(pruned_model_accuracies)):
-                #torch.save(pruned_models[i].state_dict(), "models/{}_pruned_{}_.pth".format(name, i))
-                m,epoch_accuracy = train_during_pruning(pruned_models[i], loaders=loaders, num_epochs=experiment_params["num_epochs"], gpu_id =experiment_params["gpu_id"], prune=False)
-                pruned_model_accuracies[i] = epoch_accuracy[-1]
-                pruned_models[i] = m
-
-    args.num_models = len(models_original)
-
-    #fused_model = fusion([*models_original, *pruned_models], accuracies=[*original_model_accuracies, *pruned_model_accuracies], args=args)
-    #fused_model,_ = train_during_pruning(fused_model, loaders=loaders, num_epochs=experiment_params["num_epochs"], gpu_id =experiment_params["gpu_id"], prune=False)
-    paf_model = fusion(pruned_models, accuracies=pruned_model_accuracies, args=args)
-    paf_model,_ = train_during_pruning(paf_model, loaders=loaders, num_epochs=experiment_params["num_epochs"], gpu_id =experiment_params["gpu_id"], prune=False)
-
-    pruned_and_fused_model_accuracies = []
-    pruned_and_fused_models = []
-    for i in range(len(models_original)):
-        fused_pruned = fusion([models_original[i], pruned_models[i]], args=args)#, importance=[0.8, 0.2])
-        pruned_and_fused_models.append(fused_pruned)
-        accuracy = evaluate_performance_simple(fused_pruned, loaders, gpu_id, prune=False)
-        pruned_and_fused_model_accuracies.append(accuracy)
-    
-    prune_params = {"prune_type": "l1", "sparsity": sparsity, "num_epochs": 0,
-                        "example_input": torch.randn(1,1, 28,28) if not ("vgg" in name) else torch.randn(1, 3, 32, 32),
-                        "out_features": 10, "loaders": loaders, "gpu_id": gpu_id}
-    
-    original_fused_model,_ = train_during_pruning(original_fused_model, loaders=loaders, num_epochs=experiment_params["num_epochs"], gpu_id =experiment_params["gpu_id"], prune=False)
-    fap_model, _,_ = pruning_test_manager(input_model_list=[original_fused_model], prune_params=prune_params, **params)
-    fap_model = fap_model[0]
-    fap_model,_ = train_during_pruning(fap_model, loaders=loaders, num_epochs=experiment_params["num_epochs"], gpu_id =experiment_params["gpu_id"], prune=False)
-    
-    #accuracy_fused = evaluate_performance_simple(fused_model, loaders, gpu_id, prune=False)
-    accuracy_paf = evaluate_performance_simple(paf_model, loaders, gpu_id, prune=False)
-    accuracy_fap = evaluate_performance_simple(fap_model, loaders, gpu_id, prune=False)
-    
-
-    sparsities = [0.9]
-
-    """
-    models = []
-    accuracies_new = []
-    for sparsity in sparsities:
-        prune_params = {"prune_type": "l1", "sparsity": sparsity, "num_epochs": 0,
-                        "example_input": torch.randn(1,1, 28,28) if not ("vgg" in name) else torch.randn(1, 3, 32, 32),
-                        "out_features": 10, "loaders": loaders, "gpu_id": gpu_id}
-
-        pruned_models_new, pruned_models_new_accuracies,_ = pruning_test_manager(input_model_list=[models_original[0]], prune_params=prune_params, **params)
-        m,epoch_accuracy = train_during_pruning(pruned_models_new[0], loaders=loaders, num_epochs=experiment_params["num_epochs"], gpu_id =experiment_params["gpu_id"], prune=False)
-        models.append(m)
-        accuracies_new.append(epoch_accuracy[-1]*(1-sparsity))
-    
-    models.append(models_original[0])
-    print("models are: ", models)
-    accuracies_new.append(original_model_accuracies[0])
-    fused_model = fusion(models, accuracies=accuracies_new, args=args)
-    #fused_model_imp = fusion(models, accuracies=accuracies_new, importance=accuracies_new, args=args)
-    accuracy_many_sparsity = evaluate_performance_simple(fused_model, loaders, gpu_id, prune=False)
-    #accuracy_many_sparsity_imp = evaluate_performance_simple(fused_model_imp, loaders, gpu_id, prune=False)
-    """
-    for accuracy in original_model_accuracies:
-        print('Test Accuracy of the original model: %.2f' % accuracy)
-    for accuracy in pruned_model_accuracies:
-        print('Test Accuracy of the pruned model: %.2f' % accuracy)
-    for accuracy in pruned_and_fused_model_accuracies:
-        print('Test Accuracy of the pruned and fused model: %.2f' % accuracy)
-    
-    print('Test Accuracy of the fap model: %.2f' % accuracy_fap)
-    print('Test Accuracy of the paf model: %.2f' % accuracy_paf)
-    print("--------------------")
-    #print("Test accuracy of smallest model: ", accuracies_new[-2])
-    #print('Test Accuracy many_sparsity: %.2f' % accuracy_many_sparsity)
-    #print('Test Accuracy many_sparsity_imp: %.2f' % accuracy_many_sparsity_imp)
-
-    for i in range(len(pruned_and_fused_models)):
-        m,epoch_accuracy = train_during_pruning(pruned_and_fused_models[i], loaders=loaders, num_epochs=experiment_params["num_epochs"], gpu_id =experiment_params["gpu_id"], prune=False)
-        pruned_and_fused_model_accuracies[i] = epoch_accuracy[-1]
-    """
-    m,epoch_accuracy = train_during_pruning(fused_model, loaders=loaders, num_epochs=experiment_params["num_epochs"], gpu_id =experiment_params["gpu_id"], prune=False)
-    accuracy_many_sparsity = epoch_accuracy[-1]
-    """
-    for accuracy in pruned_and_fused_model_accuracies:
-        print('Test Accuracy of the FINETUNED pruned and fused model: %.2f' % accuracy)
-    
-
-    res = {}
-
-    res["pruned"] = {}
-    res["pruned"]["0"] = pruned_model_accuracies[0]
-    res["pruned"]["1"] = pruned_model_accuracies[1]
-    res["pruned_and_fused"] = {}
-    res["pruned_and_fused"]["0"] = pruned_and_fused_model_accuracies[0]
-    res["pruned_and_fused"]["1"] = pruned_and_fused_model_accuracies[1]
-
-    res["paf"] = accuracy_paf
-    res["fap"] = accuracy_fap
-
-    new_result[sparsity] = res
-    
-    #print('Test Accuracy FINETUNED many_sparsity: %.2f' % accuracy_many_sparsity)
-
-
-
-############################ TRYING TO USE THE PERFORMANCE ASSESSMENT CODE #######################
-
-from base_resNet import get_untrained_resnet
 
 if __name__ == '__main__':
     with open('./experiment_parameters.json', 'r') as f:
         experiment_params = json.load(f)
     
-    """
-    error, message = check_parameters(experiment_params)
-    if error:
-        print(f"Error in parsing parameters:\n{message}")
-        exit()
-    """
     result_final = get_result_skeleton(experiment_params)
 
     fusion_function = wrapper_first_fusion
@@ -527,7 +381,7 @@ if __name__ == '__main__':
                 result[name][f"model_{i}"]["accuracy_original"] = float_format(original_model_accuracies[i])
             
             prune_params = {"prune_type": result["prune_type"], "sparsity": result["sparsity"], "num_epochs": experiment_params["num_epochs"],
-                    "example_input": torch.randn(1,1, 28,28) if not ("vgg" in name) else torch.randn(1, 3, 32, 32),
+                    "example_input": torch.randn(1,1, 28,28) if "cnn" in name else torch.randn(1, 3, 32, 32),
                     "out_features": 10, "loaders": loaders, "gpu_id": experiment_params["gpu_id"]}
 
             pruned_models, pruned_model_accuracies,_ = pruning_test_manager(input_model_list=models_original, prune_params=prune_params, **params)
@@ -551,20 +405,20 @@ if __name__ == '__main__':
             fusion_params.model_name = name
 
             if experiment_params["FaP"]:
-                fused_model, fused_model_accuracy,_ = fusion_test_manager(input_model_list=models_original, **params, accuracies=original_model_accuracies, num_epochs = experiment_params["num_epochs"], args=fusion_params)
+                fused_model, fused_model_accuracy,_ = fusion_test_manager(input_model_list=models_original, **params, accuracies=original_model_accuracies, num_epochs = experiment_params["num_epochs"], name=name)
                 #experimental(new_result, result["sparsity"], models_original, original_model_accuracies, pruned_models, pruned_model_accuracies, get_parameters(), loaders, experiment_params["gpu_id"], name, params, fused_model)
                 #break
                 result[name]["accuracy_fused"] = float_format(fused_model_accuracy)
             
             if experiment_params["SSF"]:
                 for i in range(len(pruned_models)):
-                    pruned_and_fused_model, pruned_and_fused_model_accuracy,_ = fusion_test_manager(input_model_list=[pruned_models[i], models_original[i]], **params, num_epochs = experiment_params["num_epochs"], args=fusion_params)
+                    pruned_and_fused_model, pruned_and_fused_model_accuracy,_ = fusion_test_manager(input_model_list=[pruned_models[i], models_original[i]], **params, num_epochs = experiment_params["num_epochs"], name=name)
                     m,epoch_accuracy= train_during_pruning(copy.deepcopy(pruned_and_fused_model), loaders=loaders, num_epochs=experiment_params["num_epochs"], gpu_id =experiment_params["gpu_id"], prune=False)
                     for idx, accuracy in enumerate(epoch_accuracy):
                         result[name][f"model_{i}"]["accuracy_pruned_and_fused"][idx] = float_format(accuracy)
             
             if experiment_params["PaF"]:
-                paf_model, paf_model_accuracy,_ = fusion_test_manager(input_model_list=pruned_models, **params, num_epochs = experiment_params["num_epochs"], args=fusion_params)
+                paf_model, paf_model_accuracy,_ = fusion_test_manager(input_model_list=pruned_models, **params, num_epochs = experiment_params["num_epochs"], name=name)
                 m,epoch_accuracy = train_during_pruning(paf_model, loaders=loaders, num_epochs=experiment_params["num_epochs"], gpu_id =experiment_params["gpu_id"], prune=False)
                 for idx, accuracy in enumerate(epoch_accuracy):
                     result[name]["accuracy_PaF"][idx] = float_format(accuracy)
@@ -572,7 +426,7 @@ if __name__ == '__main__':
             # PaF_all does the following: fuses following networks: pruned_model[0], original_model[0], original_model[1], ..., original_model[-1]
             # PaF_all achieves higher accuracy than PaF, but when we finetune PaF achieves higher accuracy
             if experiment_params["PaF_all"]:
-                paf_all_model, paf_all_model_accuracy,_ = fusion_test_manager(input_model_list=[*models_original, pruned_models[0] if pruned_model_accuracies[0] > pruned_model_accuracies[1] else pruned_models[1]], **params, num_epochs = experiment_params["num_epochs"], args=fusion_params)
+                paf_all_model, paf_all_model_accuracy,_ = fusion_test_manager(input_model_list=[*models_original, pruned_models[0] if pruned_model_accuracies[0] > pruned_model_accuracies[1] else pruned_models[1]], **params, num_epochs = experiment_params["num_epochs"], name=name)
                 m,epoch_accuracy = train_during_pruning(paf_all_model, loaders=loaders, num_epochs=experiment_params["num_epochs"], gpu_id =experiment_params["gpu_id"], prune=False)
                 for idx, accuracy in enumerate(epoch_accuracy):
                     result[name]["accuracy_PaF_all"][idx] = float_format(accuracy)
@@ -591,7 +445,7 @@ if __name__ == '__main__':
                     sparsity_iter = result["sparsity"]
                     while sparsity_iter >= 0.1:
                         prune_params = {"prune_type": result["prune_type"], "sparsity": sparsity_iter, "num_epochs": 0,
-                            "example_input": torch.randn(1,1, 28,28) if not ("vgg" in name) else torch.randn(1, 3, 32, 32),
+                            "example_input": torch.randn(1,1, 28,28) if "cnn" in name else torch.randn(1, 3, 32, 32),
                             "out_features": 10, "loaders": loaders, "gpu_id": experiment_params["gpu_id"]}
 
                         pruned_models_new, pruned_models_new_accuracies,_ = pruning_test_manager(input_model_list=[models_original[i]], prune_params=prune_params, **params)
@@ -600,7 +454,7 @@ if __name__ == '__main__':
                         sparsity_iter -= 0.1
 
                     models_sparsities.append(models_original[i])
-                    model_sparsity, model_sparsity_accuracy,_ = fusion_test_manager(input_model_list=models_sparsities, **params, num_epochs = experiment_params["num_epochs"], args=fusion_params)
+                    model_sparsity, model_sparsity_accuracy,_ = fusion_test_manager(input_model_list=models_sparsities, **params, num_epochs = experiment_params["num_epochs"], name=name)
                     m,epoch_accuracy= train_during_pruning(copy.deepcopy(model_sparsity), loaders=loaders, num_epochs=experiment_params["num_epochs"], gpu_id =experiment_params["gpu_id"], prune=False)
                     for idx, accuracy in enumerate(epoch_accuracy):
                         result[name][f"model_{i}"]["accuracy_pruned_and_fused_multiple_sparsities"][idx] = float_format(accuracy)

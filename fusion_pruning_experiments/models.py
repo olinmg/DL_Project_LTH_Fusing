@@ -121,7 +121,7 @@ def get_model(model_name, sparsity=1.0):
     elif model_name == "vgg19":
         return vgg19()
     elif model_name == "resnet18":
-        return ResNet18()
+        return ResNet18(linear_bias=False)
     elif model_name == "resnet34":
         return ResNet34()
     elif model_name == "resnet50":
