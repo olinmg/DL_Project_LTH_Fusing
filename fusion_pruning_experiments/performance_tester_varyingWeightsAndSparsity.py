@@ -304,9 +304,9 @@ import numpy as np
 import time
 if __name__ == '__main__':
     '''
-    See description of test_multiple_settings() for details whats happening in this script.
+    See description of test_multiple_settings() for details on whats happening in this script.
 
-    The format of output are .json files that are stored in "results_and_plots" in the subfolder specified by the model name.
+    The format of output are .json files that are stored in "results_and_plots_o" in the subfolder specified by the model name.
     The location can be changed.
     Models are loaded from the below given files (without the .pth ending).
     '''
