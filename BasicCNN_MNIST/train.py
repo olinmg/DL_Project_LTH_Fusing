@@ -61,7 +61,7 @@ def get_cifar_data_loader(num_models, args):
                                           num_workers=4, pin_memory=True),
         }
 
-# 5. define the training function
+# define the training function
 def train(model, loaders, num_epochs, gpu_id):
     '''
     Has to be a function that loads a dataset. 
@@ -113,7 +113,7 @@ def train(model, loaders, num_epochs, gpu_id):
 
 
 
-# 6. define the testing function
+# define the testing function
 def test(model, loaders, gpu_id):
     model.eval()
 
@@ -131,7 +131,7 @@ def test(model, loaders, gpu_id):
             total += 1
     return accuracy_accumulated/total
 
-# 7. actually execute the training and testing
+# actually execute the training and testing
 if __name__ == '__main__':
     args = get_train_parameters()
     num_models = args.num_models
@@ -154,5 +154,5 @@ if __name__ == '__main__':
         accuracy = test(model, loaders, args.gpu_id)
 
         print('Test Accuracy of the model %d: %.2f' % (idx, accuracy))
-        # 8. store the trained model and performance
+        # store the trained model and performance
         torch.save(model.state_dict(), "models/{}_diff_weight_init_{}_{}.pth".format(args.model_name, args.diff_weight_init, idx))

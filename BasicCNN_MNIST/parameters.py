@@ -21,6 +21,6 @@ def get_train_parameters():
     parser.add_argument('--diff-weight-init', action='store_true', help='Initialize models with different weights')
     parser.add_argument('--model-name', type=str, default='cnn', help='Type of neural network model (cnn | mlp | vgg | resnet)')
     parser.add_argument("--dataset", type=str, default='mnist', help='Dataset to use (mnist | cifar)')
-    parser.add_argument('--num-epochs', default=30, type=int, help='Epochs to train')
+    parser.add_argument('--num-epochs', default=5, type=int, help='Epochs to train')
     parser.add_argument("--save-folder", type=str, default='models', help='Folder to save results')
     return parser.parse_args()

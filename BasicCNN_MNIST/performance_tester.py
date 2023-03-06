@@ -15,6 +15,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 def get_mnist_data_loader():
+    'Be aware about if the data should be shuffled or not!'
 
     mnist_train = datasets.MNIST("data", train=True, transform = ToTensor(), download=True)
     mnist_test = datasets.MNIST("data", train=False, transform = ToTensor(), download=True)
@@ -90,6 +91,7 @@ def original_test_manager(input_model_list, loaders, eval_function, pruning_func
     '''
     Evaluate the performance of a list of networks. Typically the original/unchanged networks.
     '''
+    #return [0 for i in input_model_list]
 
     original_model_accuracies = []
     print("The accuracies of the original models are:")
@@ -101,28 +103,9 @@ def original_test_manager(input_model_list, loaders, eval_function, pruning_func
     return original_model_accuracies
 
 
-"""
-def functionList_test_manager(input_model, loaders, args, function_list, eval_function, para_dict):
-    '''
-    Takes a list of functions that should be used -> [prune_unstructured, simple_fusion]
-    Takes a dictionary of arguments that will be used by the functions in the above list.
-
-    What this function does:
-    Deploys the functions in the given order with the given parameters. The resulting model will be tested on a given dataset using "evaluate_performance()".
-    '''
-    if len(function_list) == 0:
-        print("No function in given function_list!")
-        return -1
-
-    resulting_model = input_model
-    for this_function in function_list:
-        resulting_model = this_function(input_model=resulting_model, para_dict=para_dict)
-
-    accuracy = eval_function(input_model=input_model, loaders=loaders, args=args)
-    return accuracy
-"""
 
 def pruning_test_manager(input_model_list, loaders, pruning_function, fusion_function, eval_function, gpu_id, prune_params):
+    #return input_model_list, [0 for i in input_model_list], ""
     '''
     Does fusion on all models included in input_model_list and evaluates the performance of the resulting models.
     '''
@@ -142,88 +125,23 @@ def pruning_test_manager(input_model_list, loaders, pruning_function, fusion_fun
 
     return pruned_models, pruned_models_accuracies, description_pruning
 
-
-def fusion_test_manager(input_model_list, loaders, pruning_function, fusion_function, eval_function, gpu_id, args, num_epochs, accuracies=None,):
+# importance para not given
+# ATT: added importance para!
+def fusion_test_manager(input_model_list, loaders, pruning_function, fusion_function, eval_function, gpu_id, args, num_epochs, accuracies=None, importance=None):
+    #return input_model_list[0], 0, ""
     '''
     Does fusion of the models in input_model_list and evaluates the performance of the resulting model.
     '''
     
-    fused_model, description_fusion = fusion_function(input_model_list, args, accuracies=accuracies)
+    fused_model, description_fusion = fusion_function(input_model_list, args, accuracies=accuracies, importance=importance)
     #fused_model,_ = train_during_pruning(model=fused_model, loaders=loaders, num_epochs=num_epochs, gpu_id = gpu_id, prune=False)
     acc_model_fused = eval_function(input_model=fused_model, loaders=loaders, gpu_id = gpu_id)
     print(f"Fused model:\t{acc_model_fused}")
 
     return fused_model, acc_model_fused, description_fusion
 
-"""
-def FaP_test_manager(input_model_list, loaders, args, pruning_function, fusion_function, eval_function, para_dict):
-    '''
-    Takes an input_model_list, a dataset, a function to do pruning, a function to do fusion and a parameter dictionary.
-    First fuses the given models and the prunes the resulting network.
-    The accuracy is evaluated in the intermediate steps.
-    '''
-
-    # 1. Do the fusion of the given models
-    fused_model, description_fusion  = fusion_function(input_model_list, args, para_dict)
-    acc_model_fused = eval_function(input_model=fused_model, loaders=loaders, args=args, para_dict=para_dict)
-    print(f"Fused model:\t{acc_model_fused}")
-
-    # 2. Do the pruning of the fused model
-    pruned_model = copy.deepcopy(fused_model)
-    _, description_pruning = pruning_function(input_model=pruned_model, para_dict=para_dict)
-    acc_model_FaP = eval_function(input_model=pruned_model, loaders=loaders, args=args, para_dict=para_dict)
-    print(f"FaP model:\t{acc_model_FaP}")
-
-    return fused_model, pruned_model, acc_model_fused, acc_model_FaP, description_fusion, description_pruning
-"""
-"""
-def PaF_test_manager(input_model_list, loaders, args, pruning_function, fusion_function, eval_function, para_dict):
-    '''
-    Takes an input_model_list, a dataset, a function to do pruning, a function to do fusion and a parameter dictionary.
-    First fuses the given models and the prunes the resulting network.
-    The accuracy is evaluated in the intermediate steps.
-    '''
-
-    # 1. Do the individual pruning of the given models
-    pruned_models = []
-    pruned_models_accuracies = []
-    for i, input_model in enumerate(input_model_list):
-        input_model_copy = copy.deepcopy(input_model)
-        _, description_pruning = pruning_function(input_model=input_model_copy, para_dict=para_dict) #prunes in place
-        pruned_models.append(input_model_copy)
-        acc_model_pruned = eval_function(input_model=input_model_copy, loaders=loaders, args=args, para_dict=para_dict)
-        pruned_models_accuracies.append(acc_model_pruned)
-        print(f"Model {i} pruned:\t{acc_model_pruned}")
-
-    # 2. Do a fusion of the pruned networks
-    fused_model, description_fusion = fusion_function(pruned_models, args, para_dict, pruned=True)
-    acc_model_fused = eval_function(input_model=fused_model, loaders=loaders, args=args, para_dict=para_dict)
-    print(f"PaF model:\t{acc_model_fused}")
-
-    return pruned_models, fused_model, pruned_models_accuracies, acc_model_fused, description_pruning, description_fusion
-"""
-
-def description_to_label(dict):
-    '''
-    Takes a dictionary that describes a pruning or fusion process. It turns the dictionary into a label that contains all the keys.
-    Expects the dict to contain the key "name".
-    '''
-
-    assert "name" in dict.keys()
-
-    keys = list(dict.keys())
-    keys.remove("name")
-    label = dict.get("name") + ":"
-
-    for key in keys:
-        label += key + "=" + str(dict.get(key)) + ","
-
-    description = label[:-1]    # remove last comma
-    
-    return description
 
 """
-################################### THIS IS WHAT NEEDS TO BE IMPLEMENTED TO MAKE USE OF THE PERFORMANCE EVALUATION FUNCTIONS ####################################
 from pruning_modified import prune_unstructured
 def wrapper_unstructured_pruning(input_model, para_dict):
     '''
@@ -250,6 +168,7 @@ from torch import optim
 from torch.autograd import Variable
 import torch.nn as nn
 def train_during_pruning(model, loaders, num_epochs, gpu_id, prune=True, performed_epochs=0):
+    #return model, [0 for i in range(num_epochs)]
     '''
     Has to be a function that loads a dataset. 
 
@@ -367,7 +286,7 @@ def wrapper_fake_fusion(list_of_models, args, para_dict):
 
 
 from fusion import fusion, fusion_old, fusion_old2
-def wrapper_first_fusion(list_of_models, args, accuracies=None,):
+def wrapper_first_fusion(list_of_models, args, accuracies=None, importance=None):
     '''
     Uses the first simple fusion approach created by Alex in fusion.py.
     So far this can only handle two (simple -> CNN and MLP) networks in list_of_models.
@@ -376,139 +295,12 @@ def wrapper_first_fusion(list_of_models, args, accuracies=None,):
     #assert "eps" in para_dict.keys()   
     name = "First Fusion"
 
-    fused_model = fusion(networks=list_of_models, args=args, accuracies=accuracies)
+    fused_model = fusion(networks=list_of_models, args=args, accuracies=accuracies, importance=importance)
 
     description = {"name": name}
 
     return fused_model, description
 
-"""
-def create_csv_entry_from_experiment(experiment, experiment_paras_original):
-    '''
-    Exectues the requested pruning/fusion/PaF/FaP and creates a formatted text that can be written to a csv later.
-
-    Essentially implements a wrapper for all the experiment functions.
-
-    CSV Format (Column names):
-    experiment_name; nn_description; data_description; pruning_description, fusion_description; original_network_performances; pruned_networks_performance; fused_network_performance; PaF_performance; FaP_performance
-    '''
-
-    assert "nn_description" in experiment_paras_original.keys()
-    assert "data_description" in experiment_paras_original.keys()
-
-    nn_description = experiment_paras_original.get("nn_description")
-    data_description = experiment_paras_original.get("data_description")
-
-    experiment_paras = copy.deepcopy(experiment_paras_original)
-    del experiment_paras["nn_description"]
-    del experiment_paras["data_description"]
-
-    experiment_name=""
-    label_pruning = ""
-    label_fusion = ""
-    original_net_perf = ""
-    pruned_net_perf = ""
-    fused_net_perf = ""
-    PaF_perf = ""
-    FaP_perf = ""
-
-    partial_models = ""
-    overall_model = ""
-
-
-    if experiment is original_test_manager:
-
-        experiment_name = "original_test_manager"
-        original_net_perf = str(experiment(**experiment_paras))
-
-    elif experiment is pruning_test_manager:
-
-        experiment_name = "pruning_test_manager"
-        pruned_models, pruned_models_accs, description_pruning = experiment(**experiment_paras)
-        label_pruning = description_to_label(description_pruning)
-        label_fusion = ""
-        original_net_perf = ""
-        pruned_net_perf = str(pruned_models_accs)
-        fused_net_perf = ""
-        PaF_perf = ""
-        FaP_perf = ""
-
-        partial_models = pruned_models
-        overall_model = pruned_models
-
-    elif experiment is fusion_test_manager:
-
-        experiment_name = "fusion_test_manager"
-        fused_model, fused_model_acc, description_fusion = experiment(**experiment_paras)
-
-        label_pruning = ""
-        label_fusion = description_to_label(description_fusion)
-        original_net_perf = ""
-        pruned_net_perf = ""
-        fused_net_perf = str(fused_model_acc)
-        PaF_perf = ""
-        FaP_perf = ""
-
-        partial_models = fused_model
-        overall_model = fused_model
-
-    elif experiment is PaF_test_manager:
-
-        experiment_name = "PaF_test_manager"
-        pruned_models, PaF_model, pruned_models_accs, PaF_model_acc, description_pruning, description_fusion = experiment(**experiment_paras)
-
-        label_fusion = description_to_label(description_fusion)
-        label_pruning = description_to_label(description_pruning)
-        original_net_perf = ""
-        pruned_net_perf = str(pruned_models_accs)
-        fused_net_perf = ""
-        PaF_perf = str(PaF_model_acc)
-        FaP_perf = ""
-
-        partial_models = pruned_models
-        overall_model = PaF_model
-
-    elif experiment is FaP_test_manager:
-
-        experiment_name = "FaP_test_manager"
-        fused_model, FaP_model, fused_model_acc, FaP_model_acc, description_fusion, description_pruning = experiment(**experiment_paras)
-        
-        label_fusion = description_to_label(description_fusion)
-        label_pruning = description_to_label(description_pruning)
-        original_net_perf = ""
-        pruned_net_perf = ""
-        fused_net_perf = str(fused_model_acc)
-        PaF_perf = ""
-        FaP_perf = str(FaP_model_acc)
-
-        partial_models = fused_model
-        overall_model = FaP_model
-    
-    result_string = experiment_name + ";" + nn_description + ";" + data_description + ";" + label_pruning + ";" + label_fusion + ";" + original_net_perf + ";" + pruned_net_perf + ";" + fused_net_perf + ";" + PaF_perf + ";" + FaP_perf
-    return result_string, partial_models, overall_model
-"""
-"""
-import os
-def add_experiment_to_csv(result_string, FILE_PATH = "performance_logger.csv"):
-    '''
-    Exectues the requested pruning/fusion/PaF/FaP and adds the results to an existing csv file.
-
-    CSV Format:
-    experiment_name; nn_description; data_description; pruning_description, fusion_description; original_network_performances; pruned_networks_performance; fused_network_performance; PaF_performance; FaP_performance
-
-    '''
-
-    if not os.path.exists("./"+FILE_PATH):
-        # if file does not exist yet, create a new file and put a header
-        header = "experiment_name;nn_description;data_description;pruning_description,fusion_description;original_network_performances;pruned_networks_performance;fused_network_performance;PaF_performance;FaP_performance"
-        with open("./"+FILE_PATH, "w") as logger:
-            logger.write(header+"\n")
-            logger.write(result_string+"\n")
-    else:
-        # if file does exist simply just append the new result_string
-        with open("./"+FILE_PATH,'a') as logger:
-            logger.write(result_string+"\n")
-"""
 
 def check_parameters(parameters):
     error = False
@@ -525,6 +317,7 @@ def check_parameters(parameters):
         message += "num models needs to be 2\n"
         """
     return error, message
+
 
 def get_result_skeleton(parameters):
     result_final = {
@@ -716,7 +509,7 @@ if __name__ == '__main__':
             name, diff_weight_init = model_dict["name"], experiment_params["diff_weight_init"]
 
             print(f"models/{name}_diff_weight_init_{diff_weight_init}_{0}.pth")
-            models_original = get_pretrained_models(name, diff_weight_init, 0, experiment_params["num_models"])
+            models_original = get_pretrained_models(name, diff_weight_init, experiment_params["gpu_id"], experiment_params["num_models"])
 
             print(type(models_original[0]))
 
@@ -745,7 +538,7 @@ if __name__ == '__main__':
 
                 s = int(result["sparsity"]*100)
                 n_epochs = experiment_params["num_epochs"]
-                torch.save(pruned_models[i].state_dict(), f"./models/vgg11_pruned_{s}_{n_epochs}")
+                torch.save(pruned_models[i].state_dict(), f"./models/{name}_pruned_{s}_{n_epochs}")
                 pruned_model_accuracies[i] = epoch_accuracy[-1]
 
                 _,epoch_accuracy_1 = train_during_pruning(copy.deepcopy(pruned_models[i]), loaders=loaders, num_epochs=experiment_params["num_epochs"], gpu_id =experiment_params["gpu_id"], prune=False, performed_epochs=experiment_params["num_epochs"])

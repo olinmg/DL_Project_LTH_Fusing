@@ -134,11 +134,46 @@ def get_model(model_name, sparsity=1.0):
         print("Invalid model name. Using CNN instead.")
         return CNN()
 
+
 def get_pretrained_models(model_name, diff_weight_init, gpu_id, num_models):
     models = []
 
     for idx in range(num_models):
-        state = torch.load(f"models/{model_name}_diff_weight_init_{diff_weight_init}_{idx}.pth")
+        try:
+            state = torch.load(f"models/{model_name}_diff_weight_init_{diff_weight_init}_{idx}.pth")
+        except:    
+            state = torch.load(f"models/{model_name}_diff_weight_init_{diff_weight_init}_{idx}.pth", map_location=torch.device('cpu'))
+
+        model = get_model(model_name)
+        if "vgg" in model_name:
+            new_state_dict = OrderedDict()
+            for k, v in state.items():
+                name = k
+                name = name.replace(".module", "")
+                new_state_dict[name] = v
+            model.load_state_dict(new_state_dict)
+        else:
+            model.load_state_dict(state)
+        if gpu_id != -1:
+            model = model.cuda(gpu_id)
+        models.append(model)
+    return models
+
+
+def get_pretrained_models_by_name(model_name, diff_weight_init, gpu_id, num_models, model_file_names):
+    models = []
+
+    #e.g. model_file_names = ["models/cnn10_sameInit_MNISTsameData_SGD_lr01_momentum09",
+    #                    "models/cnn10_sameInit_MNISTsameData_SGD_lr005_momentum09"]
+
+    for idx in range(num_models):
+        try:
+            state = torch.load(f"./{model_file_names[idx]}.pth")
+        except:
+            state = torch.load(f"./{model_file_names[idx]}.pth", map_location=torch.device('cpu'))
+
+        print(f"Getting state from: ./{model_file_names[idx]}.pth")
+
         model = get_model(model_name)
         if "vgg" in model_name:
             new_state_dict = OrderedDict()
