@@ -19,15 +19,17 @@ class VGG(nn.Module):
     def __init__(self, features, bias=True, sparsity=1.0):
         super(VGG, self).__init__()
         self.features = features
+        self.dim = round(512*sparsity) if round(512*sparsity) > 1 else 1
         self.classifier = nn.Sequential(
             nn.Dropout(),
-            nn.Linear(int(512*sparsity), int(512*sparsity), bias=bias),
+            nn.Linear(self.dim, self.dim, bias=bias),
             nn.ReLU(True),
             nn.Dropout(),
-            nn.Linear(int(512*sparsity), int(512*sparsity), bias=bias),
+            nn.Linear(self.dim, self.dim, bias=bias),
             nn.ReLU(True),
-            nn.Linear(int(512*sparsity), 10, bias=bias),
+            nn.Linear(self.dim, 10, bias=bias),
         )
+        print
          # Initialize weights
         """
         for m in self.modules():

@@ -90,7 +90,7 @@ cfg = {
 def vgg11(bias=False, sparsity=1.0):
     """VGG 11-layer model (configuration "A")"""
     params = cfg["A"]
-    params = [int(i*sparsity) if isinstance(i, int) else i for i in params]
+    params = [(round(i*sparsity) if round(i*sparsity) > 1 else 1) if isinstance(i, int) else i for i in params]
     print(params)
     return VGG(make_layers(params, bias=bias), bias=bias, sparsity=sparsity)
 
@@ -108,6 +108,7 @@ def vgg19(bias=False):
     return VGG(make_layers(cfg['E'], bias=bias), bias=bias)
 
 def get_model(model_name, sparsity=1.0):
+    print("Went in with sparsity: ", sparsity)
     if model_name == "cnn":
         return CNN()
     elif model_name == "mlp":
