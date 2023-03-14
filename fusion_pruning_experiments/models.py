@@ -1,6 +1,7 @@
 from collections import OrderedDict
 import torch
 import torch.nn as nn
+from mobilenetv1 import MobileNetV1
 from vgg import VGG, make_layers
 from resnet import BasicBlock, Bottleneck, ResNet
 
@@ -32,7 +33,7 @@ class MLP(nn.Module):
 class CNN(nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
-        bias = True
+        bias = False
         self.conv1 = nn.Sequential(         
             nn.Conv2d(
                 in_channels=1,              
@@ -41,13 +42,15 @@ class CNN(nn.Module):
                 stride=1,                   
                 padding=2,
                 bias = bias # Needs to change later!                  
-                ),                              
+                ),         
+            nn.BatchNorm2d(16, affine=True),                     
             nn.ReLU(),                      
             nn.MaxPool2d(kernel_size=2),    
         )
 
         self.conv2 = nn.Sequential(         
-            nn.Conv2d(16, 32, 5, 1, 2, bias=bias),     
+            nn.Conv2d(16, 32, 5, 1, 2, bias=bias),      
+            nn.BatchNorm2d(32, affine=True),
             nn.ReLU(),                      
             nn.MaxPool2d(2),          
         )
@@ -87,12 +90,16 @@ cfg = {
     'E': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256, 'M', 512, 512, 512, 512, 'M', 
           512, 512, 512, 512, 'M'],
 }
-def vgg11(bias=False, sparsity=1.0):
+def vgg11(bias=False, sparsity=1.0, output_dim=10):
     """VGG 11-layer model (configuration "A")"""
     params = cfg["A"]
     params = [(round(i*sparsity) if round(i*sparsity) > 1 else 1) if isinstance(i, int) else i for i in params]
     print(params)
-    return VGG(make_layers(params, bias=bias), bias=bias, sparsity=sparsity)
+    return VGG(make_layers(params, bias=bias), bias=bias, sparsity=sparsity, output_dim=output_dim)
+
+def vgg11_bn(bias=False):
+    """VGG 11-layer model (configuration "A") with batch normalization"""
+    return VGG(make_layers(cfg['A'], bias=bias, batch_norm=True))
 
 
 def vgg13(bias=True):
@@ -107,14 +114,19 @@ def vgg19(bias=False):
     """VGG 19-layer model (configuration "E")"""
     return VGG(make_layers(cfg['E'], bias=bias), bias=bias)
 
-def get_model(model_name, sparsity=1.0):
+def get_model(model_name, sparsity=1.0, output_dim=10):
     print("Went in with sparsity: ", sparsity)
+    print("Model entered: ", model_name)
     if model_name == "cnn":
         return CNN()
     elif model_name == "mlp":
         return MLP(sparsity)
+    elif model_name == "mobilenetv1":
+        return MobileNetV1(ch_in=3, n_classes=output_dim)
     elif model_name == "vgg11":
-        return vgg11(bias=False, sparsity=sparsity)
+        return vgg11(bias=False, sparsity=sparsity, output_dim=output_dim)
+    elif model_name == "vgg11_bn":
+        return vgg11_bn(bias=False)
     elif model_name == "vgg13":
         return vgg13()
     elif model_name == "vgg16":
@@ -136,27 +148,19 @@ def get_model(model_name, sparsity=1.0):
         return CNN()
 
 
-def get_pretrained_models(model_name, diff_weight_init, gpu_id, num_models):
+def get_pretrained_models(model_name, basis_name, gpu_id, num_models, output_dim=10):
     models = []
 
     for idx in range(num_models):
         try:
-            state = torch.load(f"models/{model_name}_diff_weight_init_{diff_weight_init}_{idx}.pth")
+            model = torch.load(f"models/{basis_name}_{idx}.pth")
         except:    
-            state = torch.load(f"models/{model_name}_diff_weight_init_{diff_weight_init}_{idx}.pth", map_location=torch.device('cpu'))
+            model = torch.load(f"models/{basis_name}_{idx}.pth", map_location=torch.device('cpu'))
 
-        model = get_model(model_name)
-        if "vgg" in model_name:
-            new_state_dict = OrderedDict()
-            for k, v in state.items():
-                name = k
-                name = name.replace(".module", "")
-                new_state_dict[name] = v
-            model.load_state_dict(new_state_dict)
-        else:
-            model.load_state_dict(state)
         if gpu_id != -1:
             model = model.cuda(gpu_id)
+        else:
+            modle = model.to("cpu")
         models.append(model)
     return models
 

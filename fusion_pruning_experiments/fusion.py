@@ -5,14 +5,23 @@ import numpy as np
 import ot
 import copy
 from torch import linalg as LA
+from fusion_utils import preprocess_parameters
 
 from models import get_model
 #from scipy.optimize import linear_sum_assignment # Could accomplish the same as OT with Hungarian Algorithm
 
 # get_histogram creates uniform historgram, i.e. [1/cardinality, 1/cardinality, ...]
-def get_histogram(cardinality):
+def get_histogram(cardinality, indices, add=False):
 
-    return np.ones(cardinality)/cardinality # uniform probability distribution
+    if add == False:
+        return np.ones(cardinality)/cardinality # uniform probability distribution
+
+    else:
+        result = np.ones(cardinality)
+        for indice in indices:
+            result[indice] = cardinality/indices.size()[0]
+
+        return result/np.sum(result)
 
 def normalize_vector(coordinates, eps=1e-9):
     norms = torch.norm(coordinates, dim=-1, keepdim=True)
@@ -58,6 +67,44 @@ def create_network_from_params(reference_model, param_list, gpu_id = -1,sparsity
     model.load_state_dict(model_state_dict)
 
     return model
+
+def create_network_from_parameters(reference_model, param_list, gpu_id = -1):
+    model = copy.deepcopy(reference_model)
+    for layer in param_list:
+        print(layer.super_type)
+    
+    model_state_dict = model.state_dict()
+    keys = list(model_state_dict.keys())
+    print(keys)
+    
+    idx = -1
+
+    for layer in param_list:
+        idx += 1
+        model_state_dict[keys[idx]] = layer.weight
+        if layer.bias != None:
+            idx += 1
+            model_state_dict[keys[idx]] = layer.bias
+        if layer.bn:
+            if layer.bn_gamma != None:
+                idx += 1
+                model_state_dict[keys[idx]] = layer.bn_gamma
+                idx += 1
+                model_state_dict[keys[idx]] = layer.bn_beta
+            idx += 1
+            model_state_dict[keys[idx]] = layer.bn_mean
+            idx += 1
+            model_state_dict[keys[idx]] = layer.bn_var
+
+            idx += 1
+            model_state_dict[keys[idx]] = torch.Tensor([1])
+    
+    model.load_state_dict(model_state_dict)
+
+    return model
+
+
+
 
 def update_iterators(iterators):
     for iter in iterators:
@@ -107,7 +154,7 @@ def comparator(model0_args, model1_args):
     else:
         return 0
 
-def MSF(network, sparsity = 0.65, gpu_id = -1, metric=-1, eps=1e-7, resnet=False):
+def MSF(network, sparsity = 0.65, gpu_id = -1, metric=-1, eps=1e-7, resnet=False, output_dim=10):
     num_layers = len(list(network.parameters()))
     avg_aligned_layers = []
     T_var = None
@@ -204,10 +251,11 @@ def MSF(network, sparsity = 0.65, gpu_id = -1, metric=-1, eps=1e-7, resnet=False
                 basis_weight, bias_weight, basis_bias)
         
 
-        mu = get_histogram(basis_weight.shape[0])
+        mu = get_histogram(basis_weight.shape[0], indices = None)
 
-        nu = norm_layer.cpu().numpy()/np.sum(norm_layer.cpu().numpy())
-        #nu = get_histogram(layer_shape[0])
+        #nu = norm_layer.cpu().numpy()/np.sum(norm_layer.cpu().numpy())
+        nu = get_histogram(layer_shape[0], indices = indices, add=True)
+
         #nu = softmax(norm_layer).cpu().numpy()
         #nu = torch.argsort(norm_layer, dim=- 1, descending=False, stable=True).cpu().numpy()
         #nu = nu/np.sum(nu)
@@ -267,7 +315,121 @@ def MSF(network, sparsity = 0.65, gpu_id = -1, metric=-1, eps=1e-7, resnet=False
         Maligned_wt = None 
 
     
-    return create_network_from_params(gpu_id=gpu_id, param_list=avg_aligned_layers, reference_model = get_model(model_name="vgg11", sparsity=1-sparsity))
+    return create_network_from_params(gpu_id=gpu_id, param_list=avg_aligned_layers, reference_model = get_model(model_name="vgg11", sparsity=1-sparsity, output_dim=output_dim))
+
+
+def fusion_bn(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7, resnet=False):
+    """
+    fusion fuses arbitrary many models into the model that is the smallest
+    :param networks: A list of networks to be fused
+    :param accuracies: A list of accuracies of the networks. The code will order the networks with respect to the accuracies for optimal accuracy
+    :param importance: A list of floats. If importance = [0.9, 0.1], then linear combination of weights will be: network[0]*0.9 + network[1]*0.1
+    :return: the fused model
+    """ 
+
+    num_models = len(networks)
+    T_var_list = [None]*num_models
+    skip_T_var_list = [None]*num_models
+    skip_T_var_idx_list = [-1]*num_models
+    residual_T_var_list = [None]*num_models
+    residual_T_var_idx_list = [-1]*num_models
+
+    if accuracies == None:
+        accuracies = [0]*num_models
+
+    importance = [1]*num_models if importance == None else importance
+    networks_zip = sorted(list(zip(networks, accuracies, importance)), key=functools.cmp_to_key(comparator))
+    networks = [network_zip[0] for network_zip in networks_zip]
+    importance = [network_zip[2] for network_zip in networks_zip]
+    importance = torch.tensor(importance)
+    sum = torch.sum(importance)
+    importance = importance *(importance.shape[0]/sum)
+
+    fusion_layers = preprocess_parameters(networks)
+    num_layers = len(fusion_layers)
+
+    for idx in range(num_layers):
+
+        avg_layer = fusion_layers[idx][0]
+
+        mu_cardinality = avg_layer.weight.shape[0]
+        mu = get_histogram(mu_cardinality, None)
+
+        is_conv = avg_layer.is_conv
+
+        for idx_m, fusion_layer in enumerate(fusion_layers[idx][1:]):
+            idx_model = idx_m + 1
+            T_var = T_var_list[idx_model]
+            skip_T_var = skip_T_var_list[idx_model]
+            skip_T_var_idx = skip_T_var_idx_list[idx_model]
+            residual_T_var = residual_T_var_list[idx_model]
+            residual_T_var_idx = residual_T_var_idx_list[idx_model]
+
+            nu_cardinality = fusion_layer.weight.shape[0]
+            layer_shape = fusion_layer.weight.shape
+
+
+            aligned_wt = fusion_layer.weight
+            if idx != 0:
+                if resnet and is_conv:
+                    assert len(layer_shape) == 4
+                    # save skip_level transport map if there is block ahead
+                    if layer_shape[1] != layer_shape[0]:
+                        if not (layer_shape[2] == 1 and layer_shape[3] == 1):
+                            print(f'saved skip T_var at layer {idx} with shape {layer_shape}')
+                            skip_T_var = T_var.clone()
+                            skip_T_var_idx = idx
+                        else:
+                            print(
+                                f'utilizing skip T_var saved from layer layer {skip_T_var_idx} with shape {skip_T_var.shape}')
+                            # if it's a shortcut (128, 64, 1, 1)
+                            residual_T_var = T_var.clone()
+                            residual_T_var_idx = idx  # use this after the skip
+                            T_var = skip_T_var
+                        print("shape of previous transport map now is", T_var.shape)
+                    else:
+                        if residual_T_var is not None and (residual_T_var_idx == (idx - 1)):
+                            T_var = (T_var + residual_T_var) / 2
+                            print("averaging multiple T_var's")
+                        else:
+                            print("doing nothing for skips")
+                
+                fusion_layer.align_weights(T_var)
+            
+            M = get_ground_metric(fusion_layer.create_comparison_vec(), avg_layer.create_comparison_vec(), None, None)
+
+            nu = get_histogram(nu_cardinality, None)
+
+            cpuM = M.data.cpu().numpy() # POT does not accept array on GPU
+
+            T = ot.emd(nu, mu, cpuM)        
+
+            if gpu_id != -1:
+                T_var = torch.from_numpy(T).cuda(gpu_id).float()
+            else:
+                T_var = torch.from_numpy(T).float()
+            
+
+            if gpu_id != -1:
+                marginals = torch.ones(T_var.shape[1]).cuda(gpu_id) / T_var.shape[0]
+            else:
+                marginals = torch.ones(T_var.shape[1]) / T_var.shape[0]
+            marginals = torch.diag(1.0/(marginals + eps))  # take inverse
+            T_var = torch.matmul(T_var, marginals)
+            T_var = T_var / T_var.sum(dim=0)
+
+            fusion_layer.permute_parameters(T_var)
+
+            avg_layer.update_weights(fusion_layer, torch.sum(importance[:idx_model]), importance[idx_model])
+
+
+            T_var_list[idx_model] = T_var
+            skip_T_var_list[idx_model] = skip_T_var
+            skip_T_var_idx_list[idx_model] = skip_T_var_idx
+            residual_T_var_list[idx_model] = residual_T_var
+            residual_T_var_idx_list[idx_model] = residual_T_var_idx
+
+    return create_network_from_parameters(gpu_id=gpu_id, param_list=[layers[0] for layers in fusion_layers], reference_model = networks[0])
 
 
 def fusion(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7, resnet=False):
@@ -330,7 +492,7 @@ def fusion(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7, re
         avg_layer_name, avg_layer = next(layer_iters[0])
         layer_shape = avg_layer.shape
         mu_cardinality = avg_layer.shape[0]
-        mu = get_histogram(mu_cardinality)
+        mu = get_histogram(mu_cardinality, None)
         is_conv = len(layer_shape) > 2
 
         print("idx {} and layer {}".format(idx, avg_layer_name))
@@ -417,7 +579,7 @@ def fusion(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7, re
                         aligned_wt = torch.matmul(layer, T_var)
                     M = get_ground_metric(aligned_wt, avg_layer.data, bias_weight, avg_bias_weight)
             
-            nu = get_histogram(nu_cardinality)
+            nu = get_histogram(nu_cardinality, None)
 
             
             cpuM = M.data.cpu().numpy() # POT does not accept array on GPU

@@ -16,7 +16,7 @@ class VGG(nn.Module):
     '''
     VGG model 
     '''
-    def __init__(self, features, bias=True, sparsity=1.0):
+    def __init__(self, features, bias=True, sparsity=1.0, output_dim=10):
         super(VGG, self).__init__()
         self.features = features
         self.dim = round(512*sparsity) if round(512*sparsity) > 1 else 1
@@ -27,7 +27,7 @@ class VGG(nn.Module):
             nn.Dropout(),
             nn.Linear(self.dim, self.dim, bias=bias),
             nn.ReLU(True),
-            nn.Linear(self.dim, 10, bias=bias),
+            nn.Linear(self.dim, output_dim, bias=bias),
         )
         print
          # Initialize weights
@@ -56,7 +56,7 @@ def make_layers(cfg, batch_norm=False, bias=True):
         else:
             conv2d = nn.Conv2d(in_channels, v, kernel_size=3, padding=1, bias=bias)
             if batch_norm:
-                layers += [conv2d, nn.BatchNorm2d(v), nn.ReLU(inplace=True)]
+                layers += [conv2d, nn.BatchNorm2d(v, affine=False), nn.ReLU(inplace=True)]
             else:
                 layers += [conv2d, nn.ReLU(inplace=True)]
             in_channels = v

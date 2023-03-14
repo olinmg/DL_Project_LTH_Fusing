@@ -3,7 +3,7 @@ from performance_tester import train_during_pruning
 from parameters import get_parameters
 from train import get_model
 import torch
-from fusion import MSF, fusion, fusion_old
+from fusion import MSF, MSF_2, fusion, fusion_bn, fusion_old
 from sklearn.model_selection import train_test_split
 from torchvision.transforms import ToTensor
 from torch.utils.data import DataLoader
@@ -12,7 +12,7 @@ from torch import optim
 from torch.autograd import Variable
 from torchvision import datasets
 import torchvision.transforms as transforms
-import models as m
+from models import get_pretrained_models
 import json
 
 
@@ -59,10 +59,7 @@ def evaluate_performance_simple(input_model, loaders, gpu_id):
             if gpu_id != -1:
                 images, labels = images.cuda(), labels.cuda()
             
-            try:
-                test_output, _ = input_model(images)    # TODO: WHY DOES THIS RETURN TWO VALUES?!
-            except:
-                test_output = input_model(images)
+            test_output = input_model(images)
 
             pred_y = torch.max(test_output, 1)[1].data.squeeze()
             accuracy = (pred_y == labels).sum().item() / float(labels.size(0))
@@ -79,39 +76,25 @@ def get_data_loader():
         transform = ToTensor()
     )    
 
+    train_data = datasets.MNIST(
+        root = 'data', 
+        train = True, 
+        transform = ToTensor()
+    ) 
+
     # 2. defining the data loader for train and test set using the downloaded MNIST data
     loaders = {  
         'test'  : torch.utils.data.DataLoader(test_data, 
                                             batch_size=100, 
                                             shuffle=True, 
                                             num_workers=1),
+        "train": torch.utils.data.DataLoader(train_data, 
+                                            batch_size=100, 
+                                            shuffle=True, 
+                                            num_workers=1)
     }
     return loaders
 
-
-def get_pretrained_models(model_name, diff_weight_init, gpu_id, num_models):
-    models = []
-
-    for idx in range(num_models):
-        state = torch.load(f"models/{model_name}_diff_weight_init_{diff_weight_init}_{idx}.pth")
-        model = get_model(model_name)
-        if "vgg" in model_name:
-            new_state_dict = OrderedDict()
-            for k, v in state.items():
-                print(k)
-                name = k
-                name = name.replace(".module", "")
-                print("new name is: ", name)
-                new_state_dict[name] = v
-            print(new_state_dict.keys())
-            model.load_state_dict(new_state_dict)
-        else:
-            model.load_state_dict(state)
-        if gpu_id != -1:
-            model = model.cuda(gpu_id)
-        models.append(model)
-    
-    return models
 
 def test(model, loaders, args):
     model.eval()
@@ -136,36 +119,52 @@ if __name__ == '__main__':
     dict = {}
     it = 9
 
-    models = get_pretrained_models(args.model_name, args.diff_weight_init, args.gpu_id, args.num_models)
-
+    models = get_pretrained_models(args.model_name, "vgg11_bn_diff_weight_init_True_cifar10", args.gpu_id, num_models, output_dim=10)
 
     loaders = None
     if "vgg" not in args.model_name and "resnet" not in args.model_name:
+        print("Went in here!!!")
         loaders = get_data_loader()
     else:
+        print("Got cifar")
         loaders = get_cifar_data_loader()
 
     
     accuracies = []
 
-
-    sparsity = 0.1
-    accuracies = []
-    while sparsity < 1.0:
+    for idx, ((layer0_name, fc_layer0_weight), (layer1_name, fc_layer1_weight)) in \
+            enumerate(zip(models[0].named_parameters(), models[1].named_parameters())):
+        print("idx {} and layer {} with shape: {}".format(idx, layer0_name, fc_layer0_weight.shape))
     
-        fused_model = MSF(models[0], gpu_id = args.gpu_id, metric=1, sparsity=sparsity)
-
-        accuracies.append(evaluate_performance_simple(fused_model, loaders, 0))
-        sparsity += 0.1
-    
-    sparsity = 0.1
-    idx = 0
-    while sparsity < 1.0:
-    
-        print(f"Sparsity: {sparsity}. Accuracy: {accuracies[idx]}")
-
+    """idx = -1
+    for a in models[0].named_modules():
         idx += 1
-        sparsity += 0.1
+        if idx < 2:
+            continue
+        print(type(a))
+        print(a)
+        print(type(a[1]))
+        try:
+            print(a[1].weight)
+        except:
+            print("No weights")
+        print("-----")"""
+        
+    
+    pass
+
+    fused_model = fusion_bn(models, gpu_id = args.gpu_id, resnet = False)
+
+    accuracy_0 = evaluate_performance_simple(models[0], loaders, 0)
+    accuracy_1 = evaluate_performance_simple(models[1], loaders, 0)
+    accuracy_fused = evaluate_performance_simple(fused_model, loaders, 0)
+    fused_model, _ = train_during_pruning(fused_model, loaders, 10, gpu_id=0, prune=False, performed_epochs=0)
+    accuracy_fused_2 = evaluate_performance_simple(fused_model, loaders, 0)
+
+    print('Test Accuracy of the model 0: %.2f' % accuracy_0)
+    print('Test Accuracy of the model 1: %.2f' % accuracy_1)
+    print('Test Accuracy of the model fused: %.2f' % accuracy_fused)
+    print('Test Accuracy of the model fused retrain: %.2f' % accuracy_fused_2)
 
 
     

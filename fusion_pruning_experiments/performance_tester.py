@@ -33,7 +33,7 @@ def get_mnist_data_loader():
     return loaders
     
 
-def get_cifar_data_loader():
+def get_cifar10_data_loader():
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
 
@@ -49,6 +49,33 @@ def get_cifar_data_loader():
 
     val_loader = torch.utils.data.DataLoader(
         datasets.CIFAR10(root='./data', train=False, transform=transforms.Compose([
+            transforms.ToTensor(),
+            normalize,
+        ])),
+        batch_size=128, shuffle=False,
+        num_workers=4, pin_memory=True)
+    
+    return {
+        "train" : train_loader,
+        "test" : val_loader
+    }
+
+def get_cifar100_data_loader():
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
+
+    train_loader = torch.utils.data.DataLoader(
+        datasets.CIFAR100(root='./data', train=True, transform=transforms.Compose([
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomCrop(32, 4),
+            transforms.ToTensor(),
+            normalize,
+        ]), download=True),
+        batch_size=128, shuffle=True,
+        num_workers=4, pin_memory=True)
+
+    val_loader = torch.utils.data.DataLoader(
+        datasets.CIFAR100(root='./data', train=False, transform=transforms.Compose([
             transforms.ToTensor(),
             normalize,
         ])),
@@ -182,7 +209,7 @@ def train_during_pruning(model, loaders, num_epochs, gpu_id, prune=True, perform
 
     loss_func = nn.CrossEntropyLoss()   
     #optimizer = optim.Adam(model.parameters(), lr = 0.01)
-    lr = 0.01
+    lr = 0.005
     model.train()
         
     # Train the model
@@ -342,7 +369,21 @@ if __name__ == '__main__':
     pruning_function = wrapper_structured_pruning      # still need to implement the structured pruning function
     eval_function = evaluate_performance_simple
 
-    loaders = get_mnist_data_loader() if experiment_params["dataset"] == "mnist" else get_cifar_data_loader() 
+    loaders = None
+    output_dim = None
+    match experiment_params["dataset"]:
+        case "mnist":
+            loaders = get_mnist_data_loader()
+            output_dim = 10
+        case "cifar10":
+            loaders = get_cifar10_data_loader()
+            output_dim = 10
+        case "cifar100":
+            loaders = get_cifar100_data_loader()
+            output_dim = 100
+        case _:
+            raise Exception("Provided dataset does not exist.")
+
 
     new_result = {}
     for sparsity in result_final["experiment_parameters"]["sparsity"]:
@@ -358,12 +399,10 @@ if __name__ == '__main__':
     for idx_result, result in enumerate(result_final["results"]):
         for model_dict in experiment_params["models"]:
             print("new_result: ", new_result)
-            model_architecture = get_model(model_dict["name"])
-            print(type(model_architecture))
             name, diff_weight_init = model_dict["name"], experiment_params["diff_weight_init"]
 
             print(f"models/{name}_diff_weight_init_{diff_weight_init}_{0}.pth")
-            models_original = get_pretrained_models(name, diff_weight_init, experiment_params["gpu_id"], experiment_params["num_models"])
+            models_original = get_pretrained_models(name, model_dict["basis_name"], experiment_params["gpu_id"], experiment_params["num_models"], output_dim=output_dim)
 
             print(type(models_original[0]))
 
@@ -382,7 +421,7 @@ if __name__ == '__main__':
             
             prune_params = {"prune_type": result["prune_type"], "sparsity": result["sparsity"], "num_epochs": experiment_params["num_epochs"],
                     "example_input": torch.randn(1,1, 28,28) if "cnn" in name else torch.randn(1, 3, 32, 32),
-                    "out_features": 10, "loaders": loaders, "gpu_id": experiment_params["gpu_id"]}
+                    "out_features": output_dim, "loaders": loaders, "gpu_id": experiment_params["gpu_id"]}
 
             pruned_models, pruned_model_accuracies,_ = pruning_test_manager(input_model_list=models_original, prune_params=prune_params, **params)
 

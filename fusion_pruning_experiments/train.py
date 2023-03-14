@@ -61,7 +61,35 @@ def get_cifar_data_loader(num_models, args):
                                           num_workers=4, pin_memory=True),
         }
 
-# define the training function
+def get_cifar100_data_loader(num_models, args):
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
+    train_data = datasets.CIFAR100(root='./data', train=True, transform=transforms.Compose([
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomCrop(32, 4),
+            transforms.ToTensor(),
+            normalize,
+        ]), download=True)
+    
+    test_data = datasets.CIFAR100(root='./data', train=False, transform=transforms.Compose([
+            transforms.ToTensor(),
+            normalize,
+        ]))
+    
+    fraction = 1/num_models
+    train_data_split = torch.utils.data.random_split(train_data, [fraction]*num_models) if not args.diff_weight_init else [train_data]*num_models
+
+    return {
+        "train": [torch.utils.data.DataLoader(train_data_subset, 
+                                          batch_size=128, 
+                                          shuffle=True, 
+                                          num_workers=4,pin_memory=True) for train_data_subset in train_data_split],
+        "test" : torch.utils.data.DataLoader(test_data, 
+                                          batch_size=128, 
+                                          shuffle=True, 
+                                          num_workers=4, pin_memory=True),
+        }
+
 def train(model, loaders, num_epochs, gpu_id):
     '''
     Has to be a function that loads a dataset. 
@@ -112,7 +140,6 @@ def train(model, loaders, num_epochs, gpu_id):
     return best_model, best_model_accuracy
 
 
-
 # define the testing function
 def test(model, loaders, gpu_id):
     model.eval()
@@ -136,18 +163,21 @@ if __name__ == '__main__':
     args = get_train_parameters()
     num_models = args.num_models
     loaders = None
-    if "vgg" in args.model_name or "resnet" in args.model_name:
+    if args.dataset=="cifar10":
         loaders = get_cifar_data_loader(num_models, args)
+    elif args.dataset == "cifar100":
+        print("went in here!!")
+        loaders = get_cifar100_data_loader(num_models, args)
     else:
         loaders = get_mnist_data_loader(num_models, args)
   
-    model_parent = get_model(args.model_name)
+    model_parent = get_model(args.model_name, output_dim = 100 if args.dataset == "cifar100" else 10)
     for idx, ((layer0_name, fc_layer0_weight), (layer1_name, fc_layer1_weight)) in \
             enumerate(zip(model_parent.named_parameters(), model_parent.named_parameters())):
         print(f"{layer0_name} : {fc_layer0_weight.shape}")
 
     for idx in range(num_models):
-        model = copy.deepcopy(model_parent) if not args.diff_weight_init else get_model(args.model_name)
+        model = copy.deepcopy(model_parent) if not args.diff_weight_init else get_model(args.model_name, output_dim = 100 if args.dataset == "cifar100" else 10)
         if args.gpu_id != -1:
             model = model.cuda(args.gpu_id)
         model,_ = train(model, {"train": loaders["train"][idx], "test": loaders["test"]}, args.num_epochs, args.gpu_id)
@@ -155,4 +185,4 @@ if __name__ == '__main__':
 
         print('Test Accuracy of the model %d: %.2f' % (idx, accuracy))
         # store the trained model and performance
-        torch.save(model.state_dict(), "models/{}_diff_weight_init_{}_{}.pth".format(args.model_name, args.diff_weight_init, idx))
+        torch.save(model, "models/{}_diff_weight_init_{}_{}_{}.pth".format(args.model_name, args.diff_weight_init,args.dataset, idx))
