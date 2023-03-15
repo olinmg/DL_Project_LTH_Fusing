@@ -3,7 +3,7 @@ from performance_tester import train_during_pruning
 from parameters import get_parameters
 from train import get_model
 import torch
-from fusion import MSF, MSF_2, fusion, fusion_bn, fusion_old
+from fusion import MSF, fusion, fusion_bn, fusion_old
 from sklearn.model_selection import train_test_split
 from torchvision.transforms import ToTensor
 from torch.utils.data import DataLoader
