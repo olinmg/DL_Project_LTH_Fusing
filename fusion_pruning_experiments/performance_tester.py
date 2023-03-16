@@ -371,18 +371,17 @@ if __name__ == '__main__':
 
     loaders = None
     output_dim = None
-    match experiment_params["dataset"]:
-        case "mnist":
-            loaders = get_mnist_data_loader()
-            output_dim = 10
-        case "cifar10":
-            loaders = get_cifar10_data_loader()
-            output_dim = 10
-        case "cifar100":
-            loaders = get_cifar100_data_loader()
-            output_dim = 100
-        case _:
-            raise Exception("Provided dataset does not exist.")
+    if experiment_params["dataset"] == "mnist":
+        loaders = get_mnist_data_loader()
+        output_dim = 10
+    elif experiment_params["dataset"] == "cifar10":
+        loaders = get_cifar10_data_loader()
+        output_dim = 10
+    elif experiment_params["dataset"] == "cifar100":
+        loaders = get_cifar100_data_loader()
+        output_dim = 100
+    else:
+        raise Exception("Provided dataset does not exist.")
 
 
     new_result = {}

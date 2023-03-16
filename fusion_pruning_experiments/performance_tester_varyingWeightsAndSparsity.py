@@ -7,7 +7,7 @@ from torchvision.transforms import ToTensor
 import torchvision.transforms as transforms
 import copy
 import json
-from performance_tester import get_mnist_data_loader, get_cifar_data_loader, evaluate_performance_simple
+from performance_tester import get_mnist_data_loader, get_cifar10_data_loader, get_cifar100_data_loader, evaluate_performance_simple
 from performance_tester import original_test_manager, pruning_test_manager, fusion_test_manager
 from performance_tester import wrapper_structured_pruning, wrapper_first_fusion
 from performance_tester import train_during_pruning
@@ -68,10 +68,24 @@ def test_multiple_settings(sparsity_list, fusion_weights_list, input_model_names
         experiment_params = json.load(f)
 
     # load the relevant data and models
-    loaders = get_mnist_data_loader() if experiment_params["dataset"] == "mnist" else get_cifar_data_loader()
+    loaders = None
+    output_dim = None
+    if experiment_params["dataset"] == "mnist":
+        loaders = get_mnist_data_loader()
+        output_dim = 10
+    elif experiment_params["dataset"] == "cifar10":
+        loaders = get_cifar10_data_loader()
+        output_dim = 10
+    elif experiment_params["dataset"] == "cifar100":
+        loaders = get_cifar100_data_loader()
+        output_dim = 100
+    else:
+        raise Exception("Provided dataset does not exist.")
+
+    #loaders = get_mnist_data_loader() if experiment_params["dataset"] == "mnist" else get_cifar_data_loader()
     name, diff_weight_init = experiment_params["models"][0]["name"], experiment_params["diff_weight_init"]
     model_architecture = get_model(name)
-    original_models = get_pretrained_models_by_name(name, diff_weight_init, experiment_params["gpu_id"], experiment_params["num_models"], input_model_names)
+    original_models = get_pretrained_models_by_name(name, diff_weight_init, experiment_params["gpu_id"], experiment_params["num_models"], input_model_names, output_dim)
 
 
     ##################### START COMPUTATIONS THAT ARE COMMON OVER VARIATIONS OF SPARSITY AND WEIGHTS ####################
@@ -333,8 +347,8 @@ if __name__ == '__main__':
         os.makedirs(result_folder_name)     # create folder if doesnt exist before
     
     # Path to the models that should be used (without .pth)
-    input_model_names = ["models/cnn_diff_weight_init_False_0", 
-                         "models/cnn_diff_weight_init_False_1"]
+    input_model_names = ["models/vgg11_diff_weight_init_True_0", 
+                         "models/vgg11_diff_weight_init_True_1"]
     
     # Running the experiments on different sparsity and fusion_weight combinations
     this_weight_list = experiment_params["fusion_weights"] #[[0.5, 0.5], [0.7, 0.3]] #[[round(x, 1), round(1-x,1)] for x in np.linspace(0, 1, 11)]

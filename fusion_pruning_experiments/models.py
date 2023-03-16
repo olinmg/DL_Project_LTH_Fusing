@@ -165,7 +165,7 @@ def get_pretrained_models(model_name, basis_name, gpu_id, num_models, output_dim
     return models
 
 
-def get_pretrained_models_by_name(model_name, diff_weight_init, gpu_id, num_models, model_file_names):
+def get_pretrained_models_by_name(model_name, diff_weight_init, gpu_id, num_models, model_file_names, output_dim=10):
     models = []
 
     #e.g. model_file_names = ["models/cnn10_sameInit_MNISTsameData_SGD_lr01_momentum09",
@@ -179,7 +179,7 @@ def get_pretrained_models_by_name(model_name, diff_weight_init, gpu_id, num_mode
 
         print(f"Getting state from: ./{model_file_names[idx]}.pth")
 
-        model = get_model(model_name)
+        model = get_model(model_name, output_dim=output_dim)
         if "vgg" in model_name:
             new_state_dict = OrderedDict()
             for k, v in state.items():
