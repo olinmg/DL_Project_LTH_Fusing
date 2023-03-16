@@ -65,42 +65,6 @@ class CNN(nn.Module):
         output = self.out(x)
         return output
 
-class CNN_batchNorm(nn.Module):
-    def __init__(self):
-        super(CNN_batchNorm, self).__init__()
-        bias = True
-        self.conv1 = nn.Sequential(         
-            nn.Conv2d(
-                in_channels=1,              
-                out_channels=16,            
-                kernel_size=5,              
-                stride=1,                   
-                padding=2,
-                bias = bias # Needs to change later!                  
-                ),                              
-            nn.ReLU(),                      
-            nn.MaxPool2d(kernel_size=2),
-            nn.BatchNorm2d(16)    
-        )
-
-        self.conv2 = nn.Sequential(         
-            nn.Conv2d(16, 32, 5, 1, 2, bias=bias),     
-            nn.ReLU(),                      
-            nn.MaxPool2d(2),    
-            nn.BatchNorm2d(32)      
-        )
-        # fully connected layer, output 10 classes
-        self.out = nn.Linear(32 * 7 * 7, 10, bias=bias)
-    
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.conv2(x)
-        # flatten the output of conv2 to (batch_size, 32 * 7 * 7)
-        x = x.view(x.size(0), -1)       
-        output = self.out(x)
-        return output
-
-
 
 def ResNet18(num_classes=10, use_batchnorm=False, linear_bias=True):
     print("linear_bias is: ", linear_bias)
@@ -155,8 +119,6 @@ def get_model(model_name, sparsity=1.0, output_dim=10):
     print("Model entered: ", model_name)
     if model_name == "cnn":
         return CNN()
-    if model_name == "cnn_bn":
-        return CNN_batchNorm()
     elif model_name == "mlp":
         return MLP(sparsity)
     elif model_name == "mobilenetv1":

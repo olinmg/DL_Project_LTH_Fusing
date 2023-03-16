@@ -4,11 +4,24 @@ import torch
 import numpy as np
 import ot
 import copy
+from torch import linalg as LA
+from fusion_utils import preprocess_parameters
+
+from models import get_model
 #from scipy.optimize import linear_sum_assignment # Could accomplish the same as OT with Hungarian Algorithm
 
 # get_histogram creates uniform historgram, i.e. [1/cardinality, 1/cardinality, ...]
-def get_histogram(cardinality):
-    return np.ones(cardinality)/cardinality # uniform probability distribution
+def get_histogram(cardinality, indices, add=False):
+
+    if add == False:
+        return np.ones(cardinality)/cardinality # uniform probability distribution
+
+    else:
+        result = np.ones(cardinality)
+        for indice in indices:
+            result[indice] = cardinality/indices.size()[0]
+
+        return result/np.sum(result)
 
 def normalize_vector(coordinates, eps=1e-9):
     norms = torch.norm(coordinates, dim=-1, keepdim=True)
@@ -26,7 +39,7 @@ def compute_euclidian_distance_matrix(x, y, p=2, squared=True): # For some reaso
 # get_ground_metric computes the cost matrix
 # if bias is present, the bias will be appended to the weight matrix and subsequently used to calculate the cost
 # cost matrix is based on the weights, not the activations
-def get_ground_metric(coordinates1, coordinates2, bias1, bias2, BN=None):
+def get_ground_metric(coordinates1, coordinates2, bias1, bias2):
     if bias1 != None: # and bias2 != None
         assert bias2 != None
         coordinates1 = torch.cat((coordinates1, bias1.view(bias1.shape[0], -1)), 1)
@@ -54,6 +67,44 @@ def create_network_from_params(reference_model, param_list, gpu_id = -1,sparsity
     model.load_state_dict(model_state_dict)
 
     return model
+
+def create_network_from_parameters(reference_model, param_list, gpu_id = -1):
+    model = copy.deepcopy(reference_model)
+    for layer in param_list:
+        print(layer.super_type)
+    
+    model_state_dict = model.state_dict()
+    keys = list(model_state_dict.keys())
+    print(keys)
+    
+    idx = -1
+
+    for layer in param_list:
+        idx += 1
+        model_state_dict[keys[idx]] = layer.weight
+        if layer.bias != None:
+            idx += 1
+            model_state_dict[keys[idx]] = layer.bias
+        if layer.bn:
+            if layer.bn_gamma != None:
+                idx += 1
+                model_state_dict[keys[idx]] = layer.bn_gamma
+                idx += 1
+                model_state_dict[keys[idx]] = layer.bn_beta
+            idx += 1
+            model_state_dict[keys[idx]] = layer.bn_mean
+            idx += 1
+            model_state_dict[keys[idx]] = layer.bn_var
+
+            idx += 1
+            model_state_dict[keys[idx]] = torch.Tensor([1])
+    
+    model.load_state_dict(model_state_dict)
+
+    return model
+
+
+
 
 def update_iterators(iterators):
     for iter in iterators:
@@ -103,19 +154,293 @@ def comparator(model0_args, model1_args):
     else:
         return 0
 
+def MSF(network, sparsity = 0.65, gpu_id = -1, metric=-1, eps=1e-7, resnet=False, output_dim=10):
+    num_layers = len(list(network.parameters()))
+    avg_aligned_layers = []
+    T_var = None
+    bias = False
+    bias_weight = None
+
+    softmax = torch.nn.Softmax(dim=0)
+
+    for idx, (layer_name, layer_weight) in enumerate(network.named_parameters()):
+        if bias:
+            # If in the last layer we detected bias, this layer will be the bias layer we handled before, so we can just skip it
+            bias=False
+            continue
+
+        # Check if this current layer has a bias
+        if (idx != num_layers-1):
+            next_layer = next(itertools.islice(network.named_parameters(), idx+1, None))
+            bias = True if "bias" in next_layer[0] else False
+            bias_weight = next_layer[1] if bias else None
+        else:
+            bias = False
+        
+        print("idx {} and layer {}".format(idx, layer_name))
+        print("Bias: {}".format(bias))
+        #assert fc_layer0_weight.shape == fc_layer1_weight.shape
+
+        #mu_cardinality = fc_layer0_weight.shape[0]
+        #nu_cardinality = fc_layer1_weight.shape[0]
+
+        layer_shape = layer_weight.shape
 
 
-def fusion(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7, resnet=False):
+
+        if len(layer_shape) > 2:
+            is_conv = True
+            # For convolutional layers, it is (#out_channels, #in_channels, height, width)
+            # fc_layer0_weight_data has shape: (*out_channels, #in_channels, height*width)
+            layer_weight_data = layer_weight.data.view(layer_weight.shape[0], layer_weight.shape[1], -1)
+        else:
+            is_conv = False
+            layer_weight_data = layer_weight.data
+        
+
+        amount_pruned = round(layer_shape[0]*(1-sparsity))
+        amount_pruned = 1 if amount_pruned == 0 else amount_pruned # Make sure we're not cancelling a whole layer
+
+        norm_layer = None
+        indices = None
+        basis_weight = None
+        basis_bias = None
+
+        if idx == 0:
+            norm_layer = LA.norm(layer_weight_data.view(layer_weight_data.shape[0], -1), ord=metric, dim=1)
+            _, indices = torch.topk(norm_layer, amount_pruned)
+            basis_bias = torch.index_select(bias_weight, 0, indices) if bias else None
+
+            if is_conv:
+                # input to ground_metric has shape: (#out_channels, #in_channels*height*width)
+                layer_flattened = layer_weight_data.view(layer_weight_data.shape[0], -1)
+                basis_weight = torch.index_select(layer_flattened, 0, indices)
+
+                M = get_ground_metric(layer_flattened,
+                                basis_weight, bias_weight, basis_bias)
+            else:
+                basis_weight = torch.index_select(layer_weight_data, 0, indices)
+                M = get_ground_metric(layer_weight_data, basis_weight, bias_weight, basis_bias)
+
+            aligned_wt = layer_weight_data
+        else:
+            if is_conv:
+                T_var_conv = T_var.unsqueeze(0).repeat(layer_weight_data.shape[2], 1, 1)
+                aligned_wt = torch.bmm(layer_weight_data.permute(2, 0, 1), T_var_conv).permute(1, 2, 0)
+
+            else:
+                if layer_weight.data.shape[1] != T_var.shape[0]:
+                    # Handles the switch from convolutional layers to fc layers
+                    layer_unflattened = layer_weight.data.view(layer_weight.shape[0], T_var.shape[0], -1).permute(2, 0, 1)
+                    aligned_wt = torch.bmm(
+                        layer_unflattened,
+                        T_var.unsqueeze(0).repeat(layer_unflattened.shape[0], 1, 1)
+                    ).permute(1, 2, 0)
+                    aligned_wt = aligned_wt.contiguous().view(aligned_wt.shape[0], -1)
+
+                else:
+                    aligned_wt = torch.matmul(layer_weight.data, T_var)
+            
+            aligned_wt = aligned_wt.reshape(aligned_wt.shape[0], -1)
+            norm_layer = LA.norm(aligned_wt, ord=metric, dim=1)
+            _, indices = torch.topk(norm_layer, amount_pruned)
+            basis_weight = torch.index_select(aligned_wt, 0, indices)
+            basis_bias = torch.index_select(bias_weight, 0, indices) if bias else None
+
+            M = get_ground_metric(aligned_wt,
+                basis_weight, bias_weight, basis_bias)
+        
+
+        mu = get_histogram(basis_weight.shape[0], indices = None)
+
+        #nu = norm_layer.cpu().numpy()/np.sum(norm_layer.cpu().numpy())
+        nu = get_histogram(layer_shape[0], indices = indices, add=True)
+
+        #nu = softmax(norm_layer).cpu().numpy()
+        #nu = torch.argsort(norm_layer, dim=- 1, descending=False, stable=True).cpu().numpy()
+        #nu = nu/np.sum(nu)
+
+        cpuM = M.data.cpu().numpy() # POT does not accept array on GPU
+
+
+        T = ot.emd(nu, mu, cpuM)
+
+        if gpu_id!=-1:
+            T_var = torch.from_numpy(T).cuda(gpu_id).float()
+        else:
+            T_var = torch.from_numpy(T).float()
+
+        # ----- Assumption: correction = TRUE, proper_marginals = FALSE ---------
+        if gpu_id != -1:
+            marginals = torch.ones(T_var.shape[1]).cuda(gpu_id) / T_var.shape[0]
+        else:
+            marginals = torch.ones(T_var.shape[1]) / T_var.shape[0]
+        marginals = torch.diag(1.0/(marginals + eps))  # take inverse
+        T_var = torch.matmul(T_var, marginals)
+        print(T_var.shape)
+        print(T_var[:,0])
+        T_var = T_var / T_var.sum(dim=0)
+        print(T_var[:,0])
+        # -----------------------------------------------------------------------
+        # ---- Assumption: Past correction = True (Anything else doesn't really make sense?)
+        geometric_fc = torch.matmul(T_var.t(), aligned_wt.contiguous().view(aligned_wt.shape[0], -1)) if idx != num_layers-1 else aligned_wt
+        print(geometric_fc.shape)
+        print("layer_shape: ", layer_shape)
+
+        if is_conv:
+            print(geometric_fc.shape[1]/(layer_shape[2]*layer_shape[3]))
+            geometric_fc = geometric_fc.view(torch.Size([geometric_fc.shape[0], int(geometric_fc.shape[1]/(layer_shape[2]*layer_shape[3])), layer_shape[2], layer_shape[3]]))
+
+        avg_aligned_layers.append(geometric_fc)
+        if bias:
+            geometric_bias = torch.matmul(T_var.t(), bias_weight.view(bias_weight.shape[0], -1)).flatten() if idx != num_layers-1 else bias_weight
+            avg_aligned_layers.append(geometric_bias)
+        
+        mu = None
+        nu = None
+        layer_weight_data = None
+        basis_weight = None
+        layer_flattened = None
+        basis_weight = None
+        basis_bias = None
+        norm_layer = None
+
+
+        M = None
+        cpuM = None
+        marginals = None
+        geometric_fc = None
+        bias_weight = None
+        geometric_bias = None
+        Maligned_wt = None 
+
+    
+    return create_network_from_params(gpu_id=gpu_id, param_list=avg_aligned_layers, reference_model = get_model(model_name="vgg11", sparsity=1-sparsity, output_dim=output_dim))
+
+
+def fusion_bn(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7, resnet=False):
     """
     fusion fuses arbitrary many models into the model that is the smallest
-
     :param networks: A list of networks to be fused
     :param accuracies: A list of accuracies of the networks. The code will order the networks with respect to the accuracies for optimal accuracy
     :param importance: A list of floats. If importance = [0.9, 0.1], then linear combination of weights will be: network[0]*0.9 + network[1]*0.1
     :return: the fused model
     """ 
-    print("fuse_Start")
-    gpu_id = -1
+
+    num_models = len(networks)
+    T_var_list = [None]*num_models
+    skip_T_var_list = [None]*num_models
+    skip_T_var_idx_list = [-1]*num_models
+    residual_T_var_list = [None]*num_models
+    residual_T_var_idx_list = [-1]*num_models
+
+    if accuracies == None:
+        accuracies = [0]*num_models
+
+    importance = [1]*num_models if importance == None else importance
+    networks_zip = sorted(list(zip(networks, accuracies, importance)), key=functools.cmp_to_key(comparator))
+    networks = [network_zip[0] for network_zip in networks_zip]
+    importance = [network_zip[2] for network_zip in networks_zip]
+    importance = torch.tensor(importance)
+    sum = torch.sum(importance)
+    importance = importance *(importance.shape[0]/sum)
+
+    fusion_layers = preprocess_parameters(networks)
+    num_layers = len(fusion_layers)
+
+    for idx in range(num_layers):
+
+        avg_layer = fusion_layers[idx][0]
+
+        mu_cardinality = avg_layer.weight.shape[0]
+        mu = get_histogram(mu_cardinality, None)
+
+        is_conv = avg_layer.is_conv
+
+        for idx_m, fusion_layer in enumerate(fusion_layers[idx][1:]):
+            idx_model = idx_m + 1
+            T_var = T_var_list[idx_model]
+            skip_T_var = skip_T_var_list[idx_model]
+            skip_T_var_idx = skip_T_var_idx_list[idx_model]
+            residual_T_var = residual_T_var_list[idx_model]
+            residual_T_var_idx = residual_T_var_idx_list[idx_model]
+
+            nu_cardinality = fusion_layer.weight.shape[0]
+            layer_shape = fusion_layer.weight.shape
+
+
+            aligned_wt = fusion_layer.weight
+            if idx != 0:
+                if resnet and is_conv:
+                    assert len(layer_shape) == 4
+                    # save skip_level transport map if there is block ahead
+                    if layer_shape[1] != layer_shape[0]:
+                        if not (layer_shape[2] == 1 and layer_shape[3] == 1):
+                            print(f'saved skip T_var at layer {idx} with shape {layer_shape}')
+                            skip_T_var = T_var.clone()
+                            skip_T_var_idx = idx
+                        else:
+                            print(
+                                f'utilizing skip T_var saved from layer layer {skip_T_var_idx} with shape {skip_T_var.shape}')
+                            # if it's a shortcut (128, 64, 1, 1)
+                            residual_T_var = T_var.clone()
+                            residual_T_var_idx = idx  # use this after the skip
+                            T_var = skip_T_var
+                        print("shape of previous transport map now is", T_var.shape)
+                    else:
+                        if residual_T_var is not None and (residual_T_var_idx == (idx - 1)):
+                            T_var = (T_var + residual_T_var) / 2
+                            print("averaging multiple T_var's")
+                        else:
+                            print("doing nothing for skips")
+                
+                fusion_layer.align_weights(T_var)
+            
+            M = get_ground_metric(fusion_layer.create_comparison_vec(), avg_layer.create_comparison_vec(), None, None)
+
+            nu = get_histogram(nu_cardinality, None)
+
+            cpuM = M.data.cpu().numpy() # POT does not accept array on GPU
+
+            T = ot.emd(nu, mu, cpuM)        
+
+            if gpu_id != -1:
+                T_var = torch.from_numpy(T).cuda(gpu_id).float()
+            else:
+                T_var = torch.from_numpy(T).float()
+            
+
+            if gpu_id != -1:
+                marginals = torch.ones(T_var.shape[1]).cuda(gpu_id) / T_var.shape[0]
+            else:
+                marginals = torch.ones(T_var.shape[1]) / T_var.shape[0]
+            marginals = torch.diag(1.0/(marginals + eps))  # take inverse
+            T_var = torch.matmul(T_var, marginals)
+            T_var = T_var / T_var.sum(dim=0)
+
+            fusion_layer.permute_parameters(T_var)
+
+            avg_layer.update_weights(fusion_layer, torch.sum(importance[:idx_model]), importance[idx_model])
+
+
+            T_var_list[idx_model] = T_var
+            skip_T_var_list[idx_model] = skip_T_var
+            skip_T_var_idx_list[idx_model] = skip_T_var_idx
+            residual_T_var_list[idx_model] = residual_T_var
+            residual_T_var_idx_list[idx_model] = residual_T_var_idx
+
+    return create_network_from_parameters(gpu_id=gpu_id, param_list=[layers[0] for layers in fusion_layers], reference_model = networks[0])
+
+
+def fusion(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7, resnet=False):
+    """
+    fusion fuses arbitrary many models into the model that is the smallest
+    :param networks: A list of networks to be fused
+    :param accuracies: A list of accuracies of the networks. The code will order the networks with respect to the accuracies for optimal accuracy
+    :param importance: A list of floats. If importance = [0.9, 0.1], then linear combination of weights will be: network[0]*0.9 + network[1]*0.1
+    :return: the fused model
+    """ 
+
     print("RESNET IS: ", resnet)
     num_layers = len(list(zip(networks[0].parameters(), networks[1].parameters())))
 
@@ -149,9 +474,8 @@ def fusion(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7, re
 
     layer_iters = [networks[i].named_parameters() for i in range(num_models)]
         
-    
+
     for idx in range(num_layers):
-        print(f"Layer num{idx+1}")
         if bias:
             # If in the last layer we detected bias, this layer will be the bias layer we handled before, so we can just skip it
             bias=False
@@ -160,7 +484,6 @@ def fusion(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7, re
         
         if (idx != num_layers-1):
             bias = True if "bias" in next(itertools.islice(networks[0].named_parameters(), idx+1, None))[0] else False
-            print(bias)
             avg_bias_weight = next(itertools.islice(networks[0].named_parameters(), idx+1, None))[1] if bias else None
         else:
             bias = False
@@ -169,7 +492,7 @@ def fusion(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7, re
         avg_layer_name, avg_layer = next(layer_iters[0])
         layer_shape = avg_layer.shape
         mu_cardinality = avg_layer.shape[0]
-        mu = get_histogram(mu_cardinality)
+        mu = get_histogram(mu_cardinality, None)
         is_conv = len(layer_shape) > 2
 
         print("idx {} and layer {}".format(idx, avg_layer_name))
@@ -256,7 +579,7 @@ def fusion(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7, re
                         aligned_wt = torch.matmul(layer, T_var)
                     M = get_ground_metric(aligned_wt, avg_layer.data, bias_weight, avg_bias_weight)
             
-            nu = get_histogram(nu_cardinality)
+            nu = get_histogram(nu_cardinality, None)
 
             
             cpuM = M.data.cpu().numpy() # POT does not accept array on GPU
@@ -314,43 +637,6 @@ def fusion(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7, re
         layer_data = None
 
     return create_network_from_params(gpu_id=gpu_id, param_list=avg_aligned_layers, reference_model = networks[0])
-
-def fusion_bn_alt(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7, resnet=False):
-    def scale_bn(net):
-        """
-        Create a deep copy of a PyTorch neural network and remove all BatchNorm layers from the copy.
-        
-        Args:
-            net (nn.Module): The neural network to copy and modify.
-        
-        Returns:
-            nn.Module: A deep copy of the input network with all BatchNorm layers removed.
-        """
-        # Create a deep copy of the input network.
-        new_net = copy.deepcopy(net)
-        
-
-
-        # Remove BatchNorm layers from the copy.
-        for i, key in enumerate(new_net._modules):
-            m1 = new_net._modules[key]
-            if isinstance(m1, nn.Sequential):
-                new_net._modules[list(new_net._modules.keys())[i]] = scale_bn(m1)
-            elif isinstance(m1, nn.BatchNorm2d) or isinstance(m1, nn.BatchNorm1d):
-                idx = i
-                while idx >= 0:
-                    m2 = list(new_net.modules())[idx]
-                    if isinstance(m2, nn.Linear) or isinstance(m2, nn.Conv2d):
-                        m2.weight = nn.Parameter(m2.weight / m1.weight[:, None, None, None])
-                        m2.bias = nn.Parameter(m2.bias - m1.bias)
-                        del new_net._modules[list(new_net._modules.keys())[i]]
-                        break
-                    idx -= 1
-        return new_net
-    
-    networks_without_bn = [scale_bn(net) for net in networks]
-    return fusion(networks_without_bn, gpu_id = -1, accuracies=None, importance=None, eps=1e-7, resnet=False)
-
 
 # fusion fuses two models with cost matrix based on weights, NOT ACTIVATIONS
 def fusion_old(networks, args, gpu_id = -1, importance = [], eps=1e-7, resnet=False):
