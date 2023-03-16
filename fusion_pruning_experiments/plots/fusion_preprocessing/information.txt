@@ -1,0 +1,11 @@
+
+Data Free:
+    Here, we try to see whether we can improve the non-finetuned pruned model by fusing the original model into it.
+    With Single-Sparsity Fusion (SSF), we fuse the original model into the pruned model. This is what the TA does.
+    With Multi-Sparsity Fusion (MSF), if we want to have a final network that only has 70% of its weights for example, we don't just fuse the original model into it, but also
+    the models that were pruned by 80%, and 90%. Or if it should have 50%, we also use models pruned to 60%, 70%, 80%, and 90%.
+
+Data Aware:
+    Here, we try to see whether we can improve the finetuned pruned model by fusing the original model into it.
+    With SSF, we do the following: Finetune pruned model, fuse the original model into it, and then finetune again 
+    

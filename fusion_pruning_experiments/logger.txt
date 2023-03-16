@@ -1,0 +1,5 @@
+Starting process with models:
+models/vgg11_diff_weight_init_True_0
+models/vgg11_diff_weight_init_True_1
+
+

@@ -1,0 +1,299 @@
+{
+    "Experiment Parameters": {
+        "FaP": true,
+        "PaF": true,
+        "PaF_all": false,
+        "models": [
+            {
+                "name": "vgg11"
+            }
+        ],
+        "prune_type": "l1",
+        "sparsity": [
+            0.3
+        ],
+        "num_models": 2,
+        "num_epochs": 0,
+        "diff_weight_init": true,
+        "gpu_id": -1,
+        "dataset": "cifar",
+        "Execution Time": 432.9374694824219,
+        "fusion_weights": [
+            [
+                0.0,
+                1.0
+            ],
+            [
+                0.1,
+                0.9
+            ],
+            [
+                0.2,
+                0.8
+            ],
+            [
+                0.3,
+                0.7
+            ],
+            [
+                0.4,
+                0.6
+            ],
+            [
+                0.5,
+                0.5
+            ],
+            [
+                0.6,
+                0.4
+            ],
+            [
+                0.7,
+                0.3
+            ],
+            [
+                0.8,
+                0.2
+            ],
+            [
+                0.9,
+                0.1
+            ],
+            [
+                1.0,
+                0.0
+            ]
+        ]
+    },
+    "[0.0, 1.0]": {
+        "original_model_accuracies": [
+            0.8927017405063291,
+            0.8898338607594937
+        ],
+        "original_pruned_models_accuracies": [
+            0.7174643987341772,
+            0.8120055379746836
+        ],
+        "original_fused_model_accuracy": 0.8898338607594937,
+        "PaF_model_accuracy": 0.8120055379746836,
+        "PaFaP_model_accuracy": 0.5853441455696202,
+        "FaP_model_accuracy": [
+            0.8120055379746836
+        ],
+        "sparsity": 0.3,
+        "fusion_weights": [
+            0.0,
+            1.0
+        ]
+    },
+    "[0.1, 0.9]": {
+        "original_model_accuracies": [
+            0.8927017405063291,
+            0.8898338607594937
+        ],
+        "original_pruned_models_accuracies": [
+            0.7174643987341772,
+            0.8120055379746836
+        ],
+        "original_fused_model_accuracy": 0.8822191455696202,
+        "PaF_model_accuracy": 0.8088409810126582,
+        "PaFaP_model_accuracy": 0.5924643987341772,
+        "FaP_model_accuracy": [
+            0.8203125
+        ],
+        "sparsity": 0.3,
+        "fusion_weights": [
+            0.1,
+            0.9
+        ]
+    },
+    "[0.2, 0.8]": {
+        "original_model_accuracies": [
+            0.8927017405063291,
+            0.8898338607594937
+        ],
+        "original_pruned_models_accuracies": [
+            0.7174643987341772,
+            0.8120055379746836
+        ],
+        "original_fused_model_accuracy": 0.8716376582278481,
+        "PaF_model_accuracy": 0.796875,
+        "PaFaP_model_accuracy": 0.5610166139240507,
+        "FaP_model_accuracy": [
+            0.8097310126582279
+        ],
+        "sparsity": 0.3,
+        "fusion_weights": [
+            0.2,
+            0.8
+        ]
+    },
+    "[0.3, 0.7]": {
+        "original_model_accuracies": [
+            0.8927017405063291,
+            0.8898338607594937
+        ],
+        "original_pruned_models_accuracies": [
+            0.7174643987341772,
+            0.8120055379746836
+        ],
+        "original_fused_model_accuracy": 0.8464200949367089,
+        "PaF_model_accuracy": 0.7619659810126582,
+        "PaFaP_model_accuracy": 0.5202729430379747,
+        "FaP_model_accuracy": [
+            0.7857990506329114
+        ],
+        "sparsity": 0.3,
+        "fusion_weights": [
+            0.3,
+            0.7
+        ]
+    },
+    "[0.4, 0.6]": {
+        "original_model_accuracies": [
+            0.8927017405063291,
+            0.8898338607594937
+        ],
+        "original_pruned_models_accuracies": [
+            0.7174643987341772,
+            0.8120055379746836
+        ],
+        "original_fused_model_accuracy": 0.8119066455696202,
+        "PaF_model_accuracy": 0.7068829113924051,
+        "PaFaP_model_accuracy": 0.4724090189873418,
+        "FaP_model_accuracy": [
+            0.7328916139240507
+        ],
+        "sparsity": 0.3,
+        "fusion_weights": [
+            0.4,
+            0.6
+        ]
+    },
+    "[0.5, 0.5]": {
+        "original_model_accuracies": [
+            0.8927017405063291,
+            0.8898338607594937
+        ],
+        "original_pruned_models_accuracies": [
+            0.7174643987341772,
+            0.8120055379746836
+        ],
+        "original_fused_model_accuracy": 0.7939082278481012,
+        "PaF_model_accuracy": 0.6584256329113924,
+        "PaFaP_model_accuracy": 0.4231606012658228,
+        "FaP_model_accuracy": [
+            0.7136075949367089
+        ],
+        "sparsity": 0.3,
+        "fusion_weights": [
+            0.5,
+            0.5
+        ]
+    },
+    "[0.6, 0.4]": {
+        "original_model_accuracies": [
+            0.8927017405063291,
+            0.8898338607594937
+        ],
+        "original_pruned_models_accuracies": [
+            0.7174643987341772,
+            0.8120055379746836
+        ],
+        "original_fused_model_accuracy": 0.8203125,
+        "PaF_model_accuracy": 0.6663370253164557,
+        "PaFaP_model_accuracy": 0.42147943037974683,
+        "FaP_model_accuracy": [
+            0.6865110759493671
+        ],
+        "sparsity": 0.3,
+        "fusion_weights": [
+            0.6,
+            0.4
+        ]
+    },
+    "[0.7, 0.3]": {
+        "original_model_accuracies": [
+            0.8927017405063291,
+            0.8898338607594937
+        ],
+        "original_pruned_models_accuracies": [
+            0.7174643987341772,
+            0.8120055379746836
+        ],
+        "original_fused_model_accuracy": 0.8541337025316456,
+        "PaF_model_accuracy": 0.7009493670886076,
+        "PaFaP_model_accuracy": 0.453125,
+        "FaP_model_accuracy": [
+            0.6977848101265823
+        ],
+        "sparsity": 0.3,
+        "fusion_weights": [
+            0.7,
+            0.3
+        ]
+    },
+    "[0.8, 0.2]": {
+        "original_model_accuracies": [
+            0.8927017405063291,
+            0.8898338607594937
+        ],
+        "original_pruned_models_accuracies": [
+            0.7174643987341772,
+            0.8120055379746836
+        ],
+        "original_fused_model_accuracy": 0.8772745253164557,
+        "PaF_model_accuracy": 0.7202333860759493,
+        "PaFaP_model_accuracy": 0.4432357594936709,
+        "FaP_model_accuracy": [
+            0.7117286392405063
+        ],
+        "sparsity": 0.3,
+        "fusion_weights": [
+            0.8,
+            0.2
+        ]
+    },
+    "[0.9, 0.1]": {
+        "original_model_accuracies": [
+            0.8927017405063291,
+            0.8898338607594937
+        ],
+        "original_pruned_models_accuracies": [
+            0.7174643987341772,
+            0.8120055379746836
+        ],
+        "original_fused_model_accuracy": 0.8878560126582279,
+        "PaF_model_accuracy": 0.7288370253164557,
+        "PaFaP_model_accuracy": 0.3686708860759494,
+        "FaP_model_accuracy": [
+            0.7040150316455697
+        ],
+        "sparsity": 0.3,
+        "fusion_weights": [
+            0.9,
+            0.1
+        ]
+    },
+    "[1.0, 0.0]": {
+        "original_model_accuracies": [
+            0.8927017405063291,
+            0.8898338607594937
+        ],
+        "original_pruned_models_accuracies": [
+            0.7174643987341772,
+            0.8120055379746836
+        ],
+        "original_fused_model_accuracy": 0.8927017405063291,
+        "PaF_model_accuracy": 0.7174643987341772,
+        "PaFaP_model_accuracy": 0.3615506329113924,
+        "FaP_model_accuracy": [
+            0.7174643987341772
+        ],
+        "sparsity": 0.3,
+        "fusion_weights": [
+            1.0,
+            0.0
+        ]
+    }
+}
