@@ -1004,3 +1004,171 @@ def fusion_old2(networks, args, eps=1e-7):
 
     
     return create_network_from_params(args=args, param_list=avg_aligned_layers, reference_model = networks[1])
+
+
+
+def fusion_sidak_multimodel(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7, resnet=False):
+    """
+    Implementing sidaks multi model fusion. Basically NOT fusing network by network into a "running" avg_layer,
+    but by alligning all layers at the same time and then doing the average on the result.
+
+    fusion fuses arbitrary many models into the model that is the smallest
+    :param networks: A list of networks to be fused
+    :param accuracies: A list of accuracies of the networks. The code will order the networks with respect to the accuracies for optimal accuracy
+    :param importance: A list of floats. If importance = [0.9, 0.1], then linear combination of weights will be: network[0]*0.9 + network[1]*0.1
+    :return: the fused model
+    """ 
+
+    num_models = len(networks)
+    
+    # preparing some lists that we will work with:
+    T_var_list = [None]*num_models
+    skip_T_var_list = [None]*num_models
+    skip_T_var_idx_list = [-1]*num_models
+    residual_T_var_list = [None]*num_models
+    residual_T_var_idx_list = [-1]*num_models
+
+    # to sort the networks by for better fusion order
+    if accuracies == None:
+        accuracies = [0]*num_models
+    # setting all networks to the same importance in case no importances were given
+    importance = [1]*num_models if importance == None else importance
+
+    # sort the networks by: 1. size of layers (smallest first), 2. importance, 3. accuracy. With self written comparatorF
+    networks_zip = sorted(list(zip(networks, accuracies, importance)), key=functools.cmp_to_key(comparator))
+    networks = [network_zip[0] for network_zip in networks_zip]
+    importance = [network_zip[2] for network_zip in networks_zip]
+    importance = torch.tensor(importance)
+    # normalize importance
+    sum = torch.sum(importance)
+    importance = importance *(importance.shape[0]/sum)
+
+    # takes a list of networks and pairs the layers that are going to be fused (Linear, Conv2D, BN)
+    fusion_layers = preprocess_parameters(networks)
+    # each entry in fusion_layers contains the corresponding layer of all the "networks": [[L1_net1, L1_net2], [L3_net1, L3_net2], ...] 
+    num_layers = len(fusion_layers) # number of layers that are going to be fused
+
+
+    
+    # iterate through all the layers that are going to be fused
+    for idx in range(num_layers):
+        # CHANGE: do the matchings of all the layers to the same layer (NO running average layer)
+        
+        # In fusion_layers[idx] all the idx-layers from the different networks are given.
+        # initialize the result of the averaging process with the first layer in fusion_layers[idx] (was sorted in networks_zip)
+        avg_layer = fusion_layers[idx][0]
+
+        # how many nodes are in the layer is defined by the dimensionality of the weight matrix
+        mu_cardinality = avg_layer.weight.shape[0]
+        # gets a normalized histogram that has as many entries as nodes are in the fusion_layers[idx]-layer
+        mu = get_histogram(mu_cardinality, None)
+
+        # checks if we are working on a convolutional layer (can be seen from avg_layer, since it contains an instance of nn.Conv2d/nn.Linear)
+        is_conv = avg_layer.is_conv
+
+        # OLD: update the avg_layer with all the idx-layers that are stored in fusion_layers (besides first, since its initialized with that)
+        # NEW: allign all with the same initial layer! (init to fusion_layers[idx][0])
+        # CHANGED: include these two lists to keep track of the collected permutations
+        aligned_fusions_to_average_over=[]
+        aligned_fusions_to_average_over_importance=[]
+        aligned_fusions_to_average_over_own_importance=[]
+        for idx_m, fusion_layer in enumerate(fusion_layers[idx][1:]):
+            # idx-layer of the idx_m-th model 
+
+            # index of the idx-layer of the idx_m-th model (since skipping [0] - due to init - we need to adapt)
+            idx_model = idx_m + 1
+            T_var = T_var_list[idx_model]   # = None
+
+            # QUESTION: only for resnets
+            skip_T_var = skip_T_var_list[idx_model] # = None, only used for resnets?
+            skip_T_var_idx = skip_T_var_idx_list[idx_model] # = -1, only used for resnets?
+            residual_T_var = residual_T_var_list[idx_model] # = None, only used for resnets?
+            residual_T_var_idx = residual_T_var_idx_list[idx_model] # = -1, only used for resnets?
+
+            nu_cardinality = fusion_layer.weight.shape[0]   # initialize with [0, 0, 0, ...] -> for number of nodes contained in the layer
+            layer_shape = fusion_layer.weight.shape
+
+            aligned_wt = fusion_layer.weight
+            
+            
+            # Skipping residual connection within the first iteration over the code
+            if idx != 0:
+                if resnet and is_conv:
+                    assert len(layer_shape) == 4
+                    # save skip_level transport map if there is block ahead
+                    if layer_shape[1] != layer_shape[0]:
+                        if not (layer_shape[2] == 1 and layer_shape[3] == 1):
+                            print(f'saved skip T_var at layer {idx} with shape {layer_shape}')
+                            skip_T_var = T_var.clone()
+                            skip_T_var_idx = idx
+                        else:
+                            print(
+                                f'utilizing skip T_var saved from layer layer {skip_T_var_idx} with shape {skip_T_var.shape}')
+                            # if it's a shortcut (128, 64, 1, 1)
+                            residual_T_var = T_var.clone()
+                            residual_T_var_idx = idx  # use this after the skip
+                            T_var = skip_T_var
+                        print("shape of previous transport map now is", T_var.shape)
+                    else:
+                        if residual_T_var is not None and (residual_T_var_idx == (idx - 1)):
+                            T_var = (T_var + residual_T_var) / 2
+                            print("averaging multiple T_var's")
+                        else:
+                            print("doing nothing for skips")
+                
+                fusion_layer.align_weights(T_var)
+            
+
+            # computes a matrix of similarities between nodes - based on the euclidean distance of the normalized weight vectors
+            M = get_ground_metric(fusion_layer.create_comparison_vec(), avg_layer.create_comparison_vec(), None, None)
+
+            # creates a normalized histogram that contains a value for each node in the layer. All are set to the same value.
+            nu = get_histogram(nu_cardinality, None)
+
+            # gives the similarities between the nodes of the already averaged ad the currently considered fusion_layer(M: normalized and then euclidean distance)
+            cpuM = M.data.cpu().numpy() # POT does not accept array on GPU
+
+            # computes the OT between "this" (fusion_layer) layers' nodes and the ones from the running averaged layer (avg_layer)
+            # QUESTION2: what is the resulting matrix exactly???
+            T = ot.emd(nu, mu, cpuM)        
+
+            # QUESTION3: can we just exchange this for a GMM aproach for doing the matching
+
+            # QUESTION4: is this the part that organizes how the nodes are permutated to allign with avg_layer nodeas (according to OT)????
+            if gpu_id != -1:
+                T_var = torch.from_numpy(T).cuda(gpu_id).float()
+            else:
+                T_var = torch.from_numpy(T).float()
+            if gpu_id != -1:
+                marginals = torch.ones(T_var.shape[1]).cuda(gpu_id) / T_var.shape[0]
+            else:
+                marginals = torch.ones(T_var.shape[1]) / T_var.shape[0]
+            marginals = torch.diag(1.0/(marginals + eps))  # take inverse
+            T_var = torch.matmul(T_var, marginals)
+            T_var = T_var / T_var.sum(dim=0)
+            ###################
+
+            # align the nodes in the fusion_layer with the nodeas of the avg_layer. According to findings of OT (stored in T_var(OT result))
+            fusion_layer.permute_parameters(T_var)
+
+            # CHANGED: update the running avg_layer weights with the weights of the fusion_layer: weighted average (importance of all layers in avg_layer vs importance of fusion_layer)
+            aligned_fusions_to_average_over.append(fusion_layer)
+            aligned_fusions_to_average_over_importance.append(torch.sum(importance[:idx_model]))  
+            aligned_fusions_to_average_over_own_importance.append(importance[idx_model])  
+            # Do NOT already here incorporate the newly matched nodes
+            # avg_layer.update_weights(fusion_layer, torch.sum(importance[:idx_model]), importance[idx_model])
+
+            # QUESTION: just stuff we are keeping track of so the next layers can look at it?
+            T_var_list[idx_model] = T_var
+            skip_T_var_list[idx_model] = skip_T_var
+            skip_T_var_idx_list[idx_model] = skip_T_var_idx
+            residual_T_var_list[idx_model] = residual_T_var
+            residual_T_var_idx_list[idx_model] = residual_T_var_idx
+
+        # CHANGED: update the avg_layer here: now that all the alginments already have been computed!
+        for idx, to_include_layer in enumerate(aligned_fusions_to_average_over):
+            avg_layer.update_weights(to_include_layer, aligned_fusions_to_average_over_importance[idx], aligned_fusions_to_average_over_own_importance[idx])
+
+        ####THIS LAYER IS BEING FUSED##########################
+
+    return create_network_from_parameters(gpu_id=gpu_id, param_list=[layers[0] for layers in fusion_layers], reference_model = networks[0])
