@@ -251,7 +251,7 @@ def test_one_setting(sparsity, fusion_weights, input_model_names, RESULT_FILE_PA
     if experiment_params["num_epochs"] > 0 and (experiment_params["PaTaF"] or experiment_params["PaTaFaT"]):
         with open('./logger.txt', 'a') as logger:
             logger.write(f"Computing PaTaF...\n")
-        PaTaF_model, PaTaF_model_accuracy, _ = fusion_test_manager(input_model_list=copy.deepcopy(PaT_model_list), **params, num_epochs = experiment_params["num_epochs"], args=fusion_params, importance=fusion_weights)
+        PaTaF_model, PaTaF_model_accuracy, _ = fusion_test_manager(input_model_list=copy.deepcopy(PaT_model_list), **params, num_epochs = experiment_params["num_epochs"], importance=fusion_weights)
         performance_measurements["PaTaF_model_accuracy"] = PaTaF_model_accuracy
     
     # PaTaFaT
@@ -267,7 +267,7 @@ def test_one_setting(sparsity, fusion_weights, input_model_names, RESULT_FILE_PA
     if (experiment_params["FaP"] or experiment_params["FaPaT"] or experiment_params["FaT"] or experiment_params["FaTaP"] or experiment_params["FaTaPaT"] ):
         with open('./logger.txt', 'a') as logger:
             logger.write(f"Fusing the original models...\n")
-        original_fused_model, original_fused_model_accuracy,_ = fusion_test_manager(input_model_list=copy.deepcopy(original_models), **params, accuracies=original_model_accuracies, num_epochs = experiment_params["num_epochs"], args=fusion_params, importance=fusion_weights)
+        original_fused_model, original_fused_model_accuracy,_ = fusion_test_manager(input_model_list=copy.deepcopy(original_models), **params, accuracies=original_model_accuracies, num_epochs = experiment_params["num_epochs"], importance=fusion_weights)
         performance_measurements["original_fused_model_accuracy"] = original_fused_model_accuracy
 
     # FaP

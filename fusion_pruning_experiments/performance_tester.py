@@ -113,6 +113,28 @@ def evaluate_performance_simple(input_model, loaders, gpu_id, prune=True):
         input_model.cpu()
     return accuracy_accumulated / total
 
+def update_running_statistics(input_model, loaders, gpu_id, batches=10):
+    if gpu_id != -1:
+        input_model = input_model.cuda(gpu_id)
+    input_model.train()
+
+    accuracy_accumulated = 0
+    total = 0
+    batches_count = 0
+    with torch.no_grad():
+        for images, labels in loaders['train']:
+            if batches_count == batches:
+                break
+            if gpu_id != -1:
+                images, labels = images.cuda(), labels.cuda()
+            
+            test_output = input_model(images)
+
+            batches_count += 1
+    
+    return input_model
+
+
 
 def original_test_manager(input_model_list, loaders, eval_function, pruning_function, fusion_function, gpu_id):
     '''
@@ -300,7 +322,7 @@ def wrapper_structured_pruning(input_model, prune_params):
 
     return pruned_model, description
 
-from fusion import fusion, fusion_old, fusion_old2
+from fusion import fusion, fusion_bn, fusion_old, fusion_old2, fusion_sidak_multimodel
 def wrapper_first_fusion(list_of_models, gpu_id=-1, accuracies=None, importance=None, name=""):
     '''
     Uses the first simple fusion approach created by Alex in fusion.py.
@@ -308,7 +330,7 @@ def wrapper_first_fusion(list_of_models, gpu_id=-1, accuracies=None, importance=
     '''
 
 
-    fused_model = fusion(networks=list_of_models, gpu_id=-1, accuracies=accuracies, importance=importance, resnet="resnet" in name)
+    fused_model = fusion_bn(networks=list_of_models, gpu_id=-1, accuracies=accuracies, importance=importance, resnet="resnet" in name)
 
     description = {"name": name}
 
