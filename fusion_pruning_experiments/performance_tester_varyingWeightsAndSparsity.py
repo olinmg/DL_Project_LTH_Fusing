@@ -192,8 +192,11 @@ def test_one_setting(sparsity, fusion_weights, input_model_names, RESULT_FILE_PA
     
     name, diff_weight_init = experiment_params["models"][0]["name"], experiment_params["diff_weight_init"]
     loaders = params["loaders"]
-
-
+    
+    out_features_ = 10
+    if experiment_params["dataset"] == "cifar100":
+        out_features_ = 100
+    
     # FUSION AND PRUNING SPECIFICATIONS
     fusion_params = get_parameters()
     fusion_params.model_name = name
@@ -201,7 +204,7 @@ def test_one_setting(sparsity, fusion_weights, input_model_names, RESULT_FILE_PA
     prune_type = experiment_params["prune_type"] if isinstance(experiment_params["prune_type"], str) else experiment_params["prune_type"][0]
     prune_params = {"prune_type": prune_type, "sparsity": sparsity, "num_epochs": experiment_params["num_epochs"],
             "example_input": torch.randn(1,1, 28,28) if not ("vgg" in name) else torch.randn(1, 3, 32, 32),
-            "out_features": 10, "loaders": loaders, "gpu_id": experiment_params["gpu_id"]}
+            "out_features": out_features_, "loaders": loaders, "gpu_id": experiment_params["gpu_id"]}
 
 
     ### Combinations that start with pruning
