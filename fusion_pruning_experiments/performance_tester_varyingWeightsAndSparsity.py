@@ -225,7 +225,8 @@ def test_one_setting(sparsity, fusion_weights, input_model_names, RESULT_FILE_PA
     if (experiment_params["PaF"] or experiment_params["PaFaP"] or experiment_params["PaFaT"]):
         with open('./logger.txt', 'a') as logger:
             logger.write(f"Computing PaF...\n")
-        PaF_model, PaF_model_accuracy,_ = fusion_test_manager(input_model_list=copy.deepcopy(pruned_models), **params, num_epochs = experiment_params["num_epochs"], args=fusion_params, importance=fusion_weights)
+            
+        PaF_model, PaF_model_accuracy,_ = fusion_test_manager(input_model_list=copy.deepcopy(pruned_models), **params, num_epochs = experiment_params["num_epochs"], importance=fusion_weights)
         performance_measurements["PaF_model_accuracy"] = PaF_model_accuracy
 
     # PaFaP
