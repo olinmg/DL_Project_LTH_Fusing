@@ -251,7 +251,7 @@ def test_one_setting(sparsity, fusion_weights, input_model_names, RESULT_FILE_PA
         PaT_models_epoch_accuracies_list = []
         for i in range(len(original_pruned_models_accuracies)):
             #torch.save(pruned_models[i].state_dict(), "models/{}_pruned_{}_.pth".format(name, i))
-            PaT_model, PaT_model_epoch_accuracies = train_during_pruning(copy.deepcopy(pruned_models[i]), loaders=loaders, num_epochs=experiment_params["num_epochs"]/2, gpu_id =experiment_params["gpu_id"], prune=False)
+            PaT_model, PaT_model_epoch_accuracies = train_during_pruning(copy.deepcopy(pruned_models[i]), loaders=loaders, num_epochs=int(experiment_params["num_epochs"]/2), gpu_id =experiment_params["gpu_id"], prune=False)
             PaT_model_list.append(PaT_model)
             PaT_models_epoch_accuracies_list.append(PaT_model_epoch_accuracies)
         #### -> PaT_models_epoch_accuracies_list
@@ -298,7 +298,7 @@ def test_one_setting(sparsity, fusion_weights, input_model_names, RESULT_FILE_PA
     if experiment_params["num_epochs"] > 0 and (experiment_params["FaT"] or experiment_params["FaTaP"] or experiment_params["FaTaPaT"]):
         with open('./logger.txt', 'a') as logger:
             logger.write(f"Computing FaT...\n")
-        FaT_model, FaT_epoch_accuracies = train_during_pruning(copy.deepcopy(original_fused_model), loaders=loaders, num_epochs=experiment_params["num_epochs"]/2, gpu_id =experiment_params["gpu_id"], prune=False)
+        FaT_model, FaT_epoch_accuracies = train_during_pruning(copy.deepcopy(original_fused_model), loaders=loaders, num_epochs=int(experiment_params["num_epochs"]/2), gpu_id =experiment_params["gpu_id"], prune=False)
         performance_measurements["FaT_epoch_accuracies"] = FaT_epoch_accuracies
 
     # FaTaP
@@ -312,7 +312,7 @@ def test_one_setting(sparsity, fusion_weights, input_model_names, RESULT_FILE_PA
     if experiment_params["num_epochs"] > 0 and experiment_params["FaTaPaT"]:
         with open('./logger.txt', 'a') as logger:
             logger.write(f"Computing FaTaPaT...\n")
-        FaTaPaT_model, FaTaPaT_model_accuracy = train_during_pruning(copy.deepcopy(FaTaP_model[0]), loaders=loaders, num_epochs=experiment_params["num_epochs"]/2, gpu_id =experiment_params["gpu_id"], prune=False)
+        FaTaPaT_model, FaTaPaT_model_accuracy = train_during_pruning(copy.deepcopy(FaTaP_model[0]), loaders=loaders, num_epochs=int(experiment_params["num_epochs"]/2), gpu_id =experiment_params["gpu_id"], prune=False)
         performance_measurements["FaTaPaT_model_accuracy"] = FaTaPaT_model_accuracy
     
 
