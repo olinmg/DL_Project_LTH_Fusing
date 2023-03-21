@@ -196,6 +196,12 @@ def test_one_setting(sparsity, fusion_weights, input_model_names, RESULT_FILE_PA
     out_features_ = 10
     if experiment_params["dataset"] == "cifar100":
         out_features_ = 100
+    elif experiment_params["dataset"] == "cifar10":
+        out_features_ = 10
+    elif experiment_params["dataset"] == "mnist":
+        out_features_ = 10
+    else:
+        raise ValueError("Did not specify valid dataset")
     
     # FUSION AND PRUNING SPECIFICATIONS
     fusion_params = get_parameters()
