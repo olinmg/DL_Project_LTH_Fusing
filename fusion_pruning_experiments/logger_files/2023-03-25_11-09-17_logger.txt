@@ -1,0 +1,114 @@
+[2023-03-25 11:09:17,703 root INFO] Starting process with models:
+[2023-03-25 11:09:17,703 root INFO] ./models_cnn/cnn_diff_weight_init_False_mnist_0
+[2023-03-25 11:09:17,703 root INFO] ./models_cnn/cnn_diff_weight_init_False_mnist_1
+
+[2023-03-25 11:09:17,814 root INFO] Computing original models performances...
+[2023-03-25 11:09:59,651 root INFO] 	[0.974189082278481, 0.935818829113924]
+[2023-03-25 11:09:59,651 root INFO] Training original models for additional 2 epochs...
+[2023-03-25 11:09:59,652 root INFO] 	Found the model ./models_cnn/cnn_diff_weight_init_False_mnist_0_re2.pth in cache.
+[2023-03-25 11:10:21,021 root INFO] 	Found the model ./models_cnn/cnn_diff_weight_init_False_mnist_1_re2.pth in cache.
+[2023-03-25 11:10:41,820 root INFO] 	Performance was: [0.983682753164557, 0.9612341772151899]
+
+[2023-03-25 11:10:41,820 root INFO] Starting with sparsity: 0.1, fusion_weights: [0.5, 0.5].
+[2023-03-25 11:10:41,833 root INFO] Pruning the original models...
+[2023-03-25 11:10:41,833 root INFO] 	Found the model ./models_cnn/cnn_diff_weight_init_False_mnist_0_s10_pruned.pth in cache.
+[2023-03-25 11:10:41,833 root INFO] 	Found the model ./models_cnn/cnn_diff_weight_init_False_mnist_1_s10_pruned.pth in cache.
+[2023-03-25 11:11:22,658 root INFO] Computing PaF...
+[2023-03-25 11:11:22,659 root INFO] 	Found the model ./models_cnn/cnn_diff_weight_init_False_mnist_w50_s10_PaF.pth in cache.
+[2023-03-25 11:11:43,034 root INFO] Computing PaFaP...
+[2023-03-25 11:11:43,035 root INFO] 	Found the model ./models_cnn/cnn_diff_weight_init_False_mnist_w50_s10_PaFaP.pth in cache.
+[2023-03-25 11:12:03,411 root INFO] Computing PaFaT...
+[2023-03-25 11:12:03,411 root INFO] 	Found the model ./models_cnn/cnn_diff_weight_init_False_mnist_w50_s10_PaFaT2.pth in cache.
+[2023-03-25 11:12:03,419 root INFO] 	- Best performance over epochs was: 0.9790348101265823
+[2023-03-25 11:12:03,419 root INFO] Computing PaT...
+[2023-03-25 11:13:30,961 root INFO] 	Storing model to _0_1_2.pth
+[2023-03-25 11:13:30,962 root INFO] Warning: result file already existed. Saved to _0_1_2.pth instead. Did not check if overwrote another file with this name.
+[2023-03-25 11:13:30,962 root INFO] 	Storing epoch performance during training to ./models_cnn/cnn_diff_weight_init_False_mnist_0_PaT1.json
+[2023-03-25 11:13:30,962 root INFO] 	- Best performance over epochs was: 0.982001582278481
+[2023-03-25 11:14:59,042 root INFO] 	Storing model to _0_1_2_3.pth
+[2023-03-25 11:14:59,043 root INFO] Warning: result file already existed. Saved to _0_1_2_3.pth instead. Did not check if overwrote another file with this name.
+[2023-03-25 11:14:59,043 root INFO] 	Storing epoch performance during training to ./models_cnn/cnn_diff_weight_init_False_mnist_1_PaT1.json
+[2023-03-25 11:14:59,043 root INFO] 	- Best performance over epochs was: 0.955498417721519
+[2023-03-25 11:14:59,044 root INFO] Computing PaTaF...
+[2023-03-25 11:14:59,044 root INFO] 	Found the model ./models_cnn/cnn_diff_weight_init_False_mnist_w50_s10_PaT1aF.pth in cache.
+[2023-03-25 11:15:19,678 root INFO] Computing PaTaFaT...
+[2023-03-25 11:15:19,679 root INFO] 	Found the model ./models_cnn/cnn_diff_weight_init_False_mnist_w50_s10_PaT1aFaT1.pth in cache.
+[2023-03-25 11:15:19,685 root INFO] 	- Best performance over epochs was: 0.9759691455696202
+[2023-03-25 11:15:19,685 root INFO] Fusing the original models...
+[2023-03-25 11:15:19,686 root INFO] 	Found the model ./models_cnn/cnn_diff_weight_init_False_mnist_w50_F.pth in cache.
+[2023-03-25 11:15:40,402 root INFO] Computing FaP...
+[2023-03-25 11:15:40,403 root INFO] 	Found the model ./models_cnn/cnn_diff_weight_init_False_mnist_w50_s10_FaP.pth in cache.
+[2023-03-25 11:16:00,939 root INFO] Computing FaPaT...
+[2023-03-25 11:16:00,939 root INFO] 	Found the model ./models_cnn/cnn_diff_weight_init_False_mnist_w50_s10_FaPaT2.pth in cache.
+[2023-03-25 11:16:00,969 root INFO] 	- Best performance over epochs was: 0.9769580696202531
+[2023-03-25 11:16:00,969 root INFO] Computing FaT...
+[2023-03-25 11:16:00,970 root INFO] 	Found the model ./models_cnn/cnn_diff_weight_init_False_mnist_w50_FaT1.pth in cache.
+[2023-03-25 11:16:01,051 root INFO] 	- Best performance over epochs was: 0.9743868670886076
+[2023-03-25 11:16:01,052 root INFO] Computing FaTaP...
+[2023-03-25 11:16:01,053 root INFO] 	Found the model ./models_cnn/cnn_diff_weight_init_False_mnist_w50_s10_FaT1aP.pth in cache.
+[2023-03-25 11:16:22,095 root INFO] Computing FaTaPaT...
+[2023-03-25 11:16:22,096 root INFO] 	Found the model ./models_cnn/cnn_diff_weight_init_False_mnist_w50_s10_FaT1aPaT1.pth in cache.
+[2023-03-25 11:16:22,204 root INFO] 	- Best performance over epochs was: 0.9788370253164557
+[2023-03-25 11:16:22,204 root INFO] Done with sparsity: 0.1, fusion_weights: [0.5, 0.5].
+
+[2023-03-25 11:16:22,219 root INFO] Warning: result file already existed. Saved to ./models_cnn_experiments/cnn_diff_weight_init_False_mnist_mnist_re2_w50_s10_0 instead.
+[2023-03-25 11:16:22,219 root INFO] Starting with sparsity: 0.2, fusion_weights: [0.5, 0.5].
+[2023-03-25 11:16:22,219 root INFO] Pruning the original models...
+[2023-03-25 11:16:22,219 root INFO] 	Found the model ./models_cnn/cnn_diff_weight_init_False_mnist_0_s20_pruned.pth in cache.
+[2023-03-25 11:16:22,219 root INFO] 	Found the model ./models_cnn/cnn_diff_weight_init_False_mnist_1_s20_pruned.pth in cache.
+[2023-03-25 11:17:03,471 root INFO] Computing PaF...
+[2023-03-25 11:17:03,472 root INFO] 	Found the model ./models_cnn/cnn_diff_weight_init_False_mnist_w50_s20_PaF.pth in cache.
+[2023-03-25 11:17:24,153 root INFO] Computing PaFaP...
+[2023-03-25 11:17:24,154 root INFO] 	Found the model ./models_cnn/cnn_diff_weight_init_False_mnist_w50_s20_PaFaP.pth in cache.
+[2023-03-25 11:17:44,506 root INFO] Computing PaFaT...
+[2023-03-25 11:17:44,507 root INFO] 	Found the model ./models_cnn/cnn_diff_weight_init_False_mnist_w50_s20_PaFaT2.pth in cache.
+[2023-03-25 11:17:44,548 root INFO] 	- Best performance over epochs was: 0.975870253164557
+[2023-03-25 11:17:44,548 root INFO] Computing PaT...
+[2023-03-25 11:19:10,208 root INFO] 	Storing model to _0_1_2_3_4.pth
+[2023-03-25 11:19:10,208 root INFO] Warning: result file already existed. Saved to _0_1_2_3_4.pth instead. Did not check if overwrote another file with this name.
+[2023-03-25 11:19:10,208 root INFO] 	Storing epoch performance during training to ./models_cnn/cnn_diff_weight_init_False_mnist_0_PaT1.json
+[2023-03-25 11:19:10,208 root INFO] 	- Best performance over epochs was: 0.9810126582278481
+[2023-03-25 11:20:37,007 root INFO] 	Storing model to ./models_cnn/cnn_diff_weight_init_False_mnist_1_s20_PaT1.pth
+[2023-03-25 11:20:37,007 root INFO] 	Storing epoch performance during training to ./models_cnn/cnn_diff_weight_init_False_mnist_1_PaT1.json
+[2023-03-25 11:20:37,007 root INFO] 	- Best performance over epochs was: 0.9473892405063291
+[2023-03-25 11:20:37,007 root INFO] Computing PaTaF...
+[2023-03-25 11:20:57,632 root INFO] 	Storing model to ./models_cnn/cnn_diff_weight_init_False_mnist_w50_s20_PaT1aF.pth
+[2023-03-25 11:20:57,632 root INFO] Computing PaTaFaT...
+[2023-03-25 11:22:22,966 root INFO] 	Storing model to ./models_cnn/cnn_diff_weight_init_False_mnist_w50_s20_PaT1aFaT1.pth
+[2023-03-25 11:22:22,966 root INFO] 	Storing epoch performance during training to ./models_cnn/cnn_diff_weight_init_False_mnist_w50_s20_PaT1aFaT1.json
+[2023-03-25 11:22:22,967 root INFO] 	- Best performance over epochs was: 0.9720134493670886
+[2023-03-25 11:22:22,968 root INFO] Fusing the original models...
+[2023-03-25 11:22:22,968 root INFO] 	Found the model ./models_cnn/cnn_diff_weight_init_False_mnist_w50_F.pth in cache.
+[2023-03-25 11:22:43,456 root INFO] Computing FaP...
+[2023-03-25 11:23:03,905 root INFO] 	Storing model to ./models_cnn/cnn_diff_weight_init_False_mnist_w50_s20_FaP.pth
+[2023-03-25 11:23:03,905 root INFO] Computing FaPaT...
+[2023-03-25 11:25:35,642 root INFO] 	Storing model to ./models_cnn/cnn_diff_weight_init_False_mnist_w50_s20_FaPaT2.pth
+[2023-03-25 11:25:35,643 root INFO] 	Storing epoch performance during training to ./models_cnn/cnn_diff_weight_init_False_mnist_w50_s20_FaPaT2.json
+[2023-03-25 11:25:35,643 root INFO] 	- Best performance over epochs was: 0.9756724683544303
+[2023-03-25 11:25:35,644 root INFO] Computing FaT...
+[2023-03-25 11:25:35,645 root INFO] 	Found the model ./models_cnn/cnn_diff_weight_init_False_mnist_w50_FaT1.pth in cache.
+[2023-03-25 11:25:35,648 root INFO] 	- Best performance over epochs was: 0.9743868670886076
+[2023-03-25 11:25:35,648 root INFO] Computing FaTaP...
+[2023-03-25 11:25:58,085 root INFO] 	Storing model to ./models_cnn/cnn_diff_weight_init_False_mnist_w50_s20_FaT1aP.pth
+[2023-03-25 11:25:58,085 root INFO] Computing FaTaPaT...
+[2023-03-25 11:27:22,915 root INFO] 	Storing model to ./models_cnn/cnn_diff_weight_init_False_mnist_w50_s20_FaT1aPaT1.pth
+[2023-03-25 11:27:22,915 root INFO] 	Storing epoch performance during training to ./models_cnn/cnn_diff_weight_init_False_mnist_w50_s20_FaT1aPaT1.json
+[2023-03-25 11:27:22,915 root INFO] 	- Best performance over epochs was: 0.978935917721519
+[2023-03-25 11:27:22,917 root INFO] Done with sparsity: 0.2, fusion_weights: [0.5, 0.5].
+
+[2023-03-25 11:27:22,921 root INFO] Starting with sparsity: 0.3, fusion_weights: [0.5, 0.5].
+[2023-03-25 11:27:22,923 root INFO] Pruning the original models...
+[2023-03-25 11:28:04,003 root INFO] 	Storing model to ./models_cnn/cnn_diff_weight_init_False_mnist_0_s30_pruned.pth
+[2023-03-25 11:28:04,030 root INFO] 	Storing model to ./models_cnn/cnn_diff_weight_init_False_mnist_1_s30_pruned.pth
+[2023-03-25 11:28:04,030 root INFO] Computing PaF...
+[2023-03-25 11:28:24,637 root INFO] 	Storing model to ./models_cnn/cnn_diff_weight_init_False_mnist_w50_s30_PaF.pth
+[2023-03-25 11:28:24,637 root INFO] Computing PaFaP...
+[2023-03-25 11:28:44,610 root INFO] 	Storing model to ./models_cnn/cnn_diff_weight_init_False_mnist_w50_s30_PaFaP.pth
+[2023-03-25 11:28:44,610 root INFO] Computing PaFaT...
+[2023-03-25 11:31:09,410 root INFO] 	Storing model to ./models_cnn/cnn_diff_weight_init_False_mnist_w50_s30_PaFaT2.pth
+[2023-03-25 11:31:09,411 root INFO] 	Storing epoch performance during training to ./models_cnn/cnn_diff_weight_init_False_mnist_w50_s30_PaFaT2.json
+[2023-03-25 11:31:09,411 root INFO] 	- Best performance over epochs was: 0.977254746835443
+[2023-03-25 11:31:09,412 root INFO] Computing PaT...
+[2023-03-25 11:32:32,619 root INFO] 	Storing model to ./models_cnn/cnn_diff_weight_init_False_mnist_0_s30_PaT1.pth
+[2023-03-25 11:32:32,619 root INFO] 	Storing epoch performance during training to ./models_cnn/cnn_diff_weight_init_False_mnist_0_PaT1.json
+[2023-03-25 11:32:32,619 root INFO] 	- Best performance over epochs was: 0.9808148734177216
