@@ -34,20 +34,34 @@ def file_already_exists(path):
 
 
 def save_model(model, path):
-
-    save_to_path = f"{path}.pth"
+    print(f"In 'save_model()'. With path {path} to save to.")
     count = 0
     different_path_name = False
-    while file_already_exists(save_to_path):
-        save_to_path = f"{save_to_path.split('.')[0]}_{count}.pth"
+    save_to_path = path
+    while file_already_exists(f"{save_to_path}.pth"):
+        save_to_path = f"{path}_{count}"
         different_path_name = True
         count = count + 1
-    torch.save(model, save_to_path)
-    logging.info(f"\tStoring model to {save_to_path}")
+    torch.save(model, f"{save_to_path}.pth")
+    logging.info(f"\tStoring model to {save_to_path}.pth")
     if different_path_name:
         logging.info(
             f"Warning: result file already existed. Saved to {save_to_path} instead. Did not check if overwrote another file with this name."
         )
+
+
+def save_experiment_results(path, experiment_results_dict):
+    count = 0
+    different_path_name = False
+    save_to_path = path
+    while file_already_exists(f"{save_to_path}.json"):
+        save_to_path = f"{path}_{count}"
+        different_path_name = True
+        count = count + 1
+    with open(f"{save_to_path}.json", "w") as outfile:
+        json.dump(experiment_results_dict, outfile, indent=4)
+    if different_path_name:
+        logging.info(f"Warning: result file already existed. Saved to {save_to_path}.json instead.")
 
 
 def get_model_trainHistory(model_path):
@@ -74,19 +88,6 @@ def get_correct_dataloader(dataset_name):
         return get_cifar100_data_loader(), 100
     else:
         raise Exception("Provided dataset does not exist.")
-
-
-def save_experiment_results(save_to_path, experiment_results_dict):
-    count = 0
-    different_path_name = False
-    while file_already_exists(f"{save_to_path}.json"):
-        save_to_path = f"{save_to_path}_{count}"
-        different_path_name = True
-        count = count + 1
-    with open(f"{save_to_path}.json", "w") as outfile:
-        json.dump(experiment_results_dict, outfile, indent=4)
-    if different_path_name:
-        logging.info(f"Warning: result file already existed. Saved to {save_to_path} instead.")
 
 
 def test_multiple_settings(RESULT_FILE_PATH):
