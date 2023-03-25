@@ -175,7 +175,7 @@ def original_test_manager(
     # return [0 for i in input_model_list]
 
     original_model_accuracies = []
-    print("The accuracies of the original models are:")
+    print("The accuracies of the models are:")
     for i, input_model in enumerate(input_model_list):
         acc_this_model = eval_function(input_model=input_model, loaders=loaders, gpu_id=gpu_id)
         original_model_accuracies.append(acc_this_model)
