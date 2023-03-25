@@ -221,7 +221,7 @@ def test_multiple_settings(RESULT_FILE_PATH):
 
             RESULT_FILE_PATH_MOD = f"{MODELS_PATH}_experiments/{basis_name}_{dataset}_re{num_epochs}_w{int(fusion_weights[0]*100)}_s{int(sparsity*100)}"
             save_experiment_results(
-                save_to_path=f"{RESULT_FILE_PATH_MOD}",
+                path=f"{RESULT_FILE_PATH_MOD}",
                 experiment_results_dict=perf_meas_dict,
             )
 
