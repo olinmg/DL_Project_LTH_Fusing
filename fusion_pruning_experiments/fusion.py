@@ -7,8 +7,9 @@ import copy
 from torch import linalg as LA
 from fusion_utils import preprocess_parameters
 from sklearn.cluster import KMeans
-
+import torch.nn as nn
 from models import get_model
+
 #from scipy.optimize import linear_sum_assignment # Could accomplish the same as OT with Hungarian Algorithm
 
 # get_histogram creates uniform historgram, i.e. [1/cardinality, 1/cardinality, ...]
@@ -637,6 +638,82 @@ def fusion_bn(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7,
 
     return create_network_from_parameters(gpu_id=gpu_id, param_list=[layers[0] for layers in fusion_layers], reference_model = networks[0])
 
+def merge_conv_bn(conv, bn):
+    """
+    Merge a Conv2D layer and a BatchNorm layer into a single Conv2D layer.
+    
+    Args:
+        conv (nn.Conv2d): The convolutional layer to merge.
+        bn (nn.BatchNorm2d): The batch normalization layer to merge.
+    
+    Returns:
+        nn.Conv2d: The merged Conv2D layer.
+    """
+    merged_conv = nn.Conv2d(conv.in_channels, conv.out_channels, conv.kernel_size, conv.stride,
+                            conv.padding, conv.dilation, conv.groups, conv.bias is not None)
+    merged_conv.weight = nn.Parameter(conv.weight * bn.weight[:, None, None, None] / torch.sqrt(bn.running_var + bn.eps)[:, None, None, None])
+    merged_conv.bias = nn.Parameter((conv.bias if conv.bias is not None else torch.zeros_like(bn.running_mean)) - bn.running_mean * bn.weight / torch.sqrt(bn.running_var + bn.eps) + bn.bias)
+    
+    return merged_conv
+
+def merge_layers(modules):
+    """
+    Merge Conv2D and BatchNorm layers in a list of PyTorch modules.
+    
+    Args:
+        modules (list): A list of PyTorch modules.
+    
+    Returns:
+        list: A list of PyTorch modules with Conv2D and BatchNorm layers merged.
+    """
+    new_modules = []
+    skip_next = False
+    for i, m in enumerate(modules):
+        if skip_next:
+            skip_next = False
+            continue
+        if i < len(modules) - 1 and isinstance(m, nn.Conv2d) and isinstance(modules[i + 1], nn.BatchNorm2d):
+            new_modules.append(merge_conv_bn(m, modules[i + 1]))
+            skip_next = True
+        else:
+            new_modules.append(m)
+    return new_modules
+
+def merge_conv_bn_layers(net):
+    """
+    Create a deep copy of a PyTorch neural network and merge Conv2D layers with the following BatchNorm layers.
+    
+    Args:
+        net (nn.Module): The neural network to copy and modify.
+    
+    Returns:
+        nn.Module: A deep copy of the input network with Conv2D and BatchNorm layers merged.
+    """
+    new_net = copy.deepcopy(net)
+    
+    for name, module in new_net.named_modules():
+        if isinstance(module, nn.Sequential):
+            new_modules = merge_layers(list(module.children()))
+            new_seq = nn.Sequential(*new_modules)
+            
+            name_parts = name.rsplit('.', 1)
+            if len(name_parts) == 2:
+                parent, key = name_parts
+                parent_module = dict(new_net.named_modules())[parent]
+                parent_module._modules[key] = new_seq
+            else:
+                key = name_parts[0]
+                new_net._modules[key] = new_seq
+                
+    return new_net
+
+
+def fusion_bn_alt(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7, resnet=False):
+    networks_without_bn = [merge_conv_bn_layers(net) for net in networks]
+    print(networks_without_bn[0])
+    torch.cuda.empty_cache()
+    return fusion(networks_without_bn, gpu_id, accuracies, importance, eps, resnet)
+
 
 def fusion(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7, resnet=False):
     """
@@ -844,41 +921,41 @@ def fusion(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7, re
 
     return create_network_from_params(gpu_id=gpu_id, param_list=avg_aligned_layers, reference_model = networks[0])
 
-def fusion_bn_alt(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7, resnet=False):
-    def scale_bn(net):
-        """
-        Create a deep copy of a PyTorch neural network and remove all BatchNorm layers from the copy.
+# def fusion_bn_alt(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7, resnet=False):
+#     def scale_bn(net):
+#         """
+#         Create a deep copy of a PyTorch neural network and remove all BatchNorm layers from the copy.
         
-        Args:
-            net (nn.Module): The neural network to copy and modify.
+#         Args:
+#             net (nn.Module): The neural network to copy and modify.
         
-        Returns:
-            nn.Module: A deep copy of the input network with all BatchNorm layers removed.
-        """
-        # Create a deep copy of the input network.
-        new_net = copy.deepcopy(net)
+#         Returns:
+#             nn.Module: A deep copy of the input network with all BatchNorm layers removed.
+#         """
+#         # Create a deep copy of the input network.
+#         new_net = copy.deepcopy(net)
 
 
 
-        # Remove BatchNorm layers from the copy.
-        for i, key in enumerate(new_net._modules):
-            m1 = new_net._modules[key]
-            if isinstance(m1, nn.Sequential):
-                new_net._modules[list(new_net._modules.keys())[i]] = scale_bn(m1)
-            elif isinstance(m1, nn.BatchNorm2d) or isinstance(m1, nn.BatchNorm1d):
-                idx = i
-                while idx >= 0:
-                    m2 = list(new_net.modules())[idx]
-                    if isinstance(m2, nn.Linear) or isinstance(m2, nn.Conv2d):
-                        m2.weight = nn.Parameter(m2.weight / m1.weight[:, None, None, None])
-                        m2.bias = nn.Parameter(m2.bias - m1.bias)
-                        del new_net._modules[list(new_net._modules.keys())[i]]
-                        break
-                    idx -= 1
-        return new_net
+#         # Remove BatchNorm layers from the copy.
+#         for i, key in enumerate(new_net._modules):
+#             m1 = new_net._modules[key]
+#             if isinstance(m1, nn.Sequential):
+#                 new_net._modules[list(new_net._modules.keys())[i]] = scale_bn(m1)
+#             elif isinstance(m1, nn.BatchNorm2d) or isinstance(m1, nn.BatchNorm1d):
+#                 idx = i
+#                 while idx >= 0:
+#                     m2 = list(new_net.modules())[idx]
+#                     if isinstance(m2, nn.Linear) or isinstance(m2, nn.Conv2d):
+#                         m2.weight = nn.Parameter(m2.weight / m1.weight[:, None, None, None])
+#                         m2.bias = nn.Parameter(m2.bias - m1.bias)
+#                         del new_net._modules[list(new_net._modules.keys())[i]]
+#                         break
+#                     idx -= 1
+#         return new_net
 
-    networks_without_bn = [scale_bn(net) for net in networks]
-    return fusion(networks_without_bn, gpu_id, accuracies, importance, eps, resnet)   
+#     networks_without_bn = [scale_bn(net) for net in networks]
+#     return fusion(networks_without_bn, gpu_id, accuracies, importance, eps, resnet)   
 
 # fusion fuses two models with cost matrix based on weights, NOT ACTIVATIONS
 def fusion_old(networks, args, gpu_id = -1, importance = [], eps=1e-7, resnet=False):

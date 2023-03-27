@@ -3,7 +3,7 @@ from performance_tester import train_during_pruning, update_running_statistics
 from parameters import get_parameters
 from train import get_model
 import torch
-from fusion import MSF, IntraFusion_Clustering, fusion, fusion_bn, fusion_old, fusion_sidak_multimodel
+from fusion import MSF, IntraFusion_Clustering, fusion, fusion_bn, fusion_old, fusion_sidak_multimodel, fusion_bn_alt
 from sklearn.model_selection import train_test_split
 from torchvision.transforms import ToTensor
 from torch.utils.data import DataLoader
@@ -121,7 +121,7 @@ if __name__ == '__main__':
     dict = {}
     it = 9
 
-    models = get_pretrained_models(args.model_name, "vgg11_diff_weight_init_True_cifar10", args.gpu_id, num_models, output_dim=10)
+    models = get_pretrained_models(args.model_name, "vgg11_bn_diff_weight_init_True_cifar10", args.gpu_id, num_models, output_dim=10)
 
     loaders = None
     if "vgg" not in args.model_name and "resnet" not in args.model_name:
@@ -154,8 +154,10 @@ if __name__ == '__main__':
 
     model = models[0]
     model.eval()
-    fused_model= IntraFusion_Clustering(model, gpu_id = args.gpu_id, resnet = False, sparsity=0.8)
+    #fused_model= IntraFusion_Clustering(model, gpu_id = args.gpu_id, resnet = False, sparsity=0.8)
+    fused_model = fusion_bn(models, gpu_id = args.gpu_id, resnet = False)
 
+    print("ALT")
     accuracy_0 = evaluate_performance_simple(models[0], loaders, 0)
     accuracy_1 = evaluate_performance_simple(models[1], loaders, 0)
     accuracy_fused = evaluate_performance_simple(fused_model, loaders, 0, eval=True)
@@ -166,10 +168,17 @@ if __name__ == '__main__':
 
     #fused_model = update_running_statistics(fused_model, loaders, 0)
     fused_model.train()
-    fused_model, _ = train_during_pruning(fused_model, loaders=loaders, num_epochs=40, gpu_id =0, prune=False, performed_epochs=0)
+    #fused_model, _ = train_during_pruning(fused_model, loaders=loaders, num_epochs=40, gpu_id =0, prune=False, performed_epochs=0)
+    ###
+    fused_accs = []
+    for idx in range(40):
+        fused_model, _ = train_during_pruning(fused_model, loaders=loaders, num_epochs=1, gpu_id =0, prune=False, performed_epochs=0)
+        fused_accs.append(evaluate_performance_simple(fused_model, loaders, 0, eval=True))
+
+
     accuracy_fused = evaluate_performance_simple(fused_model, loaders, 0, eval=True)
     print('Test Accuracy of the model fused after: %.2f' % accuracy_fused)
-
+    print(fused_accs)
 
 
 
