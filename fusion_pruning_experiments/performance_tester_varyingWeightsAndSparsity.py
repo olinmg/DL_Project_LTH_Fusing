@@ -25,8 +25,8 @@ from performance_tester import (
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def model_already_exists(model_path):
-    return bool(os.path.exists(f"{model_path}.pth"))
+# def model_already_exists(model_path):
+#    return bool(os.path.exists(f"{model_path}.pth"))
 
 
 def file_already_exists(path):
@@ -34,7 +34,6 @@ def file_already_exists(path):
 
 
 def save_model(model, path):
-
     save_to_path = f"{path}.pth"
     count = 0
     different_path_name = False
@@ -53,14 +52,14 @@ def save_model(model, path):
 def get_model_trainHistory(model_path):
     with open(f"{model_path}.json", "r") as f:
         train_hist = json.load(f)
-    logging.info(f"\t- Best performance over epochs was: {train_hist['train_epoch_perf'][-1]}")
+    # logging.info(f"\t- Performance in last epochs was: {train_hist['train_epoch_perf'][-1]}")
     return train_hist["train_epoch_perf"]
 
 
 def save_model_trainHistory(model_path, history):
     logging.info(f"\tStoring epoch performance during training to {model_path}.json")
     history_dict = {"train_epoch_perf": history}
-    logging.info(f"\t- Best performance over epochs was: {history[-1]}")
+    # logging.info(f"\t- Performance in last epoch was: {history[-1]}")
     with open(f"{model_path}.json", "w") as outfile:
         json.dump(history_dict, outfile, indent=4)
 
@@ -87,6 +86,52 @@ def save_experiment_results(save_to_path, experiment_results_dict):
         json.dump(experiment_results_dict, outfile, indent=4)
     if different_path_name:
         logging.info(f"Warning: result file already existed. Saved to {save_to_path} instead.")
+
+
+def model_already_exists(wanted_file_path, loaders, gpu_id):
+    # Looking for a model that has a smaller number at the end of the name. Then retraining it.
+
+    # checking if the file already exists
+    if file_already_exists(f"{wanted_file_path}.pth"):
+        return True
+
+    # if the file doesnt exist and its not about "retraining" we return False
+    # this means we cant take anything from the prefomputations.
+    if not wanted_file_path[-1].isnumeric():
+        return False
+
+    # extract the amount of necessary epochs from the ending of wanted_file_path
+    i = 1
+    while wanted_file_path[-i].isnumeric():
+        i += 1
+    target_epochs = int(wanted_file_path[-i + 1 :])
+    rest_of_path = wanted_file_path[: -i + 1]
+
+    for k in reversed(range(1, target_epochs)):
+        if file_already_exists(f"{rest_of_path}{k}.pth"):
+            existing_model_path = f"{rest_of_path}{k}"
+            logging.info(
+                f"\tFound a model of the same type with less pretrained epochs: {existing_model_path}. Now retraining it for {target_epochs-k} epochs."
+            )
+            less_trained_model = get_pretrained_model_by_name(existing_model_path, gpu_id=gpu_id)
+            # retrain the model for additional epochs
+            retrained_model, retrained_model_accuracy = train_during_pruning(
+                copy.deepcopy(less_trained_model),
+                loaders=loaders,
+                num_epochs=target_epochs - k,
+                gpu_id=gpu_id,
+                prune=False,  # unnecessary
+            )
+            retrained_model_accuracy = retrained_model_accuracy[:-1]
+            # save the new model
+            save_model(retrained_model, wanted_file_path)
+            # extend the old models train accuracies
+            less_trained_model_epochs = get_model_trainHistory(existing_model_path)
+            less_trained_model_epochs.extend(retrained_model_accuracy)
+            # less_trained_model_epochs.append(max(less_trained_model_epochs))
+            save_model_trainHistory(wanted_file_path, less_trained_model_epochs)
+            return True
+    return False
 
 
 def test_multiple_settings(RESULT_FILE_PATH):
@@ -121,7 +166,7 @@ def test_multiple_settings(RESULT_FILE_PATH):
 
     # 2. figure out some basic experiment parameters and get the names of the models the experiment is performed on
     name = experiment_params["models"][0]["name"]
-    MODELS_PATH = f"./models_{name}"
+    MODELS_PATH = f"./models/models_{name}"
 
     basis_name = experiment_params["models"][0]["basis_name"]
     num_models = experiment_params["num_models"]
@@ -165,7 +210,7 @@ def test_multiple_settings(RESULT_FILE_PATH):
     logging.info("Computing original models performances...")
     original_model_accuracies = original_test_manager(input_model_list=original_models, **params)
     performance_measurements = {"original_model_accuracies": original_model_accuracies}
-    logging.info(f"\t{original_model_accuracies}")
+    logging.info(f"\t- Performance: {original_model_accuracies}")
 
     # 9. Performance of: original models + extra training
     if num_epochs > 0:
@@ -173,7 +218,7 @@ def test_multiple_settings(RESULT_FILE_PATH):
         logging.info(f"Training original models for additional {num_epochs} epochs...")
         for i, this_model in enumerate(original_models):
             orig_retrained_model_path = f"{input_model_names[i]}_re{num_epochs}"
-            if model_already_exists(orig_retrained_model_path):
+            if model_already_exists(orig_retrained_model_path, loaders, gpu_id):
                 logging.info(f"\tFound the model {orig_retrained_model_path}.pth in cache.")
                 retrained_model = get_pretrained_model_by_name(orig_retrained_model_path, gpu_id)
                 retrained_model_accuracy = original_test_manager([retrained_model], **params)
@@ -185,15 +230,15 @@ def test_multiple_settings(RESULT_FILE_PATH):
                     gpu_id=gpu_id,
                     prune=False,  # unnecessary
                 )
+                retrained_model_accuracy = retrained_model_accuracy[:-1]
                 save_model(retrained_model, orig_retrained_model_path)
                 save_model_trainHistory(orig_retrained_model_path, retrained_model_accuracy)
             orig_model_retrained_accuracies_list.append(retrained_model_accuracy)
         performance_measurements[
             "original_model_retrained_accuracies_list"
         ] = orig_model_retrained_accuracies_list
-    logging.info(
-        f"\tPerformance was: {[mod[-1] for mod in orig_model_retrained_accuracies_list]}\n"
-    )
+        logging.info(f"\t- Performance: {[x[-1] for x in orig_model_retrained_accuracies_list]}\n")
+
     ### DONE WITH COMPUTATIONS THAT ARE COMMON OVER VARIATIONS OF SPARSITY AND WEIGHTS ###
 
     # 10. ITERATE THE FUSION_WEIGHTS AND SPARSITIES
@@ -292,15 +337,18 @@ def test_one_setting(
         or experiment_params["PaTaFaT"]
     ):
         logging.info(f"Pruning the original models...")
-        pruned_model_0_path = f"{input_model_names[0]}_s{int(sparsity*100)}_pruned"
-        pruned_model_1_path = f"{input_model_names[1]}_s{int(sparsity*100)}_pruned"
-        if model_already_exists(pruned_model_0_path) and model_already_exists(pruned_model_1_path):
+        pruned_model_0_path = f"{input_model_names[0]}_s{int(sparsity*100)}_P"
+        pruned_model_1_path = f"{input_model_names[1]}_s{int(sparsity*100)}_P"
+        if model_already_exists(pruned_model_0_path, loaders, gpu_id) and model_already_exists(
+            pruned_model_1_path, loaders, gpu_id
+        ):
             logging.info(f"\tFound the model {pruned_model_0_path}.pth in cache.")
             logging.info(f"\tFound the model {pruned_model_1_path}.pth in cache.")
             pruned_model_0 = get_pretrained_model_by_name(pruned_model_0_path, gpu_id)
             pruned_model_1 = get_pretrained_model_by_name(pruned_model_1_path, gpu_id)
             pruned_models = [pruned_model_0, pruned_model_1]
             original_pruned_models_accuracies = original_test_manager(pruned_models, **params)
+
         else:
             pruned_models, original_pruned_models_accuracies, _ = pruning_test_manager(
                 input_model_list=copy.deepcopy(original_models), prune_params=prune_params, **params
@@ -310,6 +358,7 @@ def test_one_setting(
         performance_measurements[
             "original_pruned_models_accuracies"
         ] = original_pruned_models_accuracies
+        logging.info(f"\t- Performance: {original_pruned_models_accuracies}")
 
     # PaF
     if experiment_params["PaF"] or experiment_params["PaFaP"] or experiment_params["PaFaT"]:
@@ -317,7 +366,7 @@ def test_one_setting(
         PaF_model_path = (
             f"{input_model_names[0][:-2]}_w{int(fusion_weights[0]*100)}_s{int(sparsity*100)}_PaF"
         )
-        if model_already_exists(PaF_model_path):
+        if model_already_exists(PaF_model_path, loaders, gpu_id):
             logging.info(f"\tFound the model {PaF_model_path}.pth in cache.")
             PaF_model = get_pretrained_model_by_name(PaF_model_path, gpu_id)
             PaF_model_accuracy = original_test_manager([PaF_model], **params)
@@ -330,6 +379,7 @@ def test_one_setting(
             )
             save_model(PaF_model, PaF_model_path)
         performance_measurements["PaF_model_accuracy"] = PaF_model_accuracy
+        logging.info(f"\t- Performance: {PaF_model_accuracy}")
 
     # PaFaP
     if experiment_params["PaFaP"]:
@@ -337,7 +387,7 @@ def test_one_setting(
         PaFaP_model_path = (
             f"{input_model_names[0][:-2]}_w{int(fusion_weights[0]*100)}_s{int(sparsity*100)}_PaFaP"
         )
-        if model_already_exists(PaFaP_model_path):
+        if model_already_exists(PaFaP_model_path, loaders, gpu_id):
             logging.info(f"\tFound the model {PaFaP_model_path}.pth in cache.")
             PaFaP_model = get_pretrained_model_by_name(PaFaP_model_path, gpu_id)
             PaFaP_model_accuracy = original_test_manager([PaFaP_model], **params)
@@ -350,12 +400,13 @@ def test_one_setting(
             PaFaP_model = PaFaP_model[0]
             save_model(PaFaP_model, PaFaP_model_path)
         performance_measurements["PaFaP_model_accuracy"] = PaFaP_model_accuracy[0]
+        logging.info(f"\t- Performance: {PaFaP_model_accuracy[0]}")
 
     # PaFaT
     if num_epochs > 0 and experiment_params["PaFaT"]:
         logging.info(f"Computing PaFaT...")
         PaFaT_model_path = f"{input_model_names[0][:-2]}_w{int(fusion_weights[0]*100)}_s{int(sparsity*100)}_PaFaT{num_epochs}"
-        if model_already_exists(PaFaT_model_path):
+        if model_already_exists(PaFaT_model_path, loaders, gpu_id):
             logging.info(f"\tFound the model {PaFaT_model_path}.pth in cache.")
             PaFaT_model = get_pretrained_model_by_name(PaFaT_model_path, gpu_id)
             PaFaT_model_epoch_accuracy = get_model_trainHistory(PaFaT_model_path)
@@ -367,21 +418,25 @@ def test_one_setting(
                 gpu_id=experiment_params["gpu_id"],
                 prune=False,
             )
+            PaFaT_model_epoch_accuracy = PaFaT_model_epoch_accuracy[:-1]
             save_model(PaFaT_model, PaFaT_model_path)
             save_model_trainHistory(PaFaT_model_path, PaFaT_model_epoch_accuracy)
         performance_measurements["PaFaT_model_epoch_accuracy"] = PaFaT_model_epoch_accuracy
+        logging.info(f"\t- Performance: {PaFaT_model_epoch_accuracy[-1]}")
 
     # PaT
     if num_epochs > 0 and (
         experiment_params["PaT"] or experiment_params["PaTaF"] or experiment_params["PaTaFaT"]
     ):
         logging.info(f"Computing PaT...")
-        PaT_model_0_path = f"{input_model_names[0]}_w{int(fusion_weights[0]*100)}_s{int(sparsity*100)}_PaT{int(num_epochs/2)}"
-        PaT_model_1_path = f"{input_model_names[1]}_w{int(fusion_weights[0]*100)}_s{int(sparsity*100)}_PaT{int(num_epochs/2)}"
+        PaT_model_0_path = f"{input_model_names[0]}_s{int(sparsity*100)}_PaT{int(num_epochs/2)}"
+        PaT_model_1_path = f"{input_model_names[1]}_s{int(sparsity*100)}_PaT{int(num_epochs/2)}"
         PaT_model_list = []
         PaT_models_epoch_accuracies_list = []
 
-        if model_already_exists(PaT_model_0_path) and model_already_exists(PaT_model_1_path):
+        if model_already_exists(PaT_model_0_path, loaders, gpu_id) and model_already_exists(
+            PaT_model_1_path, loaders, gpu_id
+        ):
             logging.info(f"\tFound the model {PaT_model_0_path}.pth in cache.")
             logging.info(f"\tFound the model {PaT_model_1_path}.pth in cache.")
             PaT_model_0 = get_pretrained_model_by_name(PaT_model_0_path, gpu_id)
@@ -402,23 +457,26 @@ def test_one_setting(
                     gpu_id=experiment_params["gpu_id"],
                     prune=False,
                 )
+                PaT_model_epoch_accuracies = PaT_model_epoch_accuracies[:-1]
                 PaT_model_list.append(PaT_model)
                 PaT_models_epoch_accuracies_list.append(PaT_model_epoch_accuracies)
                 save_model(
                     PaT_model, f"{input_model_names[i]}_s{int(sparsity*100)}_PaT{int(num_epochs/2)}"
                 )
                 save_model_trainHistory(
-                    f"{input_model_names[i]}_PaT{int(num_epochs/2)}", PaT_model_epoch_accuracies
+                    f"{input_model_names[i]}_s{int(sparsity*100)}_PaT{int(num_epochs/2)}",
+                    PaT_model_epoch_accuracies,
                 )
         performance_measurements[
             "PaT_models_epoch_accuracies_list"
         ] = PaT_models_epoch_accuracies_list
+        logging.info(f"\t- Performance: {[x[-1] for x in PaT_models_epoch_accuracies_list]}")
 
     # PaTaF
     if num_epochs > 0 and (experiment_params["PaTaF"] or experiment_params["PaTaFaT"]):
         logging.info(f"Computing PaTaF...")
         PaTaF_model_path = f"{input_model_names[0][:-2]}_w{int(fusion_weights[0]*100)}_s{int(sparsity*100)}_PaT{int(num_epochs/2)}aF"
-        if model_already_exists(PaTaF_model_path):
+        if model_already_exists(PaTaF_model_path, loaders, gpu_id):
             logging.info(f"\tFound the model {PaTaF_model_path}.pth in cache.")
             PaTaF_model = get_pretrained_model_by_name(PaTaF_model_path, gpu_id)
             PaTaF_model_accuracy = original_test_manager([PaTaF_model], **params)
@@ -431,12 +489,13 @@ def test_one_setting(
             )
             save_model(PaTaF_model, PaTaF_model_path)
         performance_measurements["PaTaF_model_accuracy"] = PaTaF_model_accuracy
+        logging.info(f"\t- Performance: {PaTaF_model_accuracy}")
 
     # PaTaFaT
     if num_epochs > 0 and experiment_params["PaTaFaT"]:
         logging.info(f"Computing PaTaFaT...")
         PaTaFaT_model_path = f"{input_model_names[0][:-2]}_w{int(fusion_weights[0]*100)}_s{int(sparsity*100)}_PaT{int(num_epochs/2)}aFaT{int(num_epochs/2)}"
-        if model_already_exists(PaTaFaT_model_path):
+        if model_already_exists(PaTaFaT_model_path, loaders, gpu_id):
             logging.info(f"\tFound the model {PaTaFaT_model_path}.pth in cache.")
             PaTaFaT_model = get_pretrained_model_by_name(PaTaFaT_model_path, gpu_id)
             PaTaFaT_model_accuracy = get_model_trainHistory(PaTaFaT_model_path)
@@ -448,9 +507,11 @@ def test_one_setting(
                 gpu_id=experiment_params["gpu_id"],
                 prune=False,
             )
+            PaTaFaT_model_accuracy = PaTaFaT_model_accuracy[:-1]
             save_model(PaTaFaT_model, PaTaFaT_model_path)
             save_model_trainHistory(PaTaFaT_model_path, PaTaFaT_model_accuracy)
         performance_measurements["PaTaFaT_model_accuracy"] = PaTaFaT_model_accuracy
+        logging.info(f"\t- Performance: {PaTaFaT_model_accuracy[-1]}")
 
     ### Combinations that start with fusion
     # F
@@ -463,7 +524,7 @@ def test_one_setting(
     ):
         logging.info(f"Fusing the original models...")
         F_model_path = f"{input_model_names[0][:-2]}_w{int(fusion_weights[0]*100)}_F"
-        if model_already_exists(F_model_path):
+        if model_already_exists(F_model_path, loaders, gpu_id):
             logging.info(f"\tFound the model {F_model_path}.pth in cache.")
             original_fused_model = get_pretrained_model_by_name(F_model_path, gpu_id)
             original_fused_model_accuracy = original_test_manager([original_fused_model], **params)
@@ -477,6 +538,7 @@ def test_one_setting(
             )
             save_model(original_fused_model, F_model_path)
         performance_measurements["original_fused_model_accuracy"] = original_fused_model_accuracy
+        logging.info(f"\t- Performance: {original_fused_model_accuracy}")
 
     # FaP
     if experiment_params["FaP"] or experiment_params["FaPaT"]:
@@ -484,7 +546,7 @@ def test_one_setting(
         FaP_model_path = (
             f"{input_model_names[0][:-2]}_w{int(fusion_weights[0]*100)}_s{int(sparsity*100)}_FaP"
         )
-        if model_already_exists(FaP_model_path):
+        if model_already_exists(FaP_model_path, loaders, gpu_id):
             logging.info(f"\tFound the model {FaP_model_path}.pth in cache.")
             FaP_model = get_pretrained_model_by_name(FaP_model_path, gpu_id)
             FaP_model_accuracy = original_test_manager([FaP_model], **params)
@@ -497,12 +559,13 @@ def test_one_setting(
             FaP_model = FaP_model[0]
             save_model(FaP_model, FaP_model_path)
         performance_measurements["FaP_model_accuracy"] = FaP_model_accuracy
+        logging.info(f"\t- Performance: {FaP_model_accuracy}")
 
     # FaPaT
     if num_epochs > 0 and experiment_params["FaPaT"]:
         logging.info(f"Computing FaPaT...")
         FaPaT_model_path = f"{input_model_names[0][:-2]}_w{int(fusion_weights[0]*100)}_s{int(sparsity*100)}_FaPaT{num_epochs}"
-        if model_already_exists(FaPaT_model_path):
+        if model_already_exists(FaPaT_model_path, loaders, gpu_id):
             logging.info(f"\tFound the model {FaPaT_model_path}.pth in cache.")
             FaPaT_model = get_pretrained_model_by_name(FaPaT_model_path, gpu_id)
             FaPaT_model_epoch_accuracy = get_model_trainHistory(FaPaT_model_path)
@@ -514,9 +577,11 @@ def test_one_setting(
                 gpu_id=experiment_params["gpu_id"],
                 prune=False,
             )
+            FaPaT_model_epoch_accuracy = FaPaT_model_epoch_accuracy[:-1]
             save_model(FaPaT_model, FaPaT_model_path)
             save_model_trainHistory(FaPaT_model_path, FaPaT_model_epoch_accuracy)
         performance_measurements["FaPaT_model_epoch_accuracy"] = FaPaT_model_epoch_accuracy
+        logging.info(f"\t- Performance: {FaPaT_model_epoch_accuracy[-1]}")
 
     # FaT
     if num_epochs > 0 and (
@@ -526,7 +591,7 @@ def test_one_setting(
         FaT_model_path = (
             f"{input_model_names[0][:-2]}_w{int(fusion_weights[0]*100)}_FaT{int(num_epochs/2)}"
         )
-        if model_already_exists(FaT_model_path):
+        if model_already_exists(FaT_model_path, loaders, gpu_id):
             logging.info(f"\tFound the model {FaT_model_path}.pth in cache.")
             FaT_model = get_pretrained_model_by_name(FaT_model_path, gpu_id)
             FaT_epoch_accuracies = get_model_trainHistory(FaT_model_path)
@@ -538,15 +603,17 @@ def test_one_setting(
                 gpu_id=experiment_params["gpu_id"],
                 prune=False,
             )
+            FaT_epoch_accuracies = FaT_epoch_accuracies[:-1]
             save_model(FaT_model, FaT_model_path)
             save_model_trainHistory(FaT_model_path, FaT_epoch_accuracies)
         performance_measurements["FaT_epoch_accuracies"] = FaT_epoch_accuracies
+        logging.info(f"\t- Performance: {FaT_epoch_accuracies[-1]}")
 
     # FaTaP
     if num_epochs > 0 and (experiment_params["FaTaP"] or experiment_params["FaTaPaT"]):
         logging.info(f"Computing FaTaP...")
         FaTaP_model_path = f"{input_model_names[0][:-2]}_w{int(fusion_weights[0]*100)}_s{int(sparsity*100)}_FaT{int(num_epochs/2)}aP"
-        if model_already_exists(FaTaP_model_path):
+        if model_already_exists(FaTaP_model_path, loaders, gpu_id):
             logging.info(f"\tFound the model {FaTaP_model_path}.pth in cache.")
             FaTaP_model = get_pretrained_model_by_name(FaTaP_model_path, gpu_id)
             FaTaP_model_accuracy = original_test_manager([FaTaP_model], **params)
@@ -559,12 +626,13 @@ def test_one_setting(
             FaTaP_model = FaTaP_model[0]
             save_model(FaTaP_model, FaTaP_model_path)
         performance_measurements["FaTaP_model_accuracy"] = FaTaP_model_accuracy
+        logging.info(f"\t- Performance: {FaTaP_model_accuracy}")
 
     # FaTaPaT
     if num_epochs > 0 and experiment_params["FaTaPaT"]:
         logging.info(f"Computing FaTaPaT...")
         FaTaPaT_model_path = f"{input_model_names[0][:-2]}_w{int(fusion_weights[0]*100)}_s{int(sparsity*100)}_FaT{int(num_epochs/2)}aPaT{int(num_epochs/2)}"
-        if model_already_exists(FaTaPaT_model_path):
+        if model_already_exists(FaTaPaT_model_path, loaders, gpu_id):
             logging.info(f"\tFound the model {FaTaPaT_model_path}.pth in cache.")
             FaTaPaT_model = get_pretrained_model_by_name(FaTaPaT_model_path, gpu_id)
             FaTaPaT_model_accuracy = get_model_trainHistory(FaTaPaT_model_path)
@@ -576,9 +644,11 @@ def test_one_setting(
                 gpu_id=experiment_params["gpu_id"],
                 prune=False,
             )
+            FaTaPaT_model_accuracy = FaTaPaT_model_accuracy[:-1]
             save_model(FaTaPaT_model, FaTaPaT_model_path)
             save_model_trainHistory(FaTaPaT_model_path, FaTaPaT_model_accuracy)
         performance_measurements["FaTaPaT_model_accuracy"] = FaTaPaT_model_accuracy
+        logging.info(f"\t- Performance: {FaTaPaT_model_accuracy[-1]}")
 
     logging.info(f"Done with sparsity: {sparsity}, fusion_weights: {fusion_weights}.\n")
 
@@ -589,6 +659,7 @@ import datetime
 import os
 import random
 import time
+from time import sleep
 
 import numpy as np
 
