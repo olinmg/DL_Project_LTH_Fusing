@@ -529,7 +529,9 @@ def fusion_bn(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7,
     :param importance: A list of floats. If importance = [0.9, 0.1], then linear combination of weights will be: network[0]*0.9 + network[1]*0.1
     :return: the fused model
     """ 
-
+    if gpu_id != -1:
+        networks = [net.cuda(gpu_id) for net in networks]
+        
     num_models = len(networks)
     T_var_list = [None]*num_models
     skip_T_var_list = [None]*num_models
