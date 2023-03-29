@@ -592,7 +592,7 @@ def fusion_bn(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7,
                             T_var = (T_var + residual_T_var) / 2
                             #print("averaging multiple T_var's")
                         else:
-                            #print("doing nothing for skips")
+                            print("doing nothing for skips")
                 
                 fusion_layer.align_weights(T_var)
             
