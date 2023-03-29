@@ -691,6 +691,7 @@ if __name__ == "__main__":
         format="[%(asctime)s %(name)s %(levelname)s] %(message)s",
         level="INFO",
         filename=f"./logger_files/{date}_logger.txt",
+        force=True
     )
 
     # Loading experiment parameters from corresponding file
