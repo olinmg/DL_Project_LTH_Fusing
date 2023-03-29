@@ -481,18 +481,18 @@ def MSF(network, sparsity = 0.65, gpu_id = -1, metric=-1, eps=1e-7, resnet=False
             marginals = torch.ones(T_var.shape[1]) / T_var.shape[0]
         marginals = torch.diag(1.0/(marginals + eps))  # take inverse
         T_var = torch.matmul(T_var, marginals)
-        print(T_var.shape)
-        print(T_var[:,0])
+        #print(T_var.shape)
+        #print(T_var[:,0])
         T_var = T_var / T_var.sum(dim=0)
-        print(T_var[:,0])
+        #print(T_var[:,0])
         # -----------------------------------------------------------------------
         # ---- Assumption: Past correction = True (Anything else doesn't really make sense?)
         geometric_fc = torch.matmul(T_var.t(), aligned_wt.contiguous().view(aligned_wt.shape[0], -1)) if idx != num_layers-1 else aligned_wt
-        print(geometric_fc.shape)
-        print("layer_shape: ", layer_shape)
+        #print(geometric_fc.shape)
+        #print("layer_shape: ", layer_shape)
 
         if is_conv:
-            print(geometric_fc.shape[1]/(layer_shape[2]*layer_shape[3]))
+            #print(geometric_fc.shape[1]/(layer_shape[2]*layer_shape[3]))
             geometric_fc = geometric_fc.view(torch.Size([geometric_fc.shape[0], int(geometric_fc.shape[1]/(layer_shape[2]*layer_shape[3])), layer_shape[2], layer_shape[3]]))
 
         avg_aligned_layers.append(geometric_fc)
@@ -577,23 +577,22 @@ def fusion_bn(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7,
                     # save skip_level transport map if there is block ahead
                     if layer_shape[1] != layer_shape[0]:
                         if not (layer_shape[2] == 1 and layer_shape[3] == 1):
-                            print(f'saved skip T_var at layer {idx} with shape {layer_shape}')
+                            #print(f'saved skip T_var at layer {idx} with shape {layer_shape}')
                             skip_T_var = T_var.clone()
                             skip_T_var_idx = idx
                         else:
-                            print(
-                                f'utilizing skip T_var saved from layer layer {skip_T_var_idx} with shape {skip_T_var.shape}')
+                            #print(f'utilizing skip T_var saved from layer layer {skip_T_var_idx} with shape {skip_T_var.shape}')
                             # if it's a shortcut (128, 64, 1, 1)
                             residual_T_var = T_var.clone()
                             residual_T_var_idx = idx  # use this after the skip
                             T_var = skip_T_var
-                        print("shape of previous transport map now is", T_var.shape)
+                        #print("shape of previous transport map now is", T_var.shape)
                     else:
                         if residual_T_var is not None and (residual_T_var_idx == (idx - 1)):
                             T_var = (T_var + residual_T_var) / 2
-                            print("averaging multiple T_var's")
+                            #print("averaging multiple T_var's")
                         else:
-                            print("doing nothing for skips")
+                            #print("doing nothing for skips")
                 
                 fusion_layer.align_weights(T_var)
             
@@ -605,7 +604,7 @@ def fusion_bn(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7,
 
             T = ot.emd(nu, mu, cpuM)        
 
-            print("T is: ", T[0])
+            #print("T is: ", T[0])
 
             if gpu_id != -1:
                 T_var = torch.from_numpy(T).cuda(gpu_id).float()
@@ -618,11 +617,11 @@ def fusion_bn(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7,
             else:
                 marginals = torch.ones(T_var.shape[1]) / T_var.shape[0]
             marginals = torch.diag(1.0/(marginals + eps))  # take inverse
-            print("marginals: ", marginals[0])
+            #print("marginals: ", marginals[0])
             T_var = torch.matmul(T_var, marginals)
             T_var = T_var / T_var.sum(dim=0)
 
-            print("T_var is: ", T_var[0])
+            #print("T_var is: ", T_var[0])
             #return 
 
             fusion_layer.permute_parameters(T_var)
