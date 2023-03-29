@@ -355,6 +355,8 @@ def test_one_setting(
             )
             save_model(pruned_models[0], pruned_model_0_path)
             save_model(pruned_models[1], pruned_model_1_path)
+            pruned_model_0 = pruned_models[0]
+            pruned_model_1 = pruned_models[1]
         performance_measurements[
             "original_pruned_models_accuracies"
         ] = original_pruned_models_accuracies
@@ -454,6 +456,7 @@ def test_one_setting(
                 )
             )
         else:
+            lis = []
             for i in [0, 1]:
                 PaT_model, PaT_model_epoch_accuracies = train_during_pruning(
                     copy.deepcopy(pruned_models[i]),
@@ -462,6 +465,7 @@ def test_one_setting(
                     gpu_id=experiment_params["gpu_id"],
                     prune=False,
                 )
+                lis.append(PaT_model)
                 PaT_model_epoch_accuracies = PaT_model_epoch_accuracies[:-1]
                 PaT_model_list.append(PaT_model)
                 PaT_models_epoch_accuracies_list.append(PaT_model_epoch_accuracies)
@@ -472,6 +476,8 @@ def test_one_setting(
                     f"{input_model_names[i]}_s{int(sparsity*100)}_PaT{int(num_epochs/2)}",
                     PaT_model_epoch_accuracies,
                 )
+            PaT_model_0 = lis[0]
+            PaT_model_1 = lis[1]
         performance_measurements[
             "PaT_models_epoch_accuracies_list"
         ] = PaT_models_epoch_accuracies_list
