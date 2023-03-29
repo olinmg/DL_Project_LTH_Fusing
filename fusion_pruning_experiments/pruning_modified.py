@@ -84,6 +84,10 @@ def prune_structured(net, loaders, num_epochs, example_inputs, out_features, pru
             ignored_layers.append(m)
 
     total_steps = int(total_steps)
+    
+    if next(model.parameters()).is_cuda:
+        model.to("cpu")
+    
     pruner = tp.pruner.LocalMagnitudePruner( 
         model,
         example_inputs,
