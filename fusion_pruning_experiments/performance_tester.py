@@ -423,7 +423,7 @@ def wrapper_first_fusion(list_of_models, gpu_id=-1, accuracies=None, importance=
 
     fused_model = fusion_bn(
         networks=list_of_models,
-        gpu_id=-1,
+        gpu_id=gpu_id,
         accuracies=accuracies,
         importance=importance,
         resnet="resnet" in name,
