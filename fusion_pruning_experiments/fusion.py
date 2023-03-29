@@ -623,7 +623,9 @@ def fusion_bn(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7,
 
             #print("T_var is: ", T_var[0])
             #return 
-
+            if gpu_id != -1:
+                T_var = T_var.cuda(gpu_id)
+            
             fusion_layer.permute_parameters(T_var)
 
             avg_layer.update_weights(fusion_layer, torch.sum(importance[:idx_model]), importance[idx_model])
