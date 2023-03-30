@@ -793,6 +793,8 @@ if __name__ == "__main__":
                     )
                     for idx, accuracy in enumerate(epoch_accuracy):
                         result[name][f"model_{i}"]["MSF"][idx] = float_format(accuracy)
+
+            logging.info(f"Done with sparsity: {result['sparsity']}.")
         print(json.dumps(result_final, indent=4))
         result_final["results"][idx_result] = result
 
