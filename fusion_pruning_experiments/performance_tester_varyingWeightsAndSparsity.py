@@ -361,8 +361,8 @@ def test_one_setting(
             "original_pruned_models_accuracies"
         ] = original_pruned_models_accuracies
         logging.info(f"\t- Performance: {original_pruned_models_accuracies}")
-        pruned_model_0.to("cpu")
-        pruned_model_1.to("cpu")
+        pruned_model_0 = pruned_model_0.to("cpu")
+        pruned_model_1 = pruned_model_1.to("cpu")
 
     # PaF
     if experiment_params["PaF"] or experiment_params["PaFaP"] or experiment_params["PaFaT"]:
@@ -384,7 +384,7 @@ def test_one_setting(
             save_model(PaF_model, PaF_model_path)
         performance_measurements["PaF_model_accuracy"] = PaF_model_accuracy
         logging.info(f"\t- Performance: {PaF_model_accuracy}")
-        PaF_model.to("cpu")
+        PaF_model = PaF_model.to("cpu")
 
     # PaFaP
     if experiment_params["PaFaP"]:
@@ -406,7 +406,7 @@ def test_one_setting(
             save_model(PaFaP_model, PaFaP_model_path)
         performance_measurements["PaFaP_model_accuracy"] = PaFaP_model_accuracy[0]
         logging.info(f"\t- Performance: {PaFaP_model_accuracy[0]}")
-        PaFaP_model.to("cpu")
+        PaFaP_model = PaFaP_model.to("cpu")
 
     # PaFaT
     if num_epochs > 0 and experiment_params["PaFaT"]:
@@ -429,7 +429,7 @@ def test_one_setting(
             save_model_trainHistory(PaFaT_model_path, PaFaT_model_epoch_accuracy)
         performance_measurements["PaFaT_model_epoch_accuracy"] = PaFaT_model_epoch_accuracy
         logging.info(f"\t- Performance: {PaFaT_model_epoch_accuracy[-1]}")
-        PaFaT_model.to("cpu")
+        PaFaT_model = PaFaT_model.to("cpu")
 
     # PaT
     if num_epochs > 0 and (
@@ -482,8 +482,8 @@ def test_one_setting(
             "PaT_models_epoch_accuracies_list"
         ] = PaT_models_epoch_accuracies_list
         logging.info(f"\t- Performance: {[x[-1] for x in PaT_models_epoch_accuracies_list]}")
-        PaT_model_0.to("cpu")
-        PaT_model_1.to("cpu")
+        PaT_model_0 = PaT_model_0.to("cpu")
+        PaT_model_1 = PaT_model_1.to("cpu")
 
     # PaTaF
     if num_epochs > 0 and (experiment_params["PaTaF"] or experiment_params["PaTaFaT"]):
@@ -503,7 +503,8 @@ def test_one_setting(
             save_model(PaTaF_model, PaTaF_model_path)
         performance_measurements["PaTaF_model_accuracy"] = PaTaF_model_accuracy
         logging.info(f"\t- Performance: {PaTaF_model_accuracy}")
-        PaTaF_model.to("cpu")
+        del PaTaF_model_accuracy
+        PaTaF_model = PaTaF_model.to("cpu")
 
     # PaTaFaT
     if num_epochs > 0 and experiment_params["PaTaFaT"]:
@@ -526,7 +527,7 @@ def test_one_setting(
             save_model_trainHistory(PaTaFaT_model_path, PaTaFaT_model_accuracy)
         performance_measurements["PaTaFaT_model_accuracy"] = PaTaFaT_model_accuracy
         logging.info(f"\t- Performance: {PaTaFaT_model_accuracy[-1]}")
-        PaTaFaT_model.to("cpu")
+        PaTaFaT_model = PaTaFaT_model.to("cpu")
 
     ### Combinations that start with fusion
     # F
@@ -554,7 +555,7 @@ def test_one_setting(
             save_model(original_fused_model, F_model_path)
         performance_measurements["original_fused_model_accuracy"] = original_fused_model_accuracy
         logging.info(f"\t- Performance: {original_fused_model_accuracy}")
-        original_fused_model.to("cpu")
+        original_fused_model = original_fused_model.to("cpu")
 
     # FaP
     if experiment_params["FaP"] or experiment_params["FaPaT"]:
@@ -576,7 +577,7 @@ def test_one_setting(
             save_model(FaP_model, FaP_model_path)
         performance_measurements["FaP_model_accuracy"] = FaP_model_accuracy
         logging.info(f"\t- Performance: {FaP_model_accuracy}")
-        FaP_model.to("cpu")
+        FaP_model = FaP_model.to("cpu")
 
     # FaPaT
     if num_epochs > 0 and experiment_params["FaPaT"]:
@@ -599,7 +600,7 @@ def test_one_setting(
             save_model_trainHistory(FaPaT_model_path, FaPaT_model_epoch_accuracy)
         performance_measurements["FaPaT_model_epoch_accuracy"] = FaPaT_model_epoch_accuracy
         logging.info(f"\t- Performance: {FaPaT_model_epoch_accuracy[-1]}")
-        FaPaT_model.to("cpu")
+        FaPaT_model = FaPaT_model.to("cpu")
 
     # FaT
     if num_epochs > 0 and (
@@ -626,7 +627,7 @@ def test_one_setting(
             save_model_trainHistory(FaT_model_path, FaT_epoch_accuracies)
         performance_measurements["FaT_epoch_accuracies"] = FaT_epoch_accuracies
         logging.info(f"\t- Performance: {FaT_epoch_accuracies[-1]}")
-        FaT_model.to("cpu")
+        FaT_model = FaT_model.to("cpu")
 
     # FaTaP
     if num_epochs > 0 and (experiment_params["FaTaP"] or experiment_params["FaTaPaT"]):
@@ -646,7 +647,7 @@ def test_one_setting(
             save_model(FaTaP_model, FaTaP_model_path)
         performance_measurements["FaTaP_model_accuracy"] = FaTaP_model_accuracy
         logging.info(f"\t- Performance: {FaTaP_model_accuracy}")
-        FaTaP_model.to("cpu")
+        FaTaP_model = FaTaP_model.to("cpu")
 
     # FaTaPaT
     if num_epochs > 0 and experiment_params["FaTaPaT"]:
@@ -669,7 +670,7 @@ def test_one_setting(
             save_model_trainHistory(FaTaPaT_model_path, FaTaPaT_model_accuracy)
         performance_measurements["FaTaPaT_model_accuracy"] = FaTaPaT_model_accuracy
         logging.info(f"\t- Performance: {FaTaPaT_model_accuracy[-1]}")
-        FaTaPaT_model.to("cpu")
+        FaTaPaT_model = FaTaPaT_model.to("cpu")
 
     logging.info(f"Done with sparsity: {sparsity}, fusion_weights: {fusion_weights}.\n")
 
