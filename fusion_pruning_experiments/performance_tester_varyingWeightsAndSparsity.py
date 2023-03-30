@@ -47,6 +47,7 @@ def save_model(model, path):
         logging.info(
             f"Warning: result file already existed. Saved to {save_to_path} instead. Did not check if overwrote another file with this name."
         )
+    del model
 
 
 def get_model_trainHistory(model_path):
@@ -528,6 +529,13 @@ def test_one_setting(
         performance_measurements["PaTaFaT_model_accuracy"] = PaTaFaT_model_accuracy
         logging.info(f"\t- Performance: {PaTaFaT_model_accuracy[-1]}")
         PaTaFaT_model = PaTaFaT_model.to("cpu")
+
+    del PaTaFaT_model
+    del PaT_model_1
+    del PaT_model_0
+    del PaTaF_model
+    del PaFaT_model
+    del PaF_model
 
     ### Combinations that start with fusion
     # F
