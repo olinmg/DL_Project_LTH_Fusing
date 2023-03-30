@@ -619,7 +619,10 @@ if __name__ == "__main__":
             fusion_params.model_name = name
 
             if experiment_params["FaP"]:
-                logging.info(f"(F) Fusing the original models...")
+                if experiment_params["num_epochs"] > 0:
+                    logging.info(f"(FaT) Fusing the original models...")
+                else:
+                    logging.info(f"(F) Fusing the original models...")
                 fused_model, fused_model_accuracy, _ = fusion_test_manager(
                     input_model_list=models_original,
                     **params,
