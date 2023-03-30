@@ -47,7 +47,6 @@ def save_model(model, path):
         logging.info(
             f"Warning: result file already existed. Saved to {save_to_path} instead. Did not check if overwrote another file with this name."
         )
-    del model
 
 
 def get_model_trainHistory(model_path):
@@ -140,22 +139,18 @@ def test_multiple_settings(RESULT_FILE_PATH):
     Given a list of sparsity values (e.g. [0.9, 0.8]) and fusion weight combinations (e.g. [[0.5, 0.5], [0.6, 0.4]])
     this function "coordinates" the execution of experiments for all the possible combinations of setups.
     This is done by calling the function "test_one_setting()" on the inidividual combinations of the two parameters.
-
     Which parameters should be used and what to computer (e.g. PaF, FaP, PaTaF, ...) is defined in the experiment_parameters.json.
-
     ATTENTION: conditions on experiment_parameters.json
         1. fusion_weights: has to be set to a list of lists of weights. E.g. [[0.5, 0.5], [0.8, 0.2], [0.3, 0.7]] or for single one [[0.5, 0.5]]
         2. num_epochs: integer that defines how many epochs a possible retraining should be
         3. while multiple sparsities and fusion_weights can be handled, only ONE prune_type can be given.
         4. the following fields havt to exist and be set to boolean values:
             "FaP", "PaF", "PaF_all", "PaFaP", "PaFaT", "PaT", "PaTaF", "PaTaFaT", "FaPaT", "FaT", "FaTaP", "FaTaPaT"
-
     Results:
         The following .json files will be created in the following scenarios:
             - only one fusion_weight choice is given and possibly multiple sparsities:
                 One single .json file that contains the different sparsities at fixed weights.
                 The files name will end on f"_weight{int(fusion_weights[0]*100)}.json".
-
             - all other cases (multiple fusion weights with multiple sparsities, multiple fusion weights with a since sparsity):
                 One .json file for each given sparsity. In each file the sparsity is fixed and the fusion_weights are varied.
                 The files name will end on f"_sparsity{int(sparsity*100)}.json".
@@ -284,7 +279,6 @@ def test_one_setting(
     """
     Given a single sparsity and fusion_weights setting, this function executes all experiments (e.g. PaF, FaP, ...) - besides MSF and SSF - that are set to true in the experiment_parameters.json.
     The resulting performance measures (including epoch-wise test performance for possible retraining) are returned in the dictionary "performance_measurements".
-
     The corresponding trained models are also available (see e.g. FaP_model, PaF_model, ...), but are not returned. This can be easily changed.
     """
     # Can only handle one sparsity type (e.g. "l1") at a time
@@ -356,14 +350,10 @@ def test_one_setting(
             )
             save_model(pruned_models[0], pruned_model_0_path)
             save_model(pruned_models[1], pruned_model_1_path)
-            pruned_model_0 = pruned_models[0]
-            pruned_model_1 = pruned_models[1]
         performance_measurements[
             "original_pruned_models_accuracies"
         ] = original_pruned_models_accuracies
         logging.info(f"\t- Performance: {original_pruned_models_accuracies}")
-        pruned_model_0 = pruned_model_0.to("cpu")
-        pruned_model_1 = pruned_model_1.to("cpu")
 
     # PaF
     if experiment_params["PaF"] or experiment_params["PaFaP"] or experiment_params["PaFaT"]:
@@ -385,8 +375,7 @@ def test_one_setting(
             save_model(PaF_model, PaF_model_path)
         performance_measurements["PaF_model_accuracy"] = PaF_model_accuracy
         logging.info(f"\t- Performance: {PaF_model_accuracy}")
-        PaF_model = PaF_model.to("cpu")
-
+    
     # PaFaP
     if experiment_params["PaFaP"]:
         logging.info(f"Computing PaFaP...")
@@ -407,7 +396,6 @@ def test_one_setting(
             save_model(PaFaP_model, PaFaP_model_path)
         performance_measurements["PaFaP_model_accuracy"] = PaFaP_model_accuracy[0]
         logging.info(f"\t- Performance: {PaFaP_model_accuracy[0]}")
-        PaFaP_model = PaFaP_model.to("cpu")
 
     # PaFaT
     if num_epochs > 0 and experiment_params["PaFaT"]:
@@ -430,8 +418,7 @@ def test_one_setting(
             save_model_trainHistory(PaFaT_model_path, PaFaT_model_epoch_accuracy)
         performance_measurements["PaFaT_model_epoch_accuracy"] = PaFaT_model_epoch_accuracy
         logging.info(f"\t- Performance: {PaFaT_model_epoch_accuracy[-1]}")
-        PaFaT_model = PaFaT_model.to("cpu")
-
+    
     # PaT
     if num_epochs > 0 and (
         experiment_params["PaT"] or experiment_params["PaTaF"] or experiment_params["PaTaFaT"]
@@ -457,7 +444,6 @@ def test_one_setting(
                 )
             )
         else:
-            lis = []
             for i in [0, 1]:
                 PaT_model, PaT_model_epoch_accuracies = train_during_pruning(
                     copy.deepcopy(pruned_models[i]),
@@ -466,7 +452,6 @@ def test_one_setting(
                     gpu_id=experiment_params["gpu_id"],
                     prune=False,
                 )
-                lis.append(PaT_model)
                 PaT_model_epoch_accuracies = PaT_model_epoch_accuracies[:-1]
                 PaT_model_list.append(PaT_model)
                 PaT_models_epoch_accuracies_list.append(PaT_model_epoch_accuracies)
@@ -477,15 +462,11 @@ def test_one_setting(
                     f"{input_model_names[i]}_s{int(sparsity*100)}_PaT{int(num_epochs/2)}",
                     PaT_model_epoch_accuracies,
                 )
-            PaT_model_0 = lis[0]
-            PaT_model_1 = lis[1]
         performance_measurements[
             "PaT_models_epoch_accuracies_list"
         ] = PaT_models_epoch_accuracies_list
         logging.info(f"\t- Performance: {[x[-1] for x in PaT_models_epoch_accuracies_list]}")
-        PaT_model_0 = PaT_model_0.to("cpu")
-        PaT_model_1 = PaT_model_1.to("cpu")
-
+    
     # PaTaF
     if num_epochs > 0 and (experiment_params["PaTaF"] or experiment_params["PaTaFaT"]):
         logging.info(f"Computing PaTaF...")
@@ -504,8 +485,6 @@ def test_one_setting(
             save_model(PaTaF_model, PaTaF_model_path)
         performance_measurements["PaTaF_model_accuracy"] = PaTaF_model_accuracy
         logging.info(f"\t- Performance: {PaTaF_model_accuracy}")
-        del PaTaF_model_accuracy
-        PaTaF_model = PaTaF_model.to("cpu")
 
     # PaTaFaT
     if num_epochs > 0 and experiment_params["PaTaFaT"]:
@@ -528,15 +507,7 @@ def test_one_setting(
             save_model_trainHistory(PaTaFaT_model_path, PaTaFaT_model_accuracy)
         performance_measurements["PaTaFaT_model_accuracy"] = PaTaFaT_model_accuracy
         logging.info(f"\t- Performance: {PaTaFaT_model_accuracy[-1]}")
-        PaTaFaT_model = PaTaFaT_model.to("cpu")
-
-    del PaTaFaT_model
-    del PaT_model_1
-    del PaT_model_0
-    del PaTaF_model
-    del PaFaT_model
-    del PaF_model
-
+    
     ### Combinations that start with fusion
     # F
     if (
@@ -563,7 +534,6 @@ def test_one_setting(
             save_model(original_fused_model, F_model_path)
         performance_measurements["original_fused_model_accuracy"] = original_fused_model_accuracy
         logging.info(f"\t- Performance: {original_fused_model_accuracy}")
-        original_fused_model = original_fused_model.to("cpu")
 
     # FaP
     if experiment_params["FaP"] or experiment_params["FaPaT"]:
@@ -585,7 +555,6 @@ def test_one_setting(
             save_model(FaP_model, FaP_model_path)
         performance_measurements["FaP_model_accuracy"] = FaP_model_accuracy
         logging.info(f"\t- Performance: {FaP_model_accuracy}")
-        FaP_model = FaP_model.to("cpu")
 
     # FaPaT
     if num_epochs > 0 and experiment_params["FaPaT"]:
@@ -608,8 +577,7 @@ def test_one_setting(
             save_model_trainHistory(FaPaT_model_path, FaPaT_model_epoch_accuracy)
         performance_measurements["FaPaT_model_epoch_accuracy"] = FaPaT_model_epoch_accuracy
         logging.info(f"\t- Performance: {FaPaT_model_epoch_accuracy[-1]}")
-        FaPaT_model = FaPaT_model.to("cpu")
-
+    
     # FaT
     if num_epochs > 0 and (
         experiment_params["FaT"] or experiment_params["FaTaP"] or experiment_params["FaTaPaT"]
@@ -635,7 +603,6 @@ def test_one_setting(
             save_model_trainHistory(FaT_model_path, FaT_epoch_accuracies)
         performance_measurements["FaT_epoch_accuracies"] = FaT_epoch_accuracies
         logging.info(f"\t- Performance: {FaT_epoch_accuracies[-1]}")
-        FaT_model = FaT_model.to("cpu")
 
     # FaTaP
     if num_epochs > 0 and (experiment_params["FaTaP"] or experiment_params["FaTaPaT"]):
@@ -655,8 +622,7 @@ def test_one_setting(
             save_model(FaTaP_model, FaTaP_model_path)
         performance_measurements["FaTaP_model_accuracy"] = FaTaP_model_accuracy
         logging.info(f"\t- Performance: {FaTaP_model_accuracy}")
-        FaTaP_model = FaTaP_model.to("cpu")
-
+    
     # FaTaPaT
     if num_epochs > 0 and experiment_params["FaTaPaT"]:
         logging.info(f"Computing FaTaPaT...")
@@ -678,7 +644,6 @@ def test_one_setting(
             save_model_trainHistory(FaTaPaT_model_path, FaTaPaT_model_accuracy)
         performance_measurements["FaTaPaT_model_accuracy"] = FaTaPaT_model_accuracy
         logging.info(f"\t- Performance: {FaTaPaT_model_accuracy[-1]}")
-        FaTaPaT_model = FaTaPaT_model.to("cpu")
 
     logging.info(f"Done with sparsity: {sparsity}, fusion_weights: {fusion_weights}.\n")
 
@@ -696,7 +661,6 @@ import numpy as np
 if __name__ == "__main__":
     """
     See description of test_multiple_settings() for details on whats happening in this script.
-
     The format of output are .json files that are stored in "results_and_plots_o" in the subfolder specified by the model name.
     The location can be changed.
     Models are loaded from the below given files (without the .pth ending).
@@ -715,7 +679,7 @@ if __name__ == "__main__":
         format="[%(asctime)s %(name)s %(levelname)s] %(message)s",
         level="INFO",
         filename=f"./logger_files/{date}_logger.txt",
-        force=True,
+        force=True
     )
 
     # Loading experiment parameters from corresponding file
