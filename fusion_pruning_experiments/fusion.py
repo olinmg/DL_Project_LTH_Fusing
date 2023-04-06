@@ -31,8 +31,8 @@ def normalize_vector(coordinates, eps=1e-9):
 
 # compute_euclidian_distance_matrix computes a matrix where c[i, j] corresponds to the euclidean distance of x[i] and y[j]
 def compute_euclidian_distance_matrix(x, y, p=2, squared=True): # For some reason TA prefers squared to be True
-    x_col = x.unsqueeze(1)
-    y_lin = y.unsqueeze(0)
+    x_col = x.unsqueeze(1).cpu()
+    y_lin = y.unsqueeze(0).cpu()
     c = torch.sum((torch.abs(x_col - y_lin)) ** p, 2)
     if not squared:
         c = c ** (1/2)
@@ -72,12 +72,9 @@ def create_network_from_params(reference_model, param_list, gpu_id = -1,sparsity
 
 def create_network_from_parameters(reference_model, param_list, gpu_id = -1):
     model = copy.deepcopy(reference_model)
-    for layer in param_list:
-        print(layer.super_type)
     
     model_state_dict = model.state_dict()
     keys = list(model_state_dict.keys())
-    print(keys)
     
     idx = -1
 
@@ -521,7 +518,7 @@ def MSF(network, sparsity = 0.65, gpu_id = -1, metric=-1, eps=1e-7, resnet=False
     
     return create_network_from_params(gpu_id=gpu_id, param_list=avg_aligned_layers, reference_model = get_model(model_name="vgg11", sparsity=1-sparsity, output_dim=output_dim))
 
-def fusion_bn(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7, resnet=False):
+def fusion_bn(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7, resnet=False, activation_based=False, train_loader=False, model_name=None):
     """
     fusion fuses arbitrary many models into the model that is the smallest
     :param networks: A list of networks to be fused
@@ -529,9 +526,7 @@ def fusion_bn(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7,
     :param importance: A list of floats. If importance = [0.9, 0.1], then linear combination of weights will be: network[0]*0.9 + network[1]*0.1
     :return: the fused model
     """ 
-    if gpu_id != -1:
-        networks = [net.cuda(gpu_id) for net in networks]
-        
+
     num_models = len(networks)
     T_var_list = [None]*num_models
     skip_T_var_list = [None]*num_models
@@ -550,11 +545,14 @@ def fusion_bn(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7,
     sum = torch.sum(importance)
     importance = importance *(importance.shape[0]/sum)
 
-    fusion_layers = preprocess_parameters(networks)
+    fusion_layers = preprocess_parameters(networks, activation_based=activation_based, train_loader=train_loader, model_name=model_name, gpu_id=gpu_id)
     num_layers = len(fusion_layers)
 
     for idx in range(num_layers):
 
+        fusion_layers[idx] = list(fusion_layers[idx])
+
+        #fusion_layers[idx][0].to(gpu_id)
         avg_layer = fusion_layers[idx][0]
 
         mu_cardinality = avg_layer.weight.shape[0]
@@ -563,6 +561,7 @@ def fusion_bn(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7,
         is_conv = avg_layer.is_conv
 
         for idx_m, fusion_layer in enumerate(fusion_layers[idx][1:]):
+            #fusion_layer.to(gpu_id)
             idx_model = idx_m + 1
             T_var = T_var_list[idx_model]
             skip_T_var = skip_T_var_list[idx_model]
@@ -579,22 +578,19 @@ def fusion_bn(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7,
                     # save skip_level transport map if there is block ahead
                     if layer_shape[1] != layer_shape[0]:
                         if not (layer_shape[2] == 1 and layer_shape[3] == 1):
-                            #print(f'saved skip T_var at layer {idx} with shape {layer_shape}')
                             skip_T_var = T_var.clone()
                             skip_T_var_idx = idx
                         else:
-                            #print(f'utilizing skip T_var saved from layer layer {skip_T_var_idx} with shape {skip_T_var.shape}')
+
                             # if it's a shortcut (128, 64, 1, 1)
                             residual_T_var = T_var.clone()
                             residual_T_var_idx = idx  # use this after the skip
                             T_var = skip_T_var
-                        #print("shape of previous transport map now is", T_var.shape)
+
                     else:
                         if residual_T_var is not None and (residual_T_var_idx == (idx - 1)):
                             T_var = (T_var + residual_T_var) / 2
-                            #print("averaging multiple T_var's")
-                        else:
-                            print("doing nothing for skips")
+
                 
                 fusion_layer.align_weights(T_var)
             
@@ -605,8 +601,6 @@ def fusion_bn(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7,
             cpuM = M.data.cpu().numpy() # POT does not accept array on GPU
 
             T = ot.emd(nu, mu, cpuM)        
-
-            #print("T is: ", T[0])
 
             if gpu_id != -1:
                 T_var = torch.from_numpy(T).cuda(gpu_id).float()
@@ -619,15 +613,11 @@ def fusion_bn(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7,
             else:
                 marginals = torch.ones(T_var.shape[1]) / T_var.shape[0]
             marginals = torch.diag(1.0/(marginals + eps))  # take inverse
-            #print("marginals: ", marginals[0])
+
             T_var = torch.matmul(T_var, marginals)
             T_var = T_var / T_var.sum(dim=0)
 
-            #print("T_var is: ", T_var[0])
-            #return 
-            if gpu_id != -1:
-                T_var = T_var.cuda(gpu_id)
-            
+
             fusion_layer.permute_parameters(T_var)
 
             avg_layer.update_weights(fusion_layer, torch.sum(importance[:idx_model]), importance[idx_model])
@@ -638,6 +628,23 @@ def fusion_bn(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7,
             skip_T_var_idx_list[idx_model] = skip_T_var_idx
             residual_T_var_list[idx_model] = residual_T_var
             residual_T_var_idx_list[idx_model] = residual_T_var_idx
+            fusion_layers[idx][idx_model] = None
+            #fusion_layer.to(-1)
+            del fusion_layer
+            mu = None
+            nu = None
+            M = None
+            T = None
+            T_var = None
+            skip_T_var = None
+            skip_t_var_idx = None
+            residual_T_var = None
+            residual_T_var_idx = None
+
+
+            cpuM = None
+            marginals = None
+
 
     return create_network_from_parameters(gpu_id=gpu_id, param_list=[layers[0] for layers in fusion_layers], reference_model = networks[0])
 
