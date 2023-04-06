@@ -323,18 +323,19 @@ def wrapper_structured_pruning(input_model, prune_params):
     return pruned_model, description
 
 from fusion import MSF, fusion_bn
-def wrapper_first_fusion(list_of_models, gpu_id=-1, accuracies=None, importance=None, name=""):
+def wrapper_first_fusion(activation_based, train_loader, gpu_id, num_samples=None):
     '''
     Uses the first simple fusion approach created by Alex in fusion.py.
     So far this can only handle two (simple -> CNN and MLP) networks in list_of_models.
     '''
+    
+    def fusion(list_of_models, gpu_id=-1, accuracies=None, importance=None, name=""):
+        fused_model = fusion_bn(networks=list_of_models, gpu_id=gpu_id, accuracies=accuracies, importance=importance, resnet="resnet" in name, activation_based=activation_based, train_loader=train_loader if activation_based else None, num_samples=num_samples)
 
+        description = {"name": name}
 
-    fused_model = fusion_bn(networks=list_of_models, gpu_id=-1, accuracies=accuracies, importance=importance, resnet="resnet" in name)
-
-    description = {"name": name}
-
-    return fused_model, description
+        return fused_model, description
+    return fusion
 
 def get_result_skeleton(parameters):
     result_final = {
@@ -389,9 +390,6 @@ if __name__ == '__main__':
     
     result_final = get_result_skeleton(experiment_params)
 
-    fusion_function = wrapper_first_fusion
-    pruning_function = wrapper_structured_pruning      # still need to implement the structured pruning function
-    eval_function = evaluate_performance_simple
 
     loaders = None
     output_dim = None
@@ -406,6 +404,10 @@ if __name__ == '__main__':
         output_dim = 100
     else:
         raise Exception("Provided dataset does not exist.")
+
+    fusion_function = wrapper_first_fusion(activation_based=experiment_params["activation_based"], train_loader=loaders["train"], gpu_id = experiment_params["gpu_id"], num_samples=experiment_params["num_samples"] if experiment_params["activation_based"] else None)
+    pruning_function = wrapper_structured_pruning      # still need to implement the structured pruning function
+    eval_function = evaluate_performance_simple
 
 
     new_result = {}

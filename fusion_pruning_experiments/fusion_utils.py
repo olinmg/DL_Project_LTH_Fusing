@@ -222,7 +222,7 @@ def compute_activations(model, train_loader, num_samples, fusion_layers, gpu_id=
     return activations
 
 
-def preprocess_parameters(models, activation_based=False, train_loader=None, model_name=None, gpu_id=-1):
+def preprocess_parameters(models, activation_based=False, train_loader=None, model_name=None, gpu_id=-1, num_samples=200):
     all_fusion_layers = []
 
     for idx, model in enumerate(models):
@@ -242,7 +242,7 @@ def preprocess_parameters(models, activation_based=False, train_loader=None, mod
             fusion_layers.append(fusion_layer)
         
         if activation_based:
-            activations = compute_activations(model, train_loader=train_loader, num_samples=200, fusion_layers=fusion_layers, gpu_id=gpu_id)
+            activations = compute_activations(model, train_loader=train_loader, num_samples=num_samples, fusion_layers=fusion_layers, gpu_id=gpu_id)
 
             for fusion_layer in fusion_layers:
                 fusion_layer.set_activations(activations[fusion_layer.final_name])

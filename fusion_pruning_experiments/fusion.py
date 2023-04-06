@@ -518,7 +518,7 @@ def MSF(network, sparsity = 0.65, gpu_id = -1, metric=-1, eps=1e-7, resnet=False
     
     return create_network_from_params(gpu_id=gpu_id, param_list=avg_aligned_layers, reference_model = get_model(model_name="vgg11", sparsity=1-sparsity, output_dim=output_dim))
 
-def fusion_bn(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7, resnet=False, activation_based=False, train_loader=False, model_name=None):
+def fusion_bn(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7, resnet=False, activation_based=False, train_loader=False, model_name=None, num_samples=200):
     """
     fusion fuses arbitrary many models into the model that is the smallest
     :param networks: A list of networks to be fused
@@ -544,8 +544,11 @@ def fusion_bn(networks, gpu_id = -1, accuracies=None, importance=None, eps=1e-7,
     importance = torch.tensor(importance)
     sum = torch.sum(importance)
     importance = importance *(importance.shape[0]/sum)
+    if gpu_id != -1:
+        for model in networks:
+            model = model.cuda(gpu_id)
 
-    fusion_layers = preprocess_parameters(networks, activation_based=activation_based, train_loader=train_loader, model_name=model_name, gpu_id=gpu_id)
+    fusion_layers = preprocess_parameters(networks, activation_based=activation_based, train_loader=train_loader, model_name=model_name, gpu_id=gpu_id, num_samples=200)
     num_layers = len(fusion_layers)
 
     for idx in range(num_layers):

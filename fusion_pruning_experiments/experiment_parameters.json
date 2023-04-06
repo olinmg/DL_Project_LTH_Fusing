@@ -1,6 +1,6 @@
 {
-    "FaP": false,
-    "PaF": false,
+    "FaP": true,
+    "PaF": true,
     "PaF_all": false,
     "SSF": false,
     "MSF": false,
@@ -16,20 +16,23 @@
     "FaTaP": false,
     "FaTaPaT": true,
     "FaPaT": false,
+    "IntraFusion": false,
 
 
 
     "models": [
         {
-            "name": "vgg11",
-            "basis_name": "vgg11_diff_weight_init_True"
+            "name": "resnet18",
+            "basis_name": "resnet18_diff_weight_init_True_cifar10"
     }],
     "prune_type": ["l1"],
     "sparsity": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
     "fusion_weights": [[0.5, 0.5]],
     "num_models": 2,
-    "num_epochs": 4,
+    "num_epochs": 0,
     "diff_weight_init": false,
     "gpu_id": 0,
-    "dataset": "cifar100"
+    "dataset": "cifar10",
+    "activation_based": false,
+    "num_samples": 200
 }
