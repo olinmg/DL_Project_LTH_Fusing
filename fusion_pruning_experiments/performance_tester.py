@@ -342,6 +342,8 @@ def get_result_skeleton(parameters):
     result_final = {
         "experiment_parameters": parameters,
     }
+    
+    experiment_params = parameters
 
     sparsity_list = experiment_params["sparsity"] if isinstance(experiment_params["sparsity"], list) else [experiment_params["sparsity"]]
     prune_type_list = experiment_params["prune_type"] if isinstance(experiment_params["prune_type"], list) else [experiment_params["prune_type"]]
