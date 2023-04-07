@@ -1,9 +1,13 @@
 import copy
 import json
 import math
+import os
 
 import torch
 import torchvision.transforms as transforms
+from torchvision import datasets
+from torchvision.transforms import ToTensor
+
 from fusion_utils import FusionType
 
 # import main #from main import get_data_loader, test
@@ -25,8 +29,6 @@ from performance_tester import (
     wrapper_structured_pruning,
 )
 from pruning_modified import prune_unstructured
-from torchvision import datasets
-from torchvision.transforms import ToTensor
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -98,7 +100,8 @@ if __name__ == "__main__":
                 experiment_params["num_models"],
                 output_dim=output_dim,
             )
-
+            for idx in range(experiment_params["num_models"]):
+                logging.info(f"Loaded the model: ./models/{model_dict['basis_name']}_{idx}.pth")
             print(type(models_original[0]))
 
             params = {}
@@ -351,14 +354,26 @@ if __name__ == "__main__":
         print(json.dumps(result_final, indent=4))
         result_final["results"][idx_result] = result
 
+        model_name = experiment_params["models"][0]["name"]
+        fusion_add_numsamples = (
+            str(experiment_params["num_samples"])
+            if experiment_params["fusion_type"] != FusionType.WEIGHT
+            else ""
+        )
+
+        result_folder_name = f"./results_and_plots_o/fullDict_results_{experiment_params['fusion_type']}{fusion_add_numsamples}_{model_name}"
+        # make sure the result folder exists. If not: create it
+        if not os.path.exists(result_folder_name):
+            os.makedirs(result_folder_name)
+
         with open(
-            f"./results_and_plots_o/fullDict_results_resnet18/results_s{int(result['sparsity']*100)}_re{experiment_params['num_epochs']}.json",
+            f"./results_and_plots_o/fullDict_results_{experiment_params['fusion_type']}{fusion_add_numsamples}_{model_name}/results_s{int(result['sparsity']*100)}_re{experiment_params['num_epochs']}.json",
             "w",
         ) as outfile:
             json.dump(result, outfile, indent=4)
 
     with open(
-        f"./results_and_plots_o/fullDict_results_resnet18_withBN/results_sAll_re{experiment_params['num_epochs']}.json",
+        f"./results_and_plots_o/fullDict_results_{experiment_params['fusion_type']}{fusion_add_numsamples}_{model_name}/results_sAll_re{experiment_params['num_epochs']}.json",
         "w",
     ) as outfile:
         json.dump(result_final, outfile, indent=4)
