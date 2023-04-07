@@ -805,7 +805,7 @@ if __name__ == "__main__":
             json.dump(result, outfile, indent=4)
 
     with open(
-        f"./results_and_plots_o/fullDict_results_resnet18/results_sAll_re{experiment_params['num_epochs']}.json",
+        f"./results_and_plots_o/fullDict_results_resnet18_withBN/results_sAll_re{experiment_params['num_epochs']}.json",
         "w",
     ) as outfile:
         json.dump(result_final, outfile, indent=4)
