@@ -1,8 +1,23 @@
 import torch.nn as nn
 import torch
+import enum
+
+class BaseEnum(enum.Enum):
+    @classmethod
+    def has_name(cls, name):
+        return name in cls._member_names_
+
+    @classmethod
+    def has_value(cls, value):
+        return value in cls._value2member_map_
+
+class FusionType(str,BaseEnum):
+    WEIGHT = "weight"
+    ACTIVATION = "activation"
+    GRADIENT = "gradient"
 
 class Fusion_Layer():
-    def __init__(self, super_type, weight, name, bias=None, bn=False, bn_mean=None, bn_var=None, bn_gamma=None, bn_beta=None, activation_based=False, activations=None):
+    def __init__(self, super_type, weight, name, fusion_type, bias=None, bn=False, bn_mean=None, bn_var=None, bn_gamma=None, bn_beta=None):
         self.super_type = super_type
         self.weight = torch.clone(weight).detach()
         self.bias = bias
@@ -12,8 +27,9 @@ class Fusion_Layer():
         self.bn_gamma = bn_gamma
         self.bn_beta = bn_beta
         self.is_conv = self.super_type == "Conv2d"
-        self.activation_based = activation_based
-        self.activations = activations
+        assert FusionType.has_value(fusion_type)
+        self.fusion_type = fusion_type
+        self.proxy = None # This is used to compare weights when the fusion type is not weight-based
         self.final_name = name
     
     def to(self, gpu_id):
@@ -40,11 +56,12 @@ class Fusion_Layer():
             self.activations = self.activations.cpu() if self.activations != None else None
 
     
-    def set_activations(self, activations):
-        self.activations = activations
+    def set_proxy(self, proxy):
+        self.proxy= proxy
     
-    def update_bn(self,mean, var, name, gamma=None, beta=None):   
-        self.final_name = name
+    def update_bn(self,mean, var, name=None, gamma=None, beta=None):   
+        if self.fusion_type == FusionType.ACTIVATION:
+            self.final_name = name
         self.bn = True
         self.bn_mean = mean
         self.bn_var = var
@@ -71,8 +88,10 @@ class Fusion_Layer():
         self.weight = aligned_wt
     
     def create_comparison_vec(self):
-        if self.activation_based:
-            return self.activations.view(self.activations.shape[0], -1)
+        if self.fusion_type != FusionType.WEIGHT:
+            assert self.proxy != None
+            return self.proxy.view(self.proxy.shape[0], -1)
+
         concat = None
         if self.bias != None:
             concat = self.bias
@@ -152,6 +171,84 @@ class Fusion_Layer():
             if self.bias != None:
                 self.bias = (self.bias*imp0 + other_fusion_layer.bias*imp1)/(imp0+imp1)
 
+#def compute_activations(model, train_loader, num_samples, fusion_layers, mode='mean', gpu_id=-1):
+def compute_gradients(model, train_loader, num_samples, fusion_layers, gpu_id=-1):
+
+    torch.manual_seed(42)
+
+    # hook that computes the mean activations across data samples
+    def get_activation(activation, name):
+        def hook(model, input, output):
+            #print("output: ", len(output))
+            if name not in activation:
+                activation[name] = []
+
+            activation[name].append(output[0].detach())
+
+        return hook
+
+    # Prepare all the models
+    activations = {}
+    forward_hooks = []
+
+    # handle below for bias later on!
+    param_names = [fusion_layer.final_name for fusion_layer in fusion_layers] # ------------CHANGED
+
+    # Initialize the activation dictionary for each model
+    layer_hooks = []
+    # Set forward hooks for all layers inside a model
+    for name, layer in model.named_modules():
+        if name == '':
+            continue
+        elif name not in param_names:
+            continue
+        layer_hooks.append(layer.register_full_backward_hook(get_activation(activations, name)))
+
+    forward_hooks.append(layer_hooks)
+    # Set the model in train mode
+    #model.train()
+
+    loss_func = nn.CrossEntropyLoss()
+
+    # Run the same data samples ('num_samples' many) across all the models
+    num_samples_processed = 0
+    for batch_idx, (data, target) in enumerate(train_loader):
+        if num_samples_processed >= num_samples:
+            break
+        if gpu_id != -1:
+            data = data.cuda(gpu_id)
+            target = target.cuda(gpu_id)
+
+        model.zero_grad()
+        predictions = model(data)
+        loss = loss_func(predictions, target)
+
+        # backpropagation, compute gradients 
+        loss.backward() 
+
+
+        num_samples_processed += data.shape[0]
+
+    for idx,layer in enumerate(activations):
+        activations[layer] = torch.stack(activations[layer])
+
+        if len(activations[layer].shape) == 2:
+            activations[layer] = activations[layer].t()
+        else:
+            perm = [i for i in range(2, len(activations[layer].shape))]
+            perm.append(0)
+            perm.append(1)
+
+            acts = activations[layer].permute(*perm)
+            activations[layer] = acts.reshape(acts.shape[0], -1).contiguous()
+
+    # Remove the hooks (as this was intefering with prediction ensembling)
+    for idx in range(len(forward_hooks)):
+        for hook in forward_hooks[idx]:
+            hook.remove()
+
+    return activations
+
 
 #def compute_activations(model, train_loader, num_samples, fusion_layers, mode='mean', gpu_id=-1):
 def compute_activations(model, train_loader, num_samples, fusion_layers, gpu_id=-1):
@@ -222,7 +319,7 @@ def compute_activations(model, train_loader, num_samples, fusion_layers, gpu_id=
     return activations
 
 
-def preprocess_parameters(models, activation_based=False, train_loader=None, model_name=None, gpu_id=-1, num_samples=200):
+def preprocess_parameters(models, fusion_type, train_loader=None, model_name=None, gpu_id=-1, num_samples=200):
     all_fusion_layers = []
 
     for idx, model in enumerate(models):
@@ -230,10 +327,11 @@ def preprocess_parameters(models, activation_based=False, train_loader=None, mod
         for name, module in model.named_modules():
             fusion_layer = None
             if isinstance(module, nn.Linear):
-                fusion_layer = Fusion_Layer("Linear", module.weight, name=name, bias=module.bias, activation_based=activation_based)
+                fusion_layer = Fusion_Layer("Linear", module.weight, name=name, bias=module.bias, fusion_type=fusion_type)
             elif isinstance(module, nn.Conv2d):
-                fusion_layer = Fusion_Layer("Conv2d", module.weight, name=name, bias=module.bias, activation_based=activation_based)
+                fusion_layer = Fusion_Layer("Conv2d", module.weight, name=name, bias=module.bias, fusion_type=fusion_type)
             elif isinstance(module, nn.BatchNorm2d):
+                ########## IMPORTANT: CHANGE TO NAME AGAIN!!!!!
                 fusion_layers[-1].update_bn(module.running_mean, module.running_var, name=name, gamma=module.weight, beta = module.bias)
                 continue
             else:
@@ -241,12 +339,21 @@ def preprocess_parameters(models, activation_based=False, train_loader=None, mod
 
             fusion_layers.append(fusion_layer)
         
-        if activation_based:
-            activations = compute_activations(model, train_loader=train_loader, num_samples=num_samples, fusion_layers=fusion_layers, gpu_id=gpu_id)
+        if fusion_type != FusionType.WEIGHT:
+            proxy = None
+            if fusion_type == FusionType.ACTIVATION:
+                proxy = compute_activations(model, train_loader=train_loader, num_samples=num_samples, fusion_layers=fusion_layers, gpu_id=gpu_id)
+            else:
+                proxy = compute_gradients(model, train_loader=train_loader, num_samples=num_samples, fusion_layers=fusion_layers, gpu_id=gpu_id)
+            for fusion_layer in fusion_layers:
+                fusion_layer.set_proxy(proxy[fusion_layer.final_name])
+
+        """if fusion_type == FusionType.GRADIENT:
+            activations = compute_gradients(model, train_loader=train_loader, num_samples=num_samples, fusion_layers=fusion_layers, gpu_id=gpu_id)
 
             for fusion_layer in fusion_layers:
                 fusion_layer.set_activations(activations[fusion_layer.final_name])
-                #fusion_layer.to(-1)
+                #fusion_layer.to(-1)"""
         all_fusion_layers.append(fusion_layers)
 
     return list(zip(*all_fusion_layers))

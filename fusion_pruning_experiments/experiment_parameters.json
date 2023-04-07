@@ -33,6 +33,6 @@
     "diff_weight_init": false,
     "gpu_id": 0,
     "dataset": "cifar10",
-    "activation_based": false,
+    "fusion_type": "gradient",
     "num_samples": 200
 }

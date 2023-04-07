@@ -23,10 +23,10 @@ class VGG(nn.Module):
         self.classifier = nn.Sequential(
             nn.Dropout(),
             nn.Linear(self.dim, self.dim, bias=bias),
-            nn.ReLU(True),
+            nn.ReLU(),
             nn.Dropout(),
             nn.Linear(self.dim, self.dim, bias=bias),
-            nn.ReLU(True),
+            nn.ReLU(),
             nn.Linear(self.dim, output_dim, bias=bias),
         )
         print
@@ -56,9 +56,9 @@ def make_layers(cfg, batch_norm=False, bias=True):
         else:
             conv2d = nn.Conv2d(in_channels, v, kernel_size=3, padding=1, bias=bias)
             if batch_norm:
-                layers += [conv2d, nn.BatchNorm2d(v, affine=True), nn.ReLU(inplace=True)]
+                layers += [conv2d, nn.BatchNorm2d(v, affine=True), nn.ReLU()]
             else:
-                layers += [conv2d, nn.ReLU(inplace=True)]
+                layers += [conv2d, nn.ReLU()]
             in_channels = v
     return nn.Sequential(*layers)
 
