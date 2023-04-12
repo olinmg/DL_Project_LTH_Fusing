@@ -90,7 +90,7 @@ class Fusion_Layer():
     def create_comparison_vec(self):
         if self.fusion_type != FusionType.WEIGHT:
             assert self.proxy != None
-            return self.proxy.view(self.proxy.shape[0], -1)
+            return self.proxy.reshape(self.proxy.shape[0], -1).contiguous()
 
         concat = None
         if self.bias != None:
@@ -179,11 +179,15 @@ def compute_gradients(model, train_loader, num_samples, fusion_layers, gpu_id=-1
     # hook that computes the mean activations across data samples
     def get_activation(activation, name):
         def hook(model, input, output):
-            #print("output: ", len(output))
             if name not in activation:
                 activation[name] = []
 
-            activation[name].append(output[0].detach())
+            out = output[0].detach()
+
+            """out_mean = torch.mean(out, dim=0)
+            out_mean = out_mean.unsqueeze(0)"""
+            out_mean = out
+            activation[name].append(out_mean)
 
         return hook
 
@@ -240,7 +244,7 @@ def compute_gradients(model, train_loader, num_samples, fusion_layers, gpu_id=-1
             perm.append(1)
 
             acts = activations[layer].permute(*perm)
-            activations[layer] = acts.reshape(acts.shape[0], -1).contiguous()
+            activations[layer] = acts
 
     # Remove the hooks (as this was intefering with prediction ensembling)
     for idx in range(len(forward_hooks)):

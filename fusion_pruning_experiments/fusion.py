@@ -30,13 +30,18 @@ def normalize_vector(coordinates, eps=1e-9):
     return coordinates / (norms + eps)
 
 # compute_euclidian_distance_matrix computes a matrix where c[i, j] corresponds to the euclidean distance of x[i] and y[j]
-def compute_euclidian_distance_matrix(x, y, p=2, squared=True): # For some reason TA prefers squared to be True
+def compute_euclidian_distance_matrix(x, y, p=1, squared=True): # For some reason TA prefers squared to be True
     x_col = x.unsqueeze(1).cpu()
     y_lin = y.unsqueeze(0).cpu()
     c = torch.sum((torch.abs(x_col - y_lin)) ** p, 2)
     if not squared:
         c = c ** (1/2)
     return c
+
+def normalize_ground_metric(t):
+    mean, std, var = torch.mean(t), torch.std(t), torch.var(t)
+    t  = (t-mean)/std
+    return t
 
 # get_ground_metric computes the cost matrix
 # if bias is present, the bias will be appended to the weight matrix and subsequently used to calculate the cost
@@ -48,7 +53,7 @@ def get_ground_metric(coordinates1, coordinates2, bias1, bias2):
         coordinates2 = torch.cat((coordinates2, bias2.view(bias2.shape[0], -1)), 1)
     coordinates1 = normalize_vector(coordinates1)
     coordinates2 = normalize_vector(coordinates2)
-    return compute_euclidian_distance_matrix(coordinates1, coordinates2)
+    return normalize_ground_metric(compute_euclidian_distance_matrix(coordinates1, coordinates2))
 
 # create_network_from_params creates a network given the list of weights
 def create_network_from_params(reference_model, param_list, gpu_id = -1,sparsity=1.0):
@@ -518,6 +523,7 @@ def MSF(network, sparsity = 0.65, gpu_id = -1, metric=-1, eps=1e-7, resnet=False
     
     return create_network_from_params(gpu_id=gpu_id, param_list=avg_aligned_layers, reference_model = get_model(model_name="vgg11", sparsity=1-sparsity, output_dim=output_dim))
 
+
 def fusion_bn(networks, fusion_type, gpu_id = -1, accuracies=None, importance=None, eps=1e-7, resnet=False, train_loader=False, model_name=None, num_samples=200):
     """
     fusion fuses arbitrary many models into the model that is the smallest
@@ -596,7 +602,8 @@ def fusion_bn(networks, fusion_type, gpu_id = -1, accuracies=None, importance=No
 
                 
                 fusion_layer.align_weights(T_var)
-            
+                
+
             M = get_ground_metric(fusion_layer.create_comparison_vec(), avg_layer.create_comparison_vec(), None, None)
 
             nu = get_histogram(nu_cardinality, None)
