@@ -83,42 +83,26 @@ def create_network_from_parameters(reference_model, param_list, gpu_id = -1):
     keys = list(model_state_dict.keys())
     
     idx = -1
-
-    for layer in param_list:
-        print("final name: ", layer.final_name)
-    
-    for key in keys:
-        print("keys: ", key)
     
     processed_keys = []
 
     def process_layer(layer, idx):
-        print("key is: ", keys[idx])
-        print("final name: ", layer.final_name)
-        print("my weight: ", layer.weight.shape)
-        print("reference: ", model_state_dict[keys[idx]].shape)
         model_state_dict[keys[idx]] = layer.weight.view(model_state_dict[keys[idx]].shape)
         if layer.bias != None:
             idx += 1
             model_state_dict[keys[idx]] = layer.bias
-            print("Went in here")
         if layer.bn:
             if layer.bn_gamma != None:
                 idx += 1
-                print("key for bn gamma: ", keys[idx])
                 model_state_dict[keys[idx]] = layer.bn_gamma
                 idx += 1
-                print("key for beta: ", keys[idx])
                 model_state_dict[keys[idx]] = layer.bn_beta
             idx += 1
-            print("key for mean: ", keys[idx])
             model_state_dict[keys[idx]] = layer.bn_mean
             idx += 1
-            print("key for var: ", keys[idx])
             model_state_dict[keys[idx]] = layer.bn_var
 
             idx += 1
-            print("key for batches tracked: ", keys[idx])
             model_state_dict[keys[idx]] = torch.Tensor([10000])
         
         return idx
