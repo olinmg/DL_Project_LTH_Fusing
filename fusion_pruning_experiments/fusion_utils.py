@@ -1,6 +1,7 @@
 import torch.nn as nn
 import torch
 import enum
+from torch import linalg as LA
 
 class BaseEnum(enum.Enum):
     @classmethod
@@ -17,7 +18,7 @@ class FusionType(str,BaseEnum):
     GRADIENT = "gradient"
 
 class Fusion_Layer():
-    def __init__(self, super_type, weight, name, fusion_type, bias=None, bn=False, bn_mean=None, bn_var=None, bn_gamma=None, bn_beta=None):
+    def __init__(self, super_type, weight, name, fusion_type, intrafusion=False, bias=None, bn=False, bn_mean=None, bn_var=None, bn_gamma=None, bn_beta=None):
         self.super_type = super_type
         self.weight = torch.clone(weight).detach()
         self.bias = bias
@@ -31,6 +32,12 @@ class Fusion_Layer():
         self.fusion_type = fusion_type
         self.proxy = None # This is used to compare weights when the fusion type is not weight-based
         self.final_name = name
+        self.next = None
+        self.prev = None 
+        self.skip_next = None
+        self.skip_align = None
+        self.skip_ot = None
+        self.intrafusion = intrafusion
     
     def to(self, gpu_id):
         if gpu_id != -1:
@@ -54,7 +61,23 @@ class Fusion_Layer():
                     self.bn_gamma = self.bn_gamma.cpu()
                     self.bn_beta = self.bn_beta.cpu()
             self.activations = self.activations.cpu() if self.activations != None else None
+    
+    def set_next(self, fusion_layer):
+        self.next = fusion_layer
+    
+    def set_prev(self, fusion_layer):
+        self.prev = fusion_layer
 
+    def get_incoming_features(self):
+        w = self.weight.clone()
+
+        w = w.view(self.weight.shape)
+        if (self.is_conv == False and self.prev.is_conv):
+            return None
+        else:
+            perm = [i for i in range(1, len(self.weight.shape))]
+            perm.insert(1, 0)
+            return w.permute(perm)
     
     def set_proxy(self, proxy):
         self.proxy= proxy
@@ -69,12 +92,14 @@ class Fusion_Layer():
         self.bn_beta = beta
     
     def align_weights(self,T_var):
+        if self.skip_align != None:
+            self.skip_align.align_weights(T_var)
         if self.is_conv:
             weight_reshaped = self.weight.view(self.weight.shape[0], self.weight.shape[1], -1)
             T_var_conv = T_var.unsqueeze(0).repeat(weight_reshaped.shape[2], 1, 1)
             aligned_wt = torch.bmm(weight_reshaped.permute(2, 0, 1), T_var_conv).permute(1, 2, 0)
         else:
-            if self.weight.data.shape[1] != T_var.shape[0]:
+            if self.prev.is_conv:
                 # Handles the switch from convolutional layers to fc layers
                 layer_unflattened = self.weight.view(self.weight.shape[0], T_var.shape[0], -1).permute(2, 0, 1)
                 aligned_wt = torch.bmm(
@@ -90,7 +115,10 @@ class Fusion_Layer():
     def create_comparison_vec(self):
         if self.fusion_type != FusionType.WEIGHT:
             assert self.proxy != None
-            return self.proxy.reshape(self.proxy.shape[0], -1).contiguous()
+            result = [self.proxy.reshape(self.proxy.shape[0], -1).contiguous()]
+            if self.skip_ot != None:
+                result.extend(self.skip_ot.create_comparison_vec())
+            return result
 
         concat = None
         if self.bias != None:
@@ -99,9 +127,9 @@ class Fusion_Layer():
             if concat != None:
                 concat = concat.clone() - self.bn_mean
             else:
-                concat = -self.bn_mean
+                concat = -self.bn_mean.clone()
         
-        comparison = self.weight.contiguous().view(self.weight.shape[0], -1)
+        comparison = self.weight.clone().contiguous().view(self.weight.shape[0], -1)
 
         if self.bn:
             comparison /= self.bn_var[:, None]
@@ -116,20 +144,50 @@ class Fusion_Layer():
         
         if concat != None:
             comparison = torch.cat((comparison, concat.view(concat.shape[0], -1)), 1)
-        return comparison
+        
+        result = [comparison]
+        """if concat != None:
+            result.append(concat.view(-1,1))"""
+        
+        if self.next != None and self.intrafusion:
+            next_incoming_feat = self.next.get_incoming_features()
+            if next_incoming_feat != None:
+                result.append(next_incoming_feat.reshape(next_incoming_feat.shape[0], -1).contiguous())
+        if self.skip_next != None and self.intrafusion:
+            next_incoming_feat = self.skip_next.get_incoming_features()
+            if next_incoming_feat != None:
+                result.append(next_incoming_feat.reshape(next_incoming_feat.shape[0], -1).contiguous())
+        
+        if self.skip_ot != None:
+            result.extend(self.skip_ot.create_comparison_vec())
+        return result
+    
+    def get_norm(self, metric):
+        comp_vecs = self.create_comparison_vec()
+        norm_layer = []
+
+        for idx, comp_vec in enumerate(comp_vecs):
+            norm_layer.append(torch.norm(comp_vec, p=1, dim=1))
+        
+        norm_layer = torch.stack(norm_layer, dim=0)
+        norm_layer = norm_layer.mean(dim=0)
+        return norm_layer
+
     
     def permute_parameters(self, T_var):
+        if self.skip_ot != None:
+            self.skip_ot.permute_parameters(T_var)
         self.weight = torch.matmul(T_var.t(), self.weight.contiguous().view(self.weight.shape[0], -1))
 
         if self.bias != None:
             self.bias = torch.matmul(T_var.t(), self.bias.view(self.bias.shape[0], -1)).flatten()
         
         if self.bn:
-            self.bn_mean = torch.matmul(T_var.t(), self.bn_mean.view(self.bn_mean.shape[0], -1)).flatten()
-            self.bn_var = torch.matmul(T_var.t(), self.bn_var.view(self.bn_var.shape[0], -1)).flatten()
+            self.bn_mean = torch.matmul(T_var.t(), self.bn_mean).flatten()
+            self.bn_var = torch.matmul(T_var.t(), self.bn_var).flatten()
             if self.bn_gamma != None:
-                self.bn_gamma = torch.matmul(T_var.t(), self.bn_gamma.view(self.bn_gamma.shape[0], -1)).flatten()
-                self.bn_beta = torch.matmul(T_var.t(), self.bn_beta.view(self.bn_beta.shape[0], -1)).flatten()
+                self.bn_gamma = torch.matmul(T_var.t(), self.bn_gamma).flatten()
+                self.bn_beta = torch.matmul(T_var.t(), self.bn_beta).flatten()
 
     def weighted_average(self, w0, w1, mult0, mult1, divisor, adjust):
         weight_new = None
@@ -140,9 +198,45 @@ class Fusion_Layer():
             weight_new = w0*mult0 + w1*mult1*adjust
             weight_new /= divisor
         return weight_new
+    
+    def get_intra_weights(self, T_var_col):
+        indices = T_var_col.nonzero().view(-1)
+        weight_ind = torch.index_select(self.weight, 0, indices)
 
+        mean = torch.index_select(self.bn_mean, 0, indices)
+        var = torch.index_select(self.bn_var, 0, indices)
+        gamma = torch.index_select(self.bn_gamma, 0, indices)
+        beta = torch.index_select(self.bn_beta, 0, indices)
+
+        adjust = ((torch.prod(var, 0).repeat(var.shape[0], 1) / var.view(-1,1))*gamma.view(-1,1))/(torch.sum(T_var_col)*torch.prod(var, 0))
+
+        return adjust
+    
+    def update_weights_intra(self, T_var):
+        if not self.bn:
+            self.permute_parameters(T_var)
+            return
+        if self.skip_ot != None:
+            self.skip_ot.update_weights_intra(T_var)
+
+        T_var_adjust = T_var.clone()
+        for i in range(T_var.shape[1]):
+            adjust = self.get_intra_weights(T_var_adjust[:,i])
+            temp = torch.zeros(T_var_adjust[:,i].shape).cuda(0)
+
+            temp = temp.index_copy_(0, T_var_adjust[:,i].nonzero().flatten(), adjust.flatten())
+
+            T_var_adjust[:,i] *= temp
+        
+        self.weight = torch.matmul(T_var_adjust.t(), self.weight.contiguous().view(self.weight.shape[0], -1))
+        self.bn_mean = torch.matmul(T_var_adjust.t(), self.bn_mean).flatten()
+        self.bn_var = torch.ones(self.bn_mean.shape)
+        self.bn_gamma = torch.ones(self.bn_mean.shape)
+        self.bn_beta = torch.matmul(T_var.t(), self.bn_beta).flatten()
 
     def update_weights(self, other_fusion_layer, imp0, imp1):
+        if self.skip_ot != None:
+            self.skip_ot.update_weights(other_fusion_layer.skip_ot, imp0, imp1)
         weight0 = self.weight.view(self.weight.shape[0], -1)
         weight1 = other_fusion_layer.weight.view(other_fusion_layer.weight.shape[0], -1)
         if self.bn:
@@ -197,6 +291,9 @@ def compute_gradients(model, train_loader, num_samples, fusion_layers, gpu_id=-1
 
     # handle below for bias later on!
     param_names = [fusion_layer.final_name for fusion_layer in fusion_layers] # ------------CHANGED
+    for fusion_layer in fusion_layers:
+        if fusion_layer.skip_ot != None:
+            param_names.append(fusion_layer.skip_ot.final_name)
 
     # Initialize the activation dictionary for each model
     layer_hooks = []
@@ -275,7 +372,9 @@ def compute_activations(model, train_loader, num_samples, fusion_layers, gpu_id=
 
     # handle below for bias later on!
     param_names = [fusion_layer.final_name for fusion_layer in fusion_layers] # ------------CHANGED
-
+    for fusion_layer in fusion_layers:
+        if fusion_layer.skip_ot != None:
+            param_names.append(fusion_layer.skip_ot.final_name)
     # Initialize the activation dictionary for each model
     layer_hooks = []
     # Set forward hooks for all layers inside a model
@@ -323,7 +422,7 @@ def compute_activations(model, train_loader, num_samples, fusion_layers, gpu_id=
     return activations
 
 
-def preprocess_parameters(models, fusion_type, train_loader=None, model_name=None, gpu_id=-1, num_samples=200):
+def preprocess_parameters(models, fusion_type, intrafusion=False, resnet=False, train_loader=None, model_name=None, gpu_id=-1, num_samples=200):
     all_fusion_layers = []
 
     for idx, model in enumerate(models):
@@ -331,18 +430,36 @@ def preprocess_parameters(models, fusion_type, train_loader=None, model_name=Non
         for name, module in model.named_modules():
             fusion_layer = None
             if isinstance(module, nn.Linear):
-                fusion_layer = Fusion_Layer("Linear", module.weight, name=name, bias=module.bias, fusion_type=fusion_type)
+                fusion_layer = Fusion_Layer("Linear", module.weight, intrafusion=intrafusion, name=name, bias=module.bias, fusion_type=fusion_type)
             elif isinstance(module, nn.Conv2d):
-                fusion_layer = Fusion_Layer("Conv2d", module.weight, name=name, bias=module.bias, fusion_type=fusion_type)
+                fusion_layer = Fusion_Layer("Conv2d", module.weight, name=name, intrafusion=intrafusion, bias=module.bias, fusion_type=fusion_type)
+                if resnet and len(fusion_layers) > 0:
+                    if module.weight.shape[2] == 1 and module.weight.shape[3] == 1:
+                        fusion_layers[-1].skip_ot = fusion_layer
+                        assert fusion_layers[-2].weight.shape[:2] == fusion_layer.weight.shape[:2]
+                        fusion_layers[-2].skip_align = fusion_layer
+                        fusion_layers[-3].skip_next = fusion_layer
+
+                        continue
+                        
             elif isinstance(module, nn.BatchNorm2d):
                 ########## IMPORTANT: CHANGE TO NAME AGAIN!!!!!
-                fusion_layers[-1].update_bn(module.running_mean, module.running_var, name=name, gamma=module.weight, beta = module.bias)
+                if fusion_layers[-1].bn:
+                    if fusion_layers[-1].skip_ot == None:
+                        raise Exception("Found batchnorm layer that belongs to layer we can't identify.")
+                    else:
+                        fusion_layers[-1].skip_ot.update_bn(module.running_mean, module.running_var, name=name, gamma=module.weight, beta = module.bias)
+                else:
+                    fusion_layers[-1].update_bn(module.running_mean, module.running_var, name=name, gamma=module.weight, beta = module.bias)
                 continue
             else:
                 continue
-
+            
+            if len(fusion_layers) > 0:
+                fusion_layers[-1].set_next(fusion_layer)
+                fusion_layer.set_prev(fusion_layers[-1])
             fusion_layers.append(fusion_layer)
-        
+        #exit()
         if fusion_type != FusionType.WEIGHT:
             proxy = None
             if fusion_type == FusionType.ACTIVATION:
@@ -351,13 +468,9 @@ def preprocess_parameters(models, fusion_type, train_loader=None, model_name=Non
                 proxy = compute_gradients(model, train_loader=train_loader, num_samples=num_samples, fusion_layers=fusion_layers, gpu_id=gpu_id)
             for fusion_layer in fusion_layers:
                 fusion_layer.set_proxy(proxy[fusion_layer.final_name])
+                if fusion_layer.skip_ot:
+                    fusion_layer.skip_ot.set_proxy(proxy[fusion_layer.skip_ot.final_name])
 
-        """if fusion_type == FusionType.GRADIENT:
-            activations = compute_gradients(model, train_loader=train_loader, num_samples=num_samples, fusion_layers=fusion_layers, gpu_id=gpu_id)
-
-            for fusion_layer in fusion_layers:
-                fusion_layer.set_activations(activations[fusion_layer.final_name])
-                #fusion_layer.to(-1)"""
         all_fusion_layers.append(fusion_layers)
 
     return list(zip(*all_fusion_layers))

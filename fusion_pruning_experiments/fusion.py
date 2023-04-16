@@ -1,5 +1,6 @@
 import functools
 import itertools
+from pruning_modified import prune_structured
 import torch
 import numpy as np
 import ot
@@ -53,7 +54,7 @@ def get_ground_metric(coordinates1, coordinates2, bias1, bias2):
         coordinates2 = torch.cat((coordinates2, bias2.view(bias2.shape[0], -1)), 1)
     coordinates1 = normalize_vector(coordinates1)
     coordinates2 = normalize_vector(coordinates2)
-    return normalize_ground_metric(compute_euclidian_distance_matrix(coordinates1, coordinates2))
+    return compute_euclidian_distance_matrix(coordinates1, coordinates2)
 
 # create_network_from_params creates a network given the list of weights
 def create_network_from_params(reference_model, param_list, gpu_id = -1,sparsity=1.0):
@@ -84,24 +85,74 @@ def create_network_from_parameters(reference_model, param_list, gpu_id = -1):
     idx = -1
 
     for layer in param_list:
-        idx += 1
-        model_state_dict[keys[idx]] = layer.weight
+        print("final name: ", layer.final_name)
+    
+    for key in keys:
+        print("keys: ", key)
+    
+    processed_keys = []
+
+    def process_layer(layer, idx):
+        print("key is: ", keys[idx])
+        print("final name: ", layer.final_name)
+        print("my weight: ", layer.weight.shape)
+        print("reference: ", model_state_dict[keys[idx]].shape)
+        model_state_dict[keys[idx]] = layer.weight.view(model_state_dict[keys[idx]].shape)
         if layer.bias != None:
             idx += 1
             model_state_dict[keys[idx]] = layer.bias
+            print("Went in here")
         if layer.bn:
             if layer.bn_gamma != None:
                 idx += 1
+                print("key for bn gamma: ", keys[idx])
                 model_state_dict[keys[idx]] = layer.bn_gamma
                 idx += 1
+                print("key for beta: ", keys[idx])
                 model_state_dict[keys[idx]] = layer.bn_beta
             idx += 1
+            print("key for mean: ", keys[idx])
             model_state_dict[keys[idx]] = layer.bn_mean
             idx += 1
+            print("key for var: ", keys[idx])
             model_state_dict[keys[idx]] = layer.bn_var
 
             idx += 1
-            model_state_dict[keys[idx]] = torch.Tensor([1])
+            print("key for batches tracked: ", keys[idx])
+            model_state_dict[keys[idx]] = torch.Tensor([10000])
+        
+        return idx
+    
+
+    for layer in param_list:
+        idx += 1
+        idx = process_layer(layer, idx)
+        if layer.skip_ot:
+            idx += 1
+            idx = process_layer(layer.skip_ot, idx)
+        """model_state_dict[keys[idx]] = layer.weight.view(model_state_dict[keys[idx]].shape)
+        if layer.bias != None:
+            idx += 1
+            model_state_dict[keys[idx]] = layer.bias
+            print("Went in here")
+        if layer.bn:
+            if layer.bn_gamma != None:
+                idx += 1
+                print("key for bn gamma: ", keys[idx])
+                model_state_dict[keys[idx]] = layer.bn_gamma
+                idx += 1
+                print("key for beta: ", keys[idx])
+                model_state_dict[keys[idx]] = layer.bn_beta
+            idx += 1
+            print("key for mean: ", keys[idx])
+            model_state_dict[keys[idx]] = layer.bn_mean
+            idx += 1
+            print("key for var: ", keys[idx])
+            model_state_dict[keys[idx]] = layer.bn_var
+
+            idx += 1
+            print("key for batches tracked: ", keys[idx])
+            model_state_dict[keys[idx]] = torch.Tensor([10000])"""
     
     model.load_state_dict(model_state_dict)
 
@@ -524,6 +575,140 @@ def MSF(network, sparsity = 0.65, gpu_id = -1, metric=-1, eps=1e-7, resnet=False
     return create_network_from_params(gpu_id=gpu_id, param_list=avg_aligned_layers, reference_model = get_model(model_name="vgg11", sparsity=1-sparsity, output_dim=output_dim))
 
 
+def create_incoming_feat(incoming_feat):
+    perm = [i for i in range(1, len(incoming_feat.shape))]
+    perm.insert(1, 0)
+    return incoming_feat.permute(perm)
+
+def intrafusion_bn(network, fusion_type, sparsity, metric=-1, full_model = None, gpu_id = -1, eps=1e-7, resnet=False, train_loader=False, model_name=None, num_samples=200):
+    """
+    fusion fuses arbitrary many models into the model that is the smallest
+    :param networks: A list of networks to be fused
+    :param accuracies: A list of accuracies of the networks. The code will order the networks with respect to the accuracies for optimal accuracy
+    :param importance: A list of floats. If importance = [0.9, 0.1], then linear combination of weights will be: network[0]*0.9 + network[1]*0.1
+    :return: the fused model
+    """ 
+
+    avg_aligned_layers = []
+    T_var = None
+    if gpu_id != -1:
+        model = network.cuda(gpu_id)
+
+
+    skip_T_var = None
+    residual_T_var = None
+
+
+    t = prune_structured(net=copy.deepcopy(full_model), loaders=None, num_epochs=0, gpu_id=gpu_id, example_inputs=torch.randn(1, 3, 32, 32),
+                    out_features=10, prune_type="l1", sparsity=sparsity, train_fct=None)
+    if gpu_id != -1:
+        t = t.cuda(gpu_id)
+    fusion_layers_2 = preprocess_parameters([t], resnet=resnet, intrafusion=True, fusion_type=fusion_type, train_loader=train_loader, model_name=model_name, gpu_id=gpu_id, num_samples=200)
+
+    if gpu_id != -1:
+        model = network.cuda(gpu_id)
+        network = network.cuda(gpu_id)
+    fusion_layers = preprocess_parameters([model], resnet=resnet, intrafusion=True, fusion_type=fusion_type, train_loader=train_loader, model_name=model_name, gpu_id=gpu_id, num_samples=200)
+    num_layers = len(fusion_layers)
+
+    actualized_sparsities = [1]*num_layers
+
+    for idx in range(num_layers):
+
+        fusion_layers[idx] = list(fusion_layers[idx])
+        fusion_layers_2[idx] = list(fusion_layers_2[idx])
+
+        #fusion_layers[idx][0].to(gpu_id)
+        fusion_layer = fusion_layers[idx][0]
+
+        fusion_layer_2 = fusion_layers_2[idx][0]
+        
+
+        mu_cardinality = fusion_layer.weight.shape[0]
+        mu = get_histogram(mu_cardinality, None)
+
+        is_conv = fusion_layer.is_conv
+
+        nu_cardinality = fusion_layer.weight.shape[0]
+        layer_shape = fusion_layer.weight.shape
+
+        amount_pruned = fusion_layer_2.weight.shape[0]#int(layer_shape[0]*(1-sparsity))
+        amount_pruned = 1 if amount_pruned == 0 else amount_pruned
+
+        if idx != 0:            
+            fusion_layer.align_weights(T_var)
+        
+        if idx == num_layers -1:
+            break
+        
+        norm_layer = fusion_layer.get_norm(metric)
+
+        _, indices = torch.topk(norm_layer, amount_pruned)
+        #indices, _= torch.sort(indices)
+        #print("indices are: ", indices)
+
+
+        comp_vec = fusion_layer.create_comparison_vec()
+        basis_weight = []
+        for vec in comp_vec:
+            basis_weight.append(torch.index_select(vec, 0, indices))
+        
+
+        M = [get_ground_metric(fusion_layer.create_comparison_vec()[0], basis_weight[0].view(basis_weight[0].shape[0], -1), None, None)]
+        if len(comp_vec) > 1:
+            for i in range(1, len(comp_vec)):
+                M.append(get_ground_metric(comp_vec[i], basis_weight[i].view(basis_weight[i].shape[0], -1), None, None))
+            M = torch.stack(M)
+            M = torch.mean(M, dim=0)
+        else:
+            M = M[0]
+
+        mu = get_histogram(basis_weight[0].shape[0], indices = None)
+
+        #nu = norm_layer.cpu().numpy()/np.sum(norm_layer.cpu().numpy())
+        nu = get_histogram(layer_shape[0], indices = indices, add=True)
+
+        cpuM = M.data.cpu().numpy() # POT does not accept array on GPU
+
+        T = ot.emd(nu, mu, cpuM)        
+
+        if gpu_id != -1:
+            T_var = torch.from_numpy(T).cuda(gpu_id).float()
+        else:
+            T_var = torch.from_numpy(T).float()
+        
+        #T_var /= torch.from_numpy(nu).cuda(0)[:,None]
+        T_var *= norm_layer[:,None]
+        if gpu_id != -1:
+            marginals = torch.ones(T_var.shape[1]).cuda(gpu_id) / T_var.shape[0]
+        else:
+            marginals = torch.ones(T_var.shape[1]) / T_var.shape[0]
+        marginals = torch.diag(1.0/(marginals + eps))  # take inverse
+
+        T_var = torch.matmul(T_var, marginals)
+        T_var = T_var / T_var.sum(dim=0)
+
+        #print("fusion layer before permute: ", fusion_layer.weight.view(fusion_layer.weight.shape[0], -1)[:,0])
+        #fusion_layer.permute_parameters(T_var)
+        fusion_layer.update_weights_intra(T_var)
+
+        #avg_layer.update_weights(fusion_layer, torch.sum(importance[:idx_model]), importance[idx_model])
+
+        mu = None
+        nu = None
+        M = None
+        T = None
+
+        cpuM = None
+        marginals = None
+
+        actualized_sparsities[idx] = 1-sparsity
+
+
+    return create_network_from_parameters(gpu_id=gpu_id, param_list=[layers[0] for layers in fusion_layers], reference_model = t)
+    #return create_network_from_params(gpu_id=gpu_id, param_list=avg_aligned_layers, reference_model = get_model(model_name="vgg11", sparsity=1-sparsity, output_dim=output_dim))
+
+
 def fusion_bn(networks, fusion_type, gpu_id = -1, accuracies=None, importance=None, eps=1e-7, resnet=False, train_loader=False, model_name=None, num_samples=200):
     """
     fusion fuses arbitrary many models into the model that is the smallest
@@ -554,7 +739,7 @@ def fusion_bn(networks, fusion_type, gpu_id = -1, accuracies=None, importance=No
         for model in networks:
             model = model.cuda(gpu_id)
 
-    fusion_layers = preprocess_parameters(networks, fusion_type=fusion_type, train_loader=train_loader, model_name=model_name, gpu_id=gpu_id, num_samples=200)
+    fusion_layers = preprocess_parameters(networks, resnet=resnet, fusion_type=fusion_type, train_loader=train_loader, model_name=model_name, gpu_id=gpu_id, num_samples=200)
     num_layers = len(fusion_layers)
 
     for idx in range(num_layers):
@@ -582,7 +767,7 @@ def fusion_bn(networks, fusion_type, gpu_id = -1, accuracies=None, importance=No
             layer_shape = fusion_layer.weight.shape
 
             if idx != 0:
-                if resnet and is_conv:
+                """if resnet and is_conv:
                     assert len(layer_shape) == 4
                     # save skip_level transport map if there is block ahead
                     if layer_shape[1] != layer_shape[0]:
@@ -598,17 +783,30 @@ def fusion_bn(networks, fusion_type, gpu_id = -1, accuracies=None, importance=No
 
                     else:
                         if residual_T_var is not None and (residual_T_var_idx == (idx - 1)):
-                            T_var = (T_var + residual_T_var) / 2
+                            T_var = (T_var + residual_T_var) / 2"""
 
                 
                 fusion_layer.align_weights(T_var)
                 
+            comp_vec_ours = fusion_layer.create_comparison_vec()
+            comp_vec_avg = avg_layer.create_comparison_vec()
+            
+            M = []
+            for i in range(0, len(comp_vec_ours)):
+                M.append(get_ground_metric(comp_vec_ours[i], comp_vec_avg[i].view(comp_vec_avg[i].shape[0], -1), None, None))
+            if len(M) > 1:
+                M = torch.stack(M)
+                M = torch.mean(M, dim=0)
+            else:
+                M = M[0]
+            
 
-            M = get_ground_metric(fusion_layer.create_comparison_vec(), avg_layer.create_comparison_vec(), None, None)
+            #M = get_ground_metric(fusion_layer.create_comparison_vec(), avg_layer.create_comparison_vec(), None, None)
 
             nu = get_histogram(nu_cardinality, None)
 
             cpuM = M.data.cpu().numpy() # POT does not accept array on GPU
+
 
             T = ot.emd(nu, mu, cpuM)        
 
@@ -641,7 +839,7 @@ def fusion_bn(networks, fusion_type, gpu_id = -1, accuracies=None, importance=No
             fusion_layers[idx][idx_model] = None
             #fusion_layer.to(-1)
             del fusion_layer
-            mu = None
+
             nu = None
             M = None
             T = None
