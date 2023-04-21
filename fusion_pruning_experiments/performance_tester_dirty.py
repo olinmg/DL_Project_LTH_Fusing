@@ -35,6 +35,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 import datetime
 import logging
+from fusion import MSF
 
 if __name__ == "__main__":
     date = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
