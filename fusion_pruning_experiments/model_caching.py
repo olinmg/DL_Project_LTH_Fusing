@@ -9,6 +9,7 @@ from models import get_pretrained_model_by_name
 from performance_tester import (
     get_cifar10_data_loader,
     get_cifar100_data_loader,
+    get_imagenet_data_loader,
     get_mnist_data_loader,
     train_during_pruning,
 )
@@ -33,7 +34,7 @@ def save_model(path, model):
         different_path_name = True
         count = count + 1
     torch.save(model, save_to_path)
-    logging.info(f"\tStoring model to {save_to_path}")
+    logging.info(f"\t\tStoring model to {save_to_path}")
     if different_path_name:
         logging.info(
             f"Warning: result file already existed. Saved to {save_to_path} instead. Did not check if overwrote another file with this name."
@@ -48,7 +49,7 @@ def get_model_trainHistory(model_path):
 
 
 def save_model_trainHistory(model_path, history):
-    logging.info(f"\tStoring epoch performance during training to {model_path}.json")
+    logging.info(f"\t\tStoring epoch performance during training to {model_path}.json")
     history_dict = {"train_epoch_perf": history}
     # logging.info(f"\t- Performance in last epoch was: {history[-1]}")
     with open(f"{model_path}.json", "w") as outfile:
@@ -62,6 +63,8 @@ def get_correct_dataloader(dataset_name):
         return get_cifar10_data_loader(), 10
     elif dataset_name == "cifar100":
         return get_cifar100_data_loader(), 100
+    elif dataset_name == "imagenet":
+        return get_imagenet_data_loader(), 1
     else:
         raise Exception("Provided dataset does not exist.")
 

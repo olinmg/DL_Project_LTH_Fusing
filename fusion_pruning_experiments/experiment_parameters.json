@@ -8,7 +8,7 @@
     "models": [
         {
             "name": "cnn",
-            "basis_name": "cnn_diff_weight_init_False_mnist"
+            "basis_name": "models_cnn/cnn_diff_weight_init_False_mnist"
         }
     ],
     "prune_type": [
@@ -16,10 +16,9 @@
     ],
     "use_caching": true,
     "use_iterative_pruning": false,
-    "compute_prune_baseline": true,
+    "compute_prune_baseline": false,
     "sparsity": [
-        0.4,
-        0.2
+        0.65
     ],
     "fusion_weights": [
         [
@@ -27,11 +26,11 @@
             0.5
         ]
     ],
-    "num_models": 3,
+    "num_models": 2,
     "num_epochs": 2,
     "diff_weight_init": false,
     "gpu_id": -1,
     "dataset": "mnist",
-    "fusion_type": "weight",
+    "fusion_type": "activation",
     "num_samples": 200
 }
