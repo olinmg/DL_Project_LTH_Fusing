@@ -5,9 +5,6 @@ import os
 
 import torch
 import torchvision.transforms as transforms
-from torchvision import datasets
-from torchvision.transforms import ToTensor
-
 from fusion_utils import FusionType
 from model_caching import (
     ensure_folder_existence,
@@ -37,6 +34,8 @@ from performance_tester import (
     wrapper_first_fusion,
     wrapper_structured_pruning,
 )
+from torchvision import datasets
+from torchvision.transforms import ToTensor
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -540,8 +539,9 @@ if __name__ == "__main__":
 
         result_folder_name = f"./results_and_plots_o/fullDict_results_{experiment_params['fusion_type']}{fusion_add_numsamples}_{model_name}"
         ensure_folder_existence(result_folder_name)
+        iterprune = "iter" if experiment_params["use_iterative_pruning"] else ""
         save_experiment_results(
-            f"./results_and_plots_o/fullDict_results_{experiment_params['fusion_type']}{fusion_add_numsamples}_{model_name}/results_s{int(result['sparsity']*100)}_re{experiment_params['num_epochs']}",
+            f"./results_and_plots_o/fullDict_results_{experiment_params['fusion_type']}{fusion_add_numsamples}_{model_name}/results_s{iterprune}{int(result['sparsity']*100)}_re{experiment_params['num_epochs']}",
             result,
         )
         logging.info(f"Done with sparsity: {result['sparsity']}.")
