@@ -549,6 +549,6 @@ if __name__ == "__main__":
     logging.info("")
     logging.info("All experiments completed.")
     save_experiment_results(
-        f"./results_and_plots_o/fullDict_results_{experiment_params['fusion_type']}{fusion_add_numsamples}_{model_name}/results_sAll_re{experiment_params['num_epochs']}.json",
+        f"./results_and_plots_o/fullDict_results_{experiment_params['fusion_type']}{fusion_add_numsamples}_{model_name}/results_s{iterprune}All_re{experiment_params['num_epochs']}.json",
         result_final,
     )
