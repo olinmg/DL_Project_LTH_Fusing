@@ -1,38 +1,37 @@
 {
-    "FaP": true,
+    "FaP": false,
     "PaF": true,
     "PaF_all": false,
     "SSF": false,
     "MSF": false,
-
-    
-    "PaT": false,
-    "PaTaF": false,
-    "PaTaFaT": true,
-    "PaFaP": false,
-    "PaFaT": false,
-
-    "FaT": false,
-    "FaTaP": false,
-    "FaTaPaT": true,
-    "FaPaT": false,
     "IntraFusion": false,
-
-
-
     "models": [
         {
-            "name": "resnet18",
-            "basis_name": "resnet18_diff_weight_init_True_cifar10"
-    }],
-    "prune_type": ["l1"],
-    "sparsity": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
-    "fusion_weights": [[0.5, 0.5]],
-    "num_models": 2,
-    "num_epochs": 0,
+            "name": "cnn",
+            "basis_name": "cnn_diff_weight_init_False_mnist"
+        }
+    ],
+    "prune_type": [
+        "l1"
+    ],
+    "use_caching": true,
+    "use_iterative_pruning": false,
+    "compute_prune_baseline": true,
+    "sparsity": [
+        0.4,
+        0.2
+    ],
+    "fusion_weights": [
+        [
+            0.5,
+            0.5
+        ]
+    ],
+    "num_models": 3,
+    "num_epochs": 2,
     "diff_weight_init": false,
-    "gpu_id": 0,
-    "dataset": "cifar10",
-    "fusion_type": "gradient",
+    "gpu_id": -1,
+    "dataset": "mnist",
+    "fusion_type": "weight",
     "num_samples": 200
 }

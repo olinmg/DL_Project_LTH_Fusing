@@ -9,18 +9,9 @@ from torchvision import datasets
 from torchvision.transforms import ToTensor
 
 from fusion_utils import FusionType
-from model_caching import (
-    ensure_folder_existence,
-    file_already_exists,
-    get_model_trainHistory,
-    model_already_exists,
-    save_experiment_results,
-    save_model,
-    save_model_trainHistory,
-)
 
 # import main #from main import get_data_loader, test
-from models import get_model, get_pretrained_model_by_name, get_pretrained_models
+from models import get_model, get_pretrained_models
 from parameters import get_parameters
 from performance_tester import (
     evaluate_performance_simple,
@@ -37,17 +28,16 @@ from performance_tester import (
     wrapper_first_fusion,
     wrapper_structured_pruning,
 )
+from pruning_modified import prune_unstructured
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 import datetime
 import logging
-
 from fusion import MSF
 
 if __name__ == "__main__":
-    # introducing logger
     date = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     logging.basicConfig(
         format="[%(asctime)s %(name)s %(levelname)s] %(message)s",
@@ -56,11 +46,13 @@ if __name__ == "__main__":
         force=True,
     )
 
-    # loading experiments and dataset
     logging.info(f"Loading experiment and dataset...")
+
     with open("./experiment_parameters.json", "r") as f:
         experiment_params = json.load(f)
+
     result_final = get_result_skeleton(experiment_params)
+
     loaders = None
     output_dim = None
     if experiment_params["dataset"] == "mnist":
@@ -75,34 +67,33 @@ if __name__ == "__main__":
     else:
         raise Exception("Provided dataset does not exist.")
 
-    # defining fusion/pruning/eval function to be used
-    gpu_id = experiment_params["gpu_id"]
     fusion_function = wrapper_first_fusion(
         fusion_type=experiment_params["fusion_type"],
         train_loader=loaders["train"],
-        gpu_id=gpu_id,
+        gpu_id=experiment_params["gpu_id"],
         num_samples=experiment_params["num_samples"]
         if experiment_params["fusion_type"] != FusionType.WEIGHT
         else None,
     )
     pruning_function = (
-        wrapper_structured_pruning
-        # TODO: can include iterative pruning wrapper here to switch to different pruning method
+        wrapper_structured_pruning  # still need to implement the structured pruning function
     )
     eval_function = evaluate_performance_simple
 
-    # setting skeleton for json that collects experiment results
     new_result = {}
     for sparsity in result_final["experiment_parameters"]["sparsity"]:
         new_result["sparstiy"] = {"paf": None, "pruned": None, "pruned_fused": None, "paf": None}
 
+    print(json.dumps(result_final, indent=4))
+
     for idx_result, result in enumerate(result_final["results"]):
-        logging.info("")
-        logging.info(f"Starting with sparsity: {result['sparsity']}.")
         for model_dict in experiment_params["models"]:
+            logging.info(f"Starting with sparsity: {result['sparsity']}.")
+
+            print("new_result: ", new_result)
             name, diff_weight_init = model_dict["name"], experiment_params["diff_weight_init"]
 
-            # Loading the "base"-models that are to be used for experiments
+            print(f"models/models_{name}/{name}_diff_weight_init_{diff_weight_init}_{0}.pth")
             models_original = get_pretrained_models(
                 name,
                 model_dict["basis_name"],
@@ -110,17 +101,26 @@ if __name__ == "__main__":
                 experiment_params["num_models"],
                 output_dim=output_dim,
             )
-            logging.info("Loading basis models:")
             for idx in range(experiment_params["num_models"]):
-                logging.info(f"\tLoaded the model: ./models/{model_dict['basis_name']}_{idx}.pth")
+                logging.info(f"Loaded the model: ./models/{model_dict['basis_name']}_{idx}.pth")
+            print(type(models_original[0]))
 
-            # collecting the experiment settings into a dict
             params = {}
             params["pruning_function"] = pruning_function
             params["fusion_function"] = fusion_function
             params["eval_function"] = eval_function
             params["loaders"] = loaders
-            params["gpu_id"] = gpu_id
+            params["gpu_id"] = experiment_params["gpu_id"]
+
+            original_model_accuracies = original_test_manager(
+                input_model_list=models_original, **params
+            )
+            print("original_model_accuracies ")
+            print(original_model_accuracies)
+            for i in range(len(original_model_accuracies)):
+                result[name][f"model_{i}"]["accuracy_original"] = float_format(
+                    original_model_accuracies[i]
+                )
 
             prune_params = {
                 "prune_type": result["prune_type"],
@@ -131,54 +131,39 @@ if __name__ == "__main__":
                 else torch.randn(1, 3, 32, 32),
                 "out_features": output_dim,
                 "loaders": loaders,
-                "gpu_id": gpu_id,
+                "gpu_id": experiment_params["gpu_id"],
             }
 
-            # measuring the performance of the original models
-            original_model_accuracies = original_test_manager(
-                input_model_list=models_original, **params
-            )
-            logging.info("Basis Model Accuracies:")
-            logging.info(f"\t{original_model_accuracies}")
-            # Write original performance into results json
-            for i in range(len(original_model_accuracies)):
-                result[name][f"model_{i}"]["accuracy_original"] = float_format(
-                    original_model_accuracies[i]
-                )
-
-            ##### STARTING WITH THE EXPERIMENTS #####
-            """
             if experiment_params["num_epochs"] > 0:
-                logging.info(
-                    f"(PaT) Pruning and retraining ({experiment_params['num_epochs']}) the original models..."
-                )
+                logging.info("(PaT) Pruning and retraining the original models...")
             else:
                 logging.info(f"(P) Pruning the original models...")
-
-            
-    ##### OLD STARTING PRUNE
             pruned_models, pruned_model_accuracies, _ = pruning_test_manager(
                 input_model_list=models_original, prune_params=prune_params, **params
             )
-            for i in range(len(pruned_models)):
+            for i in range(len(pruned_model_accuracies)):
                 # torch.save(pruned_models[i].state_dict(), "models/{}_pruned_{}_.pth".format(name, i))
                 pruned_models[i], epoch_accuracy = train_during_pruning(
                     copy.deepcopy(pruned_models[i]),
                     loaders=loaders,
                     num_epochs=experiment_params["num_epochs"],
-                    gpu_id=gpu_id,
+                    gpu_id=experiment_params["gpu_id"],
                     prune=False,
                 )
 
-                # s = int(result["sparsity"] * 100)
-
+                s = int(result["sparsity"] * 100)
+                n_epochs = experiment_params["num_epochs"]
+                torch.save(
+                    pruned_models[i].state_dict(),
+                    f"./models/models_{name}/{name}_pruned_{s}_{n_epochs}",
+                )
                 pruned_model_accuracies[i] = epoch_accuracy[-1]
 
                 _, epoch_accuracy_1 = train_during_pruning(
                     copy.deepcopy(pruned_models[i]),
                     loaders=loaders,
                     num_epochs=experiment_params["num_epochs"],
-                    gpu_id=gpu_id,
+                    gpu_id=experiment_params["gpu_id"],
                     prune=False,
                     performed_epochs=experiment_params["num_epochs"],
                 )
@@ -186,118 +171,8 @@ if __name__ == "__main__":
                 epoch_accuracy.extend(epoch_accuracy_1)
                 for idx, accuracy in enumerate(epoch_accuracy):
                     result[name][f"model_{i}"]["accuracy_pruned"][idx] = float_format(accuracy)
-    #### HERE WE HAVE pruned_models[] and epoch accuracy in result json is set
-            """
-
-            ### NEW VERSION HERE ###
-            # 1. describe the needed model with a name
-            MODELS_CACHING_PATH = f"./models/models_{name}/cached_models"
-            ensure_folder_existence(MODELS_CACHING_PATH)
-            input_model_names = [
-                f"{MODELS_CACHING_PATH}/{model_dict['basis_name']}_{idx}"
-                for idx in range(experiment_params["num_models"])
-            ]
-            num_epochs = experiment_params["num_epochs"]
-            use_caching = experiment_params["use_caching"]
-            if num_epochs > 0:
-                logging.info(f"(PaT) Pruning and retraining ({num_epochs}) the original models...")
-                pruned_model_paths = [
-                    f"{in_mo}_s{int(result['sparsity']*100)}_Piter{experiment_params['use_iterative_pruning']}_T{int(num_epochs)}"
-                    for in_mo in input_model_names
-                ]
-            else:
-                logging.info(f"(P) Pruning the original models...")
-                pruned_model_paths = [
-                    f"{in_mo}_s{int(result['sparsity']*100)}_Piter{experiment_params['use_iterative_pruning']}"
-                    for in_mo in input_model_names
-                ]
-
-            # 2. get the P/PaT version of the "basis"-model
-            pruned_models = []
-            pruned_model_accuracies = []
-            pruned_model_train_accuracies = []
-            assert len(pruned_model_paths) == len(models_original)
-            for k, this_model_path in enumerate(pruned_model_paths):
-                logging.info(f"\tModel {k}:")
-                if model_already_exists(this_model_path, loaders, gpu_id, use_caching):
-                    logging.info(f"\t\tFound the model {this_model_path}.pth in cache.")
-                    this_pruned_model = get_pretrained_model_by_name(this_model_path, gpu_id)
-                    this_load_trainhist = get_model_trainHistory(this_model_path)
-                    this_pruned_model_accuracy = this_load_trainhist[-1]
-                    this_pruned_model_train_accuracies = this_load_trainhist[:-1]
-                else:
-                    this_original_model = [models_original[k]]
-                    this_pruned_model_lis, _, _ = pruning_test_manager(
-                        input_model_list=this_original_model, prune_params=prune_params, **params
-                    )
-                    this_pruned_model, epoch_accuracy = train_during_pruning(
-                        copy.deepcopy(this_pruned_model_lis[0]),
-                        loaders=loaders,
-                        num_epochs=num_epochs,
-                        gpu_id=gpu_id,
-                        prune=False,
-                    )
-                    this_pruned_model = this_pruned_model_lis[0]
-                    if use_caching:
-                        save_model(this_model_path, this_pruned_model)
-                        save_model_trainHistory(this_model_path, epoch_accuracy)
-                    this_pruned_model_accuracy = epoch_accuracy[-1]
-                    this_pruned_model_train_accuracies = epoch_accuracy[:-1]
-
-                # train for another num_epochs epochs to create the prune benchmark performance
-                pruned_model_further_trained_path = (
-                    f"{this_model_path.rsplit('_', 1)[0]}_T{int(2*num_epochs)}"
-                )
-                pruned_epoch_accuracy = this_pruned_model_train_accuracies
-
-                # compute the benchmark pruned model with additional retrain epochs
-                if num_epochs > 0 and experiment_params["compute_prune_baseline"]:
-                    if model_already_exists(
-                        pruned_model_further_trained_path, loaders, gpu_id, use_caching
-                    ):
-                        # pruned_model_further_trained = get_model(pruned_model_further_trained_path)
-                        logging.info(
-                            f"\t\tFound the model {pruned_model_further_trained_path}.pth in cache."
-                        )
-                        epoch_acc_further = get_model_trainHistory(
-                            pruned_model_further_trained_path
-                        )
-                    else:
-                        (
-                            pruned_model_further_trained,
-                            epoch_accuracy_further_tr,
-                        ) = train_during_pruning(
-                            copy.deepcopy(this_pruned_model),
-                            loaders=loaders,
-                            num_epochs=num_epochs,
-                            gpu_id=gpu_id,
-                            prune=False,
-                            performed_epochs=num_epochs,
-                        )
-                        epoch_acc_further = this_pruned_model_train_accuracies
-                        epoch_acc_further.extend(epoch_accuracy_further_tr)
-                        if use_caching:
-                            save_model(
-                                pruned_model_further_trained_path, pruned_model_further_trained
-                            )
-                            # ATTENTION: the trainhistory will only show the best performance during the further retraining at [-1]
-                            save_model_trainHistory(
-                                pruned_model_further_trained_path, epoch_acc_further
-                            )
-                    pruned_epoch_accuracy = epoch_acc_further
-
-                # store the performance development of the retraining of the pruned model in result
-                for idx, accuracy in enumerate(pruned_epoch_accuracy):
-                    result[name][f"model_{i}"]["accuracy_pruned"][idx] = float_format(accuracy)
-                # here we should maybe also add the this_load_trainhist to result[PaF]
-                # so it does not only contain the fusion retrain accuracies, but its whole performance development in one dict entry
-                pruned_models.append(this_pruned_model)
-                pruned_model_accuracies.append(this_pruned_model_accuracy)
-                pruned_model_train_accuracies.append(this_pruned_model_train_accuracies)
-            ####### END NEW VERSION ######
 
             fusion_params = get_parameters()
-            fusion_weights = experiment_params["fusion_weights"][0]
             fusion_params.model_name = name
 
             if experiment_params["FaP"]:
@@ -309,14 +184,14 @@ if __name__ == "__main__":
                     input_model_list=models_original,
                     **params,
                     accuracies=original_model_accuracies,
-                    num_epochs=0,
+                    num_epochs=experiment_params["num_epochs"],
                     name=name,
                 )
                 fused_model, fused_model_accuracy_re = train_during_pruning(
                     fused_model,
                     loaders=loaders,
-                    num_epochs=num_epochs,
-                    gpu_id=gpu_id,
+                    num_epochs=experiment_params["num_epochs"],
+                    gpu_id=experiment_params["gpu_id"],
                     prune=False,
                 )
                 if experiment_params["num_epochs"] > 0:
@@ -343,14 +218,12 @@ if __name__ == "__main__":
                         copy.deepcopy(pruned_and_fused_model),
                         loaders=loaders,
                         num_epochs=experiment_params["num_epochs"],
-                        gpu_id=gpu_id,
+                        gpu_id=experiment_params["gpu_id"],
                         prune=False,
                     )
                     for idx, accuracy in enumerate(epoch_accuracy):
                         result[name][f"model_{i}"]["accuracy_SSF"][idx] = float_format(accuracy)
 
-            """
-    ##### START of OLD VERSION of fusion part in PaF #########
             if experiment_params["PaF"]:
                 if experiment_params["num_epochs"] > 0:
                     logging.info(f"(PaTaFaT) Fusing the pruned models...")
@@ -366,51 +239,11 @@ if __name__ == "__main__":
                     paf_model,
                     loaders=loaders,
                     num_epochs=experiment_params["num_epochs"],
-                    gpu_id=gpu_id,
+                    gpu_id=experiment_params["gpu_id"],
                     prune=False,
                 )
                 for idx, accuracy in enumerate(epoch_accuracy):
                     result[name]["accuracy_PaF"][idx] = float_format(accuracy)
-    ##### END of OLD VERSION of fusion part in PaF #########
-            """
-
-            ####### START NEW VERSION (fusion part) ######
-            if experiment_params["PaF"]:
-                if experiment_params["num_epochs"] > 0:
-                    logging.info(
-                        f"(PaTaFaT) Fusing and retraining ({num_epochs}) the pruned models..."
-                    )
-                    paf_model_path = f"{input_model_names[0][:-2]}_w{int(fusion_weights[0]*100)}_s{int(result['sparsity']*100)}_Piter{experiment_params['use_iterative_pruning']}_aT{int(num_epochs)}aFaT{int(num_epochs)}"
-                else:
-                    logging.info(f"(PaF) Fusing the pruned models...")
-                    paf_model_path = f"{input_model_names[0][:-2]}_w{int(fusion_weights[0]*100)}_s{int(result['sparsity']*100)}_Piter{experiment_params['use_iterative_pruning']}_aF"
-
-                # 2. check if the model is already available
-                if model_already_exists(paf_model_path, loaders, gpu_id, use_caching):
-                    logging.info(f"\tFound the model {paf_model_path}.pth in cache.")
-                    paf_model = get_pretrained_model_by_name(this_model_path, gpu_id)
-                    paf_accuracy = get_model_trainHistory(this_model_path)
-                else:
-                    paf_model, paf_model_accuracy, _ = fusion_test_manager(
-                        input_model_list=pruned_models,
-                        **params,
-                        num_epochs=0,
-                        name=name,
-                    )
-                    m, paf_accuracy = train_during_pruning(
-                        paf_model,
-                        loaders=loaders,
-                        num_epochs=num_epochs,
-                        gpu_id=gpu_id,
-                        prune=False,
-                    )
-                    if use_caching:
-                        save_model(paf_model_path, paf_model)
-                        save_model_trainHistory(paf_model_path, paf_accuracy)
-
-                for idx, accuracy in enumerate(paf_accuracy):
-                    result[name]["accuracy_PaF"][idx] = float_format(accuracy)
-            ####### END NEW VERSION (fusion part) ######
 
             # PaF_all does the following: fuses following networks: pruned_model[0], original_model[0], original_model[1], ..., original_model[-1]
             # PaF_all achieves higher accuracy than PaF, but when we finetune PaF achieves higher accuracy
@@ -430,7 +263,7 @@ if __name__ == "__main__":
                     paf_all_model,
                     loaders=loaders,
                     num_epochs=experiment_params["num_epochs"],
-                    gpu_id=gpu_id,
+                    gpu_id=experiment_params["gpu_id"],
                     prune=False,
                 )
                 for idx, accuracy in enumerate(epoch_accuracy):
@@ -448,7 +281,7 @@ if __name__ == "__main__":
                     fap_models[0],
                     loaders=loaders,
                     num_epochs=experiment_params["num_epochs"],
-                    gpu_id=gpu_id,
+                    gpu_id=experiment_params["gpu_id"],
                     prune=False,
                 )
                 for idx, accuracy in enumerate(epoch_accuracy):
@@ -463,7 +296,7 @@ if __name__ == "__main__":
                         intra_fusion_model,
                         loaders=loaders,
                         num_epochs=experiment_params["num_epochs"] * 2,
-                        gpu_id=gpu_id,
+                        gpu_id=experiment_params["gpu_id"],
                         prune=False,
                     )
                     # intra_fusion_model, _,_ = fusion_test_manager(input_model_list=[intra_fusion_model, models_original[i]], **params, num_epochs = experiment_params["num_epochs"], name=name)
@@ -489,7 +322,7 @@ if __name__ == "__main__":
                             else torch.randn(1, 3, 32, 32),
                             "out_features": 10,
                             "loaders": loaders,
-                            "gpu_id": gpu_id,
+                            "gpu_id": experiment_params["gpu_id"],
                         }
 
                         pruned_models_new, pruned_models_new_accuracies, _ = pruning_test_manager(
@@ -512,13 +345,14 @@ if __name__ == "__main__":
                         copy.deepcopy(model_sparsity),
                         loaders=loaders,
                         num_epochs=experiment_params["num_epochs"],
-                        gpu_id=gpu_id,
+                        gpu_id=experiment_params["gpu_id"],
                         prune=False,
                     )
                     for idx, accuracy in enumerate(epoch_accuracy):
                         result[name][f"model_{i}"]["MSF"][idx] = float_format(accuracy)
 
-        # print(json.dumps(result_final, indent=4))
+            logging.info(f"Done with sparsity: {result['sparsity']}.")
+        print(json.dumps(result_final, indent=4))
         result_final["results"][idx_result] = result
 
         model_name = experiment_params["models"][0]["name"]
@@ -529,14 +363,18 @@ if __name__ == "__main__":
         )
 
         result_folder_name = f"./results_and_plots_o/fullDict_results_{experiment_params['fusion_type']}{fusion_add_numsamples}_{model_name}"
-        ensure_folder_existence(result_folder_name)
-        save_experiment_results(
-            f"./results_and_plots_o/fullDict_results_{experiment_params['fusion_type']}{fusion_add_numsamples}_{model_name}/results_s{int(result['sparsity']*100)}_re{experiment_params['num_epochs']}",
-            result,
-        )
-        logging.info(f"Done with sparsity: {result['sparsity']}.")
+        # make sure the result folder exists. If not: create it
+        if not os.path.exists(result_folder_name):
+            os.makedirs(result_folder_name)
 
-    save_experiment_results(
+        with open(
+            f"./results_and_plots_o/fullDict_results_{experiment_params['fusion_type']}{fusion_add_numsamples}_{model_name}/results_s{int(result['sparsity']*100)}_re{experiment_params['num_epochs']}.json",
+            "w",
+        ) as outfile:
+            json.dump(result, outfile, indent=4)
+
+    with open(
         f"./results_and_plots_o/fullDict_results_{experiment_params['fusion_type']}{fusion_add_numsamples}_{model_name}/results_sAll_re{experiment_params['num_epochs']}.json",
-        result_final,
-    )
+        "w",
+    ) as outfile:
+        json.dump(result_final, outfile, indent=4)
