@@ -9,7 +9,6 @@ from models import get_pretrained_model_by_name
 from performance_tester import (
     get_cifar10_data_loader,
     get_cifar100_data_loader,
-    get_imagenet_data_loader,
     get_mnist_data_loader,
     train_during_pruning,
 )
@@ -64,7 +63,7 @@ def get_correct_dataloader(dataset_name):
     elif dataset_name == "cifar100":
         return get_cifar100_data_loader(), 100
     elif dataset_name == "imagenet":
-        return get_imagenet_data_loader(), 1
+        pass
     else:
         raise Exception("Provided dataset does not exist.")
 
