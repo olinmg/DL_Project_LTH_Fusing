@@ -8,4 +8,4 @@ fusion_pruning_experiments/data/*
 fusion_pruning_experiments/models/*
 fusion_pruning_experiments/logger_files/*
 results_and_plots_o/*
-fusion_pruning_experiments/experiment_parameters.json
+
