@@ -62,6 +62,27 @@ if __name__ == "__main__":
     num_epochs = experiment_params["num_epochs"]
     use_caching = experiment_params["use_caching"]
     gpu_id = experiment_params["gpu_id"]
+    prune_iter_steps = experiment_params["prune_iter_steps"]
+    use_iter_prune = experiment_params["use_iter_prune"]
+    use_iterative_pruning = (
+        True
+        if (
+            experiment_params["prune_iter_epochs"] > 0 and experiment_params["prune_iter_steps"] > 1
+        )
+        else False
+    )
+    prune_iter_epochs = experiment_params["prune_iter_epochs"]
+    if use_iter_prune and prune_iter_epochs > 0:
+        logging.info(
+            f"Working with iterative pruning: {prune_iter_steps} steps with each {prune_iter_epochs} epochs retraining."
+        )
+    else:
+        logging.info(f"Working with direct pruning (NOT iterative pruning).")
+    iterprune_text = (
+        f"{experiment_params['prune_iter_steps']}iter{experiment_params['prune_iter_epochs']}"
+        if use_iterative_pruning
+        else ""
+    )
 
     result_final = get_result_skeleton(experiment_params)
     loaders = None
@@ -90,10 +111,7 @@ if __name__ == "__main__":
         if experiment_params["fusion_type"] != FusionType.WEIGHT
         else None,
     )
-    pruning_function = (
-        wrapper_structured_pruning
-        # TODO: can include iterative pruning wrapper here to switch to different pruning method
-    )
+    pruning_function = wrapper_structured_pruning
     eval_function = evaluate_performance_simple
 
     # collecting the experiment settings into a dict
@@ -142,11 +160,13 @@ if __name__ == "__main__":
             prune_params = {
                 "prune_type": result["prune_type"],
                 "sparsity": result["sparsity"],
-                "num_epochs": num_epochs,
                 "example_input": torch.randn(1, 1, 28, 28)
                 if "cnn" in name
                 else torch.randn(1, 3, 32, 32),
                 "out_features": output_dim,
+                "use_iter_prune": use_iter_prune,
+                "prune_iter_steps": prune_iter_steps,
+                "prune_iter_epochs": prune_iter_epochs,
                 "loaders": loaders,
                 "gpu_id": gpu_id,
             }
@@ -211,13 +231,13 @@ if __name__ == "__main__":
             if num_epochs > 0:
                 logging.info(f"(PaT) Pruning and retraining ({num_epochs}) the original models...")
                 pruned_model_paths = [
-                    f"{in_mo}_s{int(result['sparsity']*100)}_Piter{experiment_params['use_iterative_pruning']}_T{int(num_epochs)}"
+                    f"{in_mo}_s{int(result['sparsity']*100)}_P{iterprune_text}_T{int(num_epochs)}"
                     for in_mo in input_model_names
                 ]
             else:
                 logging.info(f"(P) Pruning the original models...")
                 pruned_model_paths = [
-                    f"{in_mo}_s{int(result['sparsity']*100)}_Piter{experiment_params['use_iterative_pruning']}"
+                    f"{in_mo}_s{int(result['sparsity']*100)}_P{iterprune_text}"
                     for in_mo in input_model_names
                 ]
 
@@ -389,10 +409,10 @@ if __name__ == "__main__":
                     logging.info(
                         f"(PaTaFaT) Fusing and retraining ({num_epochs}) the pruned models..."
                     )
-                    paf_model_path = f"{input_model_names[0][:-2]}_w{int(fusion_weights[0]*100)}_s{int(result['sparsity']*100)}_Piter{experiment_params['use_iterative_pruning']}_aT{int(num_epochs)}aFaT{int(num_epochs)}"
+                    paf_model_path = f"{input_model_names[0][:-2]}_w{int(fusion_weights[0]*100)}_s{int(result['sparsity']*100)}_P{iterprune_text}_aT{int(num_epochs)}aFaT{int(num_epochs)}"
                 else:
                     logging.info(f"(PaF) Fusing the pruned models...")
-                    paf_model_path = f"{input_model_names[0][:-2]}_w{int(fusion_weights[0]*100)}_s{int(result['sparsity']*100)}_Piter{experiment_params['use_iterative_pruning']}_aF"
+                    paf_model_path = f"{input_model_names[0][:-2]}_w{int(fusion_weights[0]*100)}_s{int(result['sparsity']*100)}_P{iterprune_text}_aF"
 
                 # 2. check if the model is already available
                 if model_already_exists(paf_model_path, loaders, gpu_id, use_caching):
@@ -496,6 +516,9 @@ if __name__ == "__main__":
                             "example_input": torch.randn(1, 1, 28, 28)
                             if "cnn" in name
                             else torch.randn(1, 3, 32, 32),
+                            "use_iter_prune": use_iter_prune,
+                            "prune_iter_steps": prune_iter_steps,
+                            "prune_iter_epochs": prune_iter_epochs,
                             "out_features": 10,
                             "loaders": loaders,
                             "gpu_id": gpu_id,
@@ -539,9 +562,8 @@ if __name__ == "__main__":
 
         result_folder_name = f"./results_and_plots_o/fullDict_results_{experiment_params['fusion_type']}{fusion_add_numsamples}_{model_name}"
         ensure_folder_existence(result_folder_name)
-        iterprune = "iter" if experiment_params["use_iterative_pruning"] else ""
         save_experiment_results(
-            f"./results_and_plots_o/fullDict_results_{experiment_params['fusion_type']}{fusion_add_numsamples}_{model_name}/results_s{iterprune}{int(result['sparsity']*100)}_re{experiment_params['num_epochs']}",
+            f"./results_and_plots_o/fullDict_results_{experiment_params['fusion_type']}{fusion_add_numsamples}_{model_name}/results_{iterprune_text}s{int(result['sparsity']*100)}_re{experiment_params['num_epochs']}",
             result,
         )
         logging.info(f"Done with sparsity: {result['sparsity']}.")
@@ -549,6 +571,6 @@ if __name__ == "__main__":
     logging.info("")
     logging.info("All experiments completed.")
     save_experiment_results(
-        f"./results_and_plots_o/fullDict_results_{experiment_params['fusion_type']}{fusion_add_numsamples}_{model_name}/results_s{iterprune}All_re{experiment_params['num_epochs']}.json",
+        f"./results_and_plots_o/fullDict_results_{experiment_params['fusion_type']}{fusion_add_numsamples}_{model_name}/results_{iterprune_text}sAll_re{experiment_params['num_epochs']}",
         result_final,
     )
