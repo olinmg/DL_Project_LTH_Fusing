@@ -4,15 +4,14 @@ import math
 
 import torch
 import torchvision.transforms as transforms
-from torchvision import datasets
-from torchvision.transforms import ToTensor
-
 from fusion_utils import FusionType
 
 # import main #from main import get_data_loader, test
 from models import get_model, get_pretrained_models
 from parameters import get_parameters
 from pruning_modified import prune_unstructured
+from torchvision import datasets
+from torchvision.transforms import ToTensor
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -634,6 +633,9 @@ if __name__ == "__main__":
                 "example_input": torch.randn(1, 1, 28, 28)
                 if "cnn" in name
                 else torch.randn(1, 3, 32, 32),
+                "use_iter_prune": experiment_params["use_iter_prune"],
+                "prune_iter_steps": experiment_params["prune_iter_steps"],
+                "prune_iter_epochs": experiment_params["prune_iter_epochs"],
                 "out_features": output_dim,
                 "loaders": loaders,
                 "gpu_id": experiment_params["gpu_id"],
@@ -796,6 +798,9 @@ if __name__ == "__main__":
                             "example_input": torch.randn(1, 1, 28, 28)
                             if "cnn" in name
                             else torch.randn(1, 3, 32, 32),
+                            "use_iter_prune": experiment_params["use_iter_prune"],
+                            "prune_iter_steps": experiment_params["prune_iter_steps"],
+                            "prune_iter_epochs": experiment_params["prune_iter_epochs"],
                             "out_features": 10,
                             "loaders": loaders,
                             "gpu_id": experiment_params["gpu_id"],
