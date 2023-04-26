@@ -101,6 +101,9 @@ if __name__ == "__main__":
             "example_input": torch.randn(1, 1, 28, 28)
             if "cnn" in name
             else torch.randn(1, 3, 32, 32),
+            "use_iter_prune": experiment_params["use_iter_prune"],
+            "prune_iter_steps": experiment_params["prune_iter_steps"],
+            "prune_iter_epochs": experiment_params["prune_iter_epochs"],
             "out_features": output_dim,
             "loaders": loaders,
             "gpu_id": experiment_params["gpu_id"],
