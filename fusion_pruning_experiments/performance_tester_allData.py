@@ -44,12 +44,13 @@ if __name__ == "__main__":
     logging.basicConfig(
         format="[%(asctime)s %(name)s %(levelname)s] %(message)s",
         level="INFO",
-        filename=f"./fusion_pruning_experiments/logger_files/{date}_logger.txt",
+        filename=f"./logger_files/{date}_logger.txt",
+        force = True
     )
 
     logging.info(f"Loading experiment and dataset...")
 
-    with open("./fusion_pruning_experiments/experiment_parameters.json", "r") as f:
+    with open("./experiment_parameters.json", "r") as f:
         experiment_params = json.load(f)
     num_epochs = experiment_params["num_epochs"]
     use_caching = experiment_params["use_caching"]
@@ -100,7 +101,7 @@ if __name__ == "__main__":
     }
 
     # Load the model that should be pruned and retraiend
-    model_path = f"./fusion_pruning_experiments/models/{experiment_params['models'][0]['basis_name']}_fullData"
+    model_path = f"./models/{experiment_params['models'][0]['basis_name']}_fullData"
     logging.info(f"Loading model: {model_path}.")
     print(f"Loading model: {model_path}.")
     models_original = [get_pretrained_model_by_name(model_path, gpu_id=experiment_params["gpu_id"])]
