@@ -189,7 +189,7 @@ if __name__ == "__main__":
         logging.info(f"Done with sparsity: {sp}.")
 
     with open(
-        f"./results_and_plots_o/fullDict_wholeData_{name}/results_sAll_re{experiment_params['num_epochs']*2}_wholeDataModel.json",
+        f"./results_and_plots_o/fullDict_wholeData_{name}/results_s{iterprune_text}All_re{experiment_params['num_epochs']*2}_wholeDataModel.json",
         "w",
     ) as outfile:
         json.dump(result, outfile, indent=4)
