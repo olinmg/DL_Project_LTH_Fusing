@@ -353,10 +353,6 @@ def main_worker(gpu, ngpus_per_node, args):
         sampler=train_sampler,
     )
 
-    print(type(train_loader))
-    print(len(train_loader.dataset))
-    print(type(enumerate(train_loader)))
-
     val_loader = torch.utils.data.DataLoader(
         val_dataset,
         batch_size=args.batch_size,
