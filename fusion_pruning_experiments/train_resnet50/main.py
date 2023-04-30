@@ -39,6 +39,21 @@ parser.add_argument(
     choices=model_names,
     help="model architecture: " + " | ".join(model_names) + " (default: resnet18)",
 )
+
+parser.add_argument(
+    "--nr_datasplits", default="2", type=int, help="how many parts to split the dataset into"
+)
+
+parser.add_argument(
+    "--touse_datasplit", default="0", type=int, help="which of the datasplits to use (fix seed!)"
+)
+
+parser.add_argument(
+    "--seed_datasubsets",
+    default="99",
+    type=int,
+    help="to generate same datasubsets when training models on different splits of the data",
+)
 parser.add_argument(
     "-j",
     "--workers",
@@ -279,7 +294,7 @@ def main_worker(gpu, ngpus_per_node, args):
             print("=> no checkpoint found at '{}'".format(args.resume))
 
     # Data loading code
-    if True:  # args.dummy:
+    if args.dummy:
         print("=> Dummy data is used!")
         train_dataset = datasets.FakeData(1281167, (3, 224, 224), 1000, transforms.ToTensor())
         val_dataset = datasets.FakeData(50000, (3, 224, 224), 1000, transforms.ToTensor())
@@ -312,6 +327,14 @@ def main_worker(gpu, ngpus_per_node, args):
             ),
         )
 
+    fraction = 1 / args.nr_datasplits
+    original_seed = torch.initial_seed()
+    torch.manual_seed(args.seed_datasubsets)
+    train_data_split = torch.utils.data.random_split(train_dataset, [fraction] * args.nr_datasplits)
+    train_dataset = [train_data_subset for train_data_subset in train_data_split]
+    train_dataset = train_dataset[args.touse_datasplit]
+    torch.manual_seed(original_seed)
+
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
         val_sampler = torch.utils.data.distributed.DistributedSampler(
@@ -329,6 +352,10 @@ def main_worker(gpu, ngpus_per_node, args):
         pin_memory=True,
         sampler=train_sampler,
     )
+
+    print(type(train_loader))
+    print(len(train_loader.dataset))
+    print(type(enumerate(train_loader)))
 
     val_loader = torch.utils.data.DataLoader(
         val_dataset,
@@ -376,6 +403,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
 
 def train(train_loader, model, criterion, optimizer, epoch, device, args):
+    print(type(train_loader))
     batch_time = AverageMeter("Time", ":6.3f")
     data_time = AverageMeter("Data", ":6.3f")
     losses = AverageMeter("Loss", ":.4e")
@@ -392,6 +420,7 @@ def train(train_loader, model, criterion, optimizer, epoch, device, args):
 
     end = time.time()
     for i, (images, target) in enumerate(train_loader):
+        print("Like this its working!")
         # measure data loading time
         data_time.update(time.time() - end)
 
