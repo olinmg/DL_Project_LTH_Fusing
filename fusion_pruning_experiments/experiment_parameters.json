@@ -15,7 +15,7 @@
         "l1"
     ],
     "use_caching": true,
-    "use_iter_prune": true,
+    "use_iter_prune": false,
     "prune_iter_steps": 3,
     "prune_iter_epochs": 4,
     "compute_prune_baseline": false,
