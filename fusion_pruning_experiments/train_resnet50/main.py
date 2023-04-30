@@ -41,7 +41,7 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--nr_datasplits", default="2", type=int, help="how many parts to split the dataset into"
+    "--nr_datasplits", default="1", type=int, help="how many parts to split the dataset into"
 )
 
 parser.add_argument(
@@ -327,6 +327,7 @@ def main_worker(gpu, ngpus_per_node, args):
             ),
         )
 
+    # Splitting the dataset into multiple parts to train the "half-data" networks with
     fraction = 1 / args.nr_datasplits
     original_seed = torch.initial_seed()
     torch.manual_seed(args.seed_datasubsets)
