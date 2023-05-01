@@ -5,7 +5,7 @@ from performance_tester import train_during_pruning, update_running_statistics
 from parameters import get_parameters
 from train import get_model
 import torch
-from fusion_IF import MSF, IntraFusion_Clustering, fusion, fusion_bn, fusion_old, fusion_sidak_multimodel, fusion_bn_alt, intrafusion_bn
+from fusion import MSF, IntraFusion_Clustering, fusion, fusion_bn, fusion_old, fusion_sidak_multimodel, fusion_bn_alt, intrafusion_bn
 from sklearn.model_selection import train_test_split
 from torchvision.transforms import ToTensor
 from torch.utils.data import DataLoader
@@ -124,7 +124,7 @@ if __name__ == '__main__':
     dict = {}
     it = 9
 
-    models = get_pretrained_models(args.model_name, "resnet18_diff_weight_init_True_cifar10", args.gpu_id, num_models, output_dim=10)
+    models = get_pretrained_models(args.model_name, "vgg11_bn_diff_weight_init_True_cifar10", args.gpu_id, num_models, output_dim=10)
 
     loaders = None
     if "vgg" not in args.model_name and "resnet" not in args.model_name:

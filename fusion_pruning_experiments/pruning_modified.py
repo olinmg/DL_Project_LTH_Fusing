@@ -3,12 +3,9 @@ import torch
 import torch.nn.functional as F
 import torch.nn.utils.prune as prune
 import torch_pruning as tp
-<<<<<<< HEAD
 from torch import nn
-=======
 import copy
 
->>>>>>> b446bcd (Extend fusion and intra-fusion to handle skip connections without shortcuts)
 
 ### TO-DO:
 ### RETURN MODEL
