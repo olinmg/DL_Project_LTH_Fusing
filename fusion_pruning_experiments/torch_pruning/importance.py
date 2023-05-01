@@ -58,6 +58,7 @@ class MagnitudeImportance(Importance):
             if self.local:
                 break
         importance_mat = torch.stack(importance_mat, dim=0)
+
         if non_importance:
             return None
         if self.reduction == "sum":

@@ -2,6 +2,7 @@ import torch.nn as nn
 import torch
 import enum
 from torch import linalg as LA
+import math
 
 class BaseEnum(enum.Enum):
     @classmethod
@@ -40,6 +41,7 @@ class Fusion_Layer():
         self.intrafusion = intrafusion
         self.T = None
         self.skip_t = None
+        self.skip_ot_2 = None
     
     def to(self, gpu_id):
         if gpu_id != -1:
@@ -94,8 +96,6 @@ class Fusion_Layer():
         self.bn_beta = beta
     
     def align_weights(self,T_var):
-        if self.skip_t != None:
-            T_var = (self.skip_t.T + T_var)/2 ## ADDED
         if self.skip_align != None:
             self.skip_align.align_weights(T_var)
         if self.is_conv:
@@ -122,6 +122,8 @@ class Fusion_Layer():
             result = [self.proxy.reshape(self.proxy.shape[0], -1).contiguous()]
             if self.skip_ot != None:
                 result.extend(self.skip_ot.create_comparison_vec())
+            if self.skip_ot_2 != None:
+                result.extend(self.skip_ot_2.create_comparison_vec())
             return result
 
         concat = None
@@ -156,6 +158,7 @@ class Fusion_Layer():
         if self.next != None and self.intrafusion:
             next_incoming_feat = self.next.get_incoming_features()
             if next_incoming_feat != None:
+
                 result.append(next_incoming_feat.reshape(next_incoming_feat.shape[0], -1).contiguous())
         if self.skip_next != None and self.intrafusion:
             next_incoming_feat = self.skip_next.get_incoming_features()
@@ -164,6 +167,8 @@ class Fusion_Layer():
         
         if self.skip_ot != None:
             result.extend(self.skip_ot.create_comparison_vec())
+        if self.skip_ot_2 != None:
+            result.extend(self.skip_ot_2.create_comparison_vec())
         return result
     
     def get_norm(self, metric):
@@ -182,7 +187,16 @@ class Fusion_Layer():
         self.T = T_var
         if self.skip_ot != None:
             self.skip_ot.permute_parameters(T_var)
+        if self.skip_ot_2 != None:
+            self.skip_ot_2.permute_parameters(T_var)
+        
+        w_shape = self.weight.shape
         self.weight = torch.matmul(T_var.t(), self.weight.contiguous().view(self.weight.shape[0], -1))
+        if len(w_shape) == 3:
+            self.weight = self.weight.view(-1, w_shape[1], int(math.sqrt(w_shape[2])), int(math.sqrt(w_shape[2])))
+        elif len(w_shape) == 4:
+            self.weight = self.weight.view(-1, w_shape[1], w_shape[2], w_shape[3])
+
 
         if self.bias != None:
             self.bias = torch.matmul(T_var.t(), self.bias.view(self.bias.shape[0], -1)).flatten()
@@ -219,11 +233,14 @@ class Fusion_Layer():
     
     def update_weights_intra(self, T_var):
         self.T = T_var
+        w_shape = self.weight.shape
         if not self.bn:
             self.permute_parameters(T_var)
             return
         if self.skip_ot != None:
             self.skip_ot.update_weights_intra(T_var)
+        if self.skip_ot_2 != None:
+            self.skip_ot_2.update_weights_intra(T_var)
 
         T_var_adjust = T_var.clone()
         for i in range(T_var.shape[1]):
@@ -239,6 +256,11 @@ class Fusion_Layer():
         self.bn_var = torch.ones(self.bn_mean.shape)
         self.bn_gamma = torch.ones(self.bn_mean.shape)
         self.bn_beta = torch.matmul(T_var.t(), self.bn_beta).flatten()
+
+        if len(w_shape) == 3:
+            self.weight = self.weight.view(-1, w_shape[1], int(math.sqrt(w_shape[2])), int(math.sqrt(w_shape[2])))
+        elif len(w_shape) == 4:
+            self.weight = self.weight.view(-1, w_shape[1], w_shape[2], w_shape[3])
 
     def update_weights(self, other_fusion_layer, imp0, imp1):
         if self.skip_ot != None:
@@ -438,6 +460,9 @@ def preprocess_parameters(models, fusion_type, intrafusion=False, resnet=False, 
             fusion_layer = None
             if isinstance(module, nn.Linear):
                 fusion_layer = Fusion_Layer("Linear", module.weight, intrafusion=intrafusion, name=name, bias=module.bias, fusion_type=fusion_type)
+                if resnet and len(fusion_layers) > 1 and fusion_layers[-2].weight.shape[0] == fusion_layers[-2].weight.shape[1]:
+                    fusion_layers[-3].skip_ot_2 = fusion_layers[-1]
+
             elif isinstance(module, nn.Conv2d):
                 fusion_layer = Fusion_Layer("Conv2d", module.weight, name=name, intrafusion=intrafusion, bias=module.bias, fusion_type=fusion_type)
                 if resnet and len(fusion_layers) > 0:
@@ -449,7 +474,7 @@ def preprocess_parameters(models, fusion_type, intrafusion=False, resnet=False, 
 
                         continue
                     if len(fusion_layers) > 1 and "conv1" in name and fusion_layers[-2].weight.shape[0] == fusion_layers[-2].weight.shape[1]:
-                        fusion_layer.skip_t = fusion_layers[-3]
+                        fusion_layers[-3].skip_ot_2 = fusion_layers[-1]
 
 
                         

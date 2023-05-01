@@ -6,7 +6,7 @@ import numpy as np
 import ot
 import copy
 from torch import linalg as LA
-from fusion_utils import preprocess_parameters, FusionType
+from fusion_utils_IF import preprocess_parameters, FusionType
 from sklearn.cluster import KMeans
 import torch.nn as nn
 from models import get_model
@@ -20,7 +20,7 @@ def get_histogram(cardinality, indices, add=False):
         return np.ones(cardinality)/cardinality # uniform probability distribution
 
     else:
-        result = np.zeros(cardinality)
+        result = np.ones(cardinality)
         for indice in indices:
             result[indice] = cardinality/indices.size()[0]
 
@@ -114,29 +114,6 @@ def create_network_from_parameters(reference_model, param_list, gpu_id = -1):
         if layer.skip_ot:
             idx += 1
             idx = process_layer(layer.skip_ot, idx)
-        """model_state_dict[keys[idx]] = layer.weight.view(model_state_dict[keys[idx]].shape)
-        if layer.bias != None:
-            idx += 1
-            model_state_dict[keys[idx]] = layer.bias
-            print("Went in here")
-        if layer.bn:
-            if layer.bn_gamma != None:
-                idx += 1
-                print("key for bn gamma: ", keys[idx])
-                model_state_dict[keys[idx]] = layer.bn_gamma
-                idx += 1
-                print("key for beta: ", keys[idx])
-                model_state_dict[keys[idx]] = layer.bn_beta
-            idx += 1
-            print("key for mean: ", keys[idx])
-            model_state_dict[keys[idx]] = layer.bn_mean
-            idx += 1
-            print("key for var: ", keys[idx])
-            model_state_dict[keys[idx]] = layer.bn_var
-
-            idx += 1
-            print("key for batches tracked: ", keys[idx])
-            model_state_dict[keys[idx]] = torch.Tensor([10000])"""
     
     model.load_state_dict(model_state_dict)
 
@@ -585,7 +562,7 @@ def intrafusion_bn(network, fusion_type, sparsity, metric=-1, full_model = None,
 
     
     t = prune_structured(net=copy.deepcopy(full_model), loaders=None, num_epochs=0, gpu_id=gpu_id, example_inputs=torch.randn(1, 3, 32, 32),
-                    out_features=10, prune_type="l1", sparsity=sparsity, train_fct=None) if small_model == None else small_model
+                    out_features=10, prune_type="l1", sparsity=sparsity, train_fct=None, total_steps=1) if small_model == None else small_model
     if gpu_id != -1:
         t = t.cuda(gpu_id)
     fusion_layers_2 = preprocess_parameters([t], resnet=resnet, intrafusion=True, fusion_type=fusion_type, train_loader=train_loader, model_name=model_name, gpu_id=gpu_id, num_samples=200)
@@ -620,8 +597,14 @@ def intrafusion_bn(network, fusion_type, sparsity, metric=-1, full_model = None,
         amount_pruned = fusion_layer_2.weight.shape[0]#int(layer_shape[0]*(1-sparsity))
         amount_pruned = 1 if amount_pruned == 0 else amount_pruned
 
-        if idx != 0:            
+        if idx != 0:        
             fusion_layer.align_weights(T_var)
+
+        
+        if amount_pruned == layer_shape[0]:
+            assert idx == num_layers - 1 or fusion_layer.T != None
+            T_var = fusion_layer.T
+            continue
         
         if idx == num_layers -1:
             break
@@ -629,6 +612,7 @@ def intrafusion_bn(network, fusion_type, sparsity, metric=-1, full_model = None,
         norm_layer = fusion_layer.get_norm(metric)
 
         _, indices = torch.topk(norm_layer, amount_pruned)
+
         #indices, _= torch.sort(indices)
         #print("indices are: ", indices)
 
@@ -663,7 +647,7 @@ def intrafusion_bn(network, fusion_type, sparsity, metric=-1, full_model = None,
             T_var = torch.from_numpy(T).float()
         
         #T_var /= torch.from_numpy(nu).cuda(0)[:,None]
-        #T_var *= norm_layer[:,None]
+        T_var *= torch.pow(norm_layer, 1)[:,None]
         if gpu_id != -1:
             marginals = torch.ones(T_var.shape[1]).cuda(gpu_id) / T_var.shape[0]
         else:

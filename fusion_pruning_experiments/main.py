@@ -1,9 +1,11 @@
 from collections import OrderedDict
+import copy
+from pruning_modified import prune_structured, prune_structured_intra
 from performance_tester import train_during_pruning, update_running_statistics
 from parameters import get_parameters
 from train import get_model
 import torch
-from fusion import MSF, IntraFusion_Clustering, fusion, fusion_bn, fusion_old, fusion_sidak_multimodel, fusion_bn_alt
+from fusion_IF import MSF, IntraFusion_Clustering, fusion, fusion_bn, fusion_old, fusion_sidak_multimodel, fusion_bn_alt, intrafusion_bn
 from sklearn.model_selection import train_test_split
 from torchvision.transforms import ToTensor
 from torch.utils.data import DataLoader
@@ -14,9 +16,10 @@ from torchvision import datasets
 import torchvision.transforms as transforms
 from models import get_pretrained_models
 import json
+import re
 
 
-def get_cifar_data_loader():
+def get_cifar_data_loader(shuffle=True):
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
 
@@ -27,7 +30,7 @@ def get_cifar_data_loader():
             transforms.ToTensor(),
             normalize,
         ]), download=True),
-        batch_size=128, shuffle=True,
+        batch_size=128, shuffle=shuffle,
         num_workers=4, pin_memory=True)
 
     val_loader = torch.utils.data.DataLoader(
@@ -71,7 +74,7 @@ def evaluate_performance_simple(input_model, loaders, gpu_id, eval=True):
     return accuracy_accumulated / total
 
 
-def get_data_loader():
+def get_data_loader(shuffle=True):
     test_data = datasets.MNIST(
         root = 'data', 
         train = False, 
@@ -88,11 +91,11 @@ def get_data_loader():
     loaders = {  
         'test'  : torch.utils.data.DataLoader(test_data, 
                                             batch_size=100, 
-                                            shuffle=True, 
+                                            shuffle=shuffle, 
                                             num_workers=1),
         "train": torch.utils.data.DataLoader(train_data, 
                                             batch_size=100, 
-                                            shuffle=True, 
+                                            shuffle=shuffle, 
                                             num_workers=1)
     }
     return loaders
@@ -121,7 +124,7 @@ if __name__ == '__main__':
     dict = {}
     it = 9
 
-    models = get_pretrained_models(args.model_name, "vgg11_bn_diff_weight_init_True_cifar10", args.gpu_id, num_models, output_dim=10)
+    models = get_pretrained_models(args.model_name, "resnet18_diff_weight_init_True_cifar10", args.gpu_id, num_models, output_dim=10)
 
     loaders = None
     if "vgg" not in args.model_name and "resnet" not in args.model_name:
@@ -134,43 +137,100 @@ if __name__ == '__main__':
     
     accuracies = []
 
+    """result = {}
+    sparsities = [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]
+    result["prune"] = {}
+    result["IF"] = {}
+    for sparsity in sparsities:
+        t = prune_structured(net=copy.deepcopy(models[0]), loaders=None, num_epochs=0, gpu_id=args.gpu_id, example_inputs=torch.randn(1, 3, 32, 32),
+                    out_features=10, prune_type="l1", sparsity=sparsity, train_fct=None, total_steps=1)
+        result["prune"][sparsity] = evaluate_performance_simple(t, loaders, 0, eval=True)
+
+        fused_model_g = intrafusion_bn(models[0], full_model = models[0], sparsity=sparsity, fusion_type="weight", gpu_id = args.gpu_id, resnet = True, train_loader=get_cifar_data_loader(shuffle=True)["train"])
+        result["IF"][sparsity] = evaluate_performance_simple(fused_model_g, loaders, 0, eval=True)
+    with open("results_IF_datafree_vgg", "w") as outfile:
+        json.dump(result, outfile, indent=4)
+    exit()"""
+
+
+    for idx, ((layer0_name, fc_layer0_weight), (layer1_name, fc_layer1_weight)) in \
+            enumerate(zip(models[0].named_parameters(), models[0].named_parameters())):
+        print(f"{layer0_name} : {fc_layer0_weight.shape}")
+
+    fused_model_g = fusion_bn(models, fusion_type="weight", gpu_id=args.gpu_id, resnet=False, train_loader=get_cifar_data_loader(shuffle=True)["train"])
+    #fused_model_g = fusion(models, gpu_id=args.gpu_id, resnet=True)
+    print(evaluate_performance_simple(fused_model_g, loaders, 0, eval=True))
+    exit()
+    """fused_model_g = intrafusion_bn(models[0], full_model = models[0], sparsity=0.9, fusion_type="weight", gpu_id = args.gpu_id, resnet = True, train_loader=get_cifar_data_loader(shuffle=True)["train"])
+    print(evaluate_performance_simple(fused_model_g, loaders, 0, eval=True))
+    exit()"""
+
+
+    result = {}
+
+    train_epochs = 10
+    sparsities = [0.8]
+    for idx, model in enumerate(models):
+        result[f"model_{idx}"] = {}
+        for sparsity in sparsities:
+            print("****************Sparsity: ", sparsity)
+            prune_steps = prune_structured_intra(net=copy.deepcopy(model), loaders=None, num_epochs=0, gpu_id=args.gpu_id, example_inputs=torch.randn(1, 3, 32, 32),
+                    out_features=10, prune_type="l1", sparsity=sparsity, train_fct=None, total_steps=4)
+            fused_model_g = model
+            for prune_step in prune_steps:
+                fused_model_g = intrafusion_bn(fused_model_g, sparsity=sparsity, fusion_type="weight", full_model = model, small_model=prune_step, gpu_id = args.gpu_id, resnet = True, train_loader=get_cifar_data_loader(shuffle=True)["train"])
+                fused_model_g,_ = train_during_pruning(fused_model_g, loaders=loaders, num_epochs=train_epochs, gpu_id =0, prune=False, performed_epochs=0)
+            accuracy_fused_g = evaluate_performance_simple(fused_model_g, loaders, 0, eval=True)
+            print("fused: ", accuracy_fused_g)
+            fused_model_g, epoch_accuracies = train_during_pruning(fused_model_g, loaders=loaders, num_epochs=110, gpu_id =0, prune=False, performed_epochs=0)
+            print("Final fused is: ", epoch_accuracies[-1])
+            result[f"model_{idx}"][sparsity] = epoch_accuracies
     
-    """idx = -1
-    for a in models[0].named_modules():
-        idx += 1
-        if idx < 2:
-            continue
-        print(type(a))
-        print(a)
-        print(type(a[1]))
-        try:
-            print(a[1].weight)
-        except:
-            print("No weights")
-        print("-----")"""
-        
-    
-    pass
+    with open("results_intrafusion_resnet18_dataaware_prune_IF_08", "w") as outfile:
+        json.dump(result, outfile, indent=4)
 
-    model = models[0]
-    model.eval()
-    #fused_model= IntraFusion_Clustering(model, gpu_id = args.gpu_id, resnet = False, sparsity=0.8)
-    fused_model = fusion_bn(models, gpu_id = args.gpu_id, resnet = False)
 
-    print("ALT")
-    accuracy_0 = evaluate_performance_simple(models[0], loaders, 0)
-    accuracy_1 = evaluate_performance_simple(models[1], loaders, 0)
-    accuracy_fused = evaluate_performance_simple(fused_model, loaders, 0, eval=True)
+    exit()
+    """sparsities = [0.5, 0.6, 0.7, 0.8]
+    result = {}
+    for idx, model in enumerate(models):
+        result[f"model_{idx}"] = {}
+        for sparsity in sparsities:
+            fused_model_g = model
+            iterations = []
+            if sparsity > 0.5:
+                if sparsity == 0.6:
+                    iterations = [0.2, 0.4]
+                if sparsity == 0.7 or sparsity == 0.8:
+                    iterations = [0.2, 0.4, 0.6]
+                for i in iterations:
+                    fused_model_g = intrafusion_bn(fused_model_g, sparsity=i, fusion_type="weight", full_model = model, gpu_id = args.gpu_id, resnet = True, train_loader=get_cifar_data_loader(shuffle=True)["train"])
+                    fused_model_g, _ = train_during_pruning(fused_model_g, loaders=loaders, num_epochs=10, gpu_id =0, prune=False, performed_epochs=0)
 
-    print('Test Accuracy of the model 0: %.2f' % accuracy_0)
-    print('Test Accuracy of the model 1: %.2f' % accuracy_1)
-    print('Test Accuracy of the model fused beginning: %.2f' % accuracy_fused)
+            fused_model_g = intrafusion_bn(fused_model_g, sparsity=sparsity, fusion_type="weight", full_model = model, gpu_id = args.gpu_id, resnet = True, train_loader=get_cifar_data_loader(shuffle=True)["train"])
+            #fused_model_g, _ = train_during_pruning(fused_model_g, loaders=loaders, num_epochs=140, gpu_id =0, prune=False, performed_epochs=0)
+            accuracy_fused_g = evaluate_performance_simple(fused_model_g, loaders, 0, eval=True)
+            print('Test Accuracy of the model fused beginning gradient: %.2f' % accuracy_fused_g)
 
-    #fused_model = update_running_statistics(fused_model, loaders, 0)
-    fused_model.train()
-    #fused_model, _ = train_during_pruning(fused_model, loaders=loaders, num_epochs=40, gpu_id =0, prune=False, performed_epochs=0)
-    ###
-    fused_accs = []
+            #print('Test Accuracy of the model fused beginning weight: %.2f' % accuracy_fused_w)
+
+            fused_model_g, epoch_accuracies = train_during_pruning(fused_model_g, loaders=loaders, num_epochs=150-10*len(iterations), gpu_id =0, prune=False, performed_epochs=0)
+
+            print('Test Accuracy of the model fused beginning gradient: %.2f' % accuracy_fused_g)
+            result[f"model_{idx}"][str(sparsity)] = epoch_accuracies
+
+    with open("results_intrafusion.json", "w") as outfile:
+        json.dump(result, outfile, indent=4)
+    exit()"""
+    #fused_model_w, _ = train_during_pruning(fused_model_w, loaders=loaders, num_epochs=40, gpu_id =0, prune=False, performed_epochs=0)
+    fused_model_g, _ = train_during_pruning(fused_model_g, loaders=loaders, num_epochs=40, gpu_id =0, prune=False, performed_epochs=0)
+
+    #accuracy_fused_w = evaluate_performance_simple(fused_model_w, loaders, 0, eval=True)
+    accuracy_fused_g = evaluate_performance_simple(fused_model_g, loaders, 0, eval=True)
+
+    #print('Test Accuracy of the model fused beginning weight: %.2f' % accuracy_fused_w)
+    print('Test Accuracy of the model fused beginning gradient: %.2f' % accuracy_fused_g)
+    """fused_accs = []
     for idx in range(40):
         fused_model, _ = train_during_pruning(fused_model, loaders=loaders, num_epochs=1, gpu_id =0, prune=False, performed_epochs=0)
         fused_accs.append(evaluate_performance_simple(fused_model, loaders, 0, eval=True))
@@ -178,7 +238,7 @@ if __name__ == '__main__':
 
     accuracy_fused = evaluate_performance_simple(fused_model, loaders, 0, eval=True)
     print('Test Accuracy of the model fused after: %.2f' % accuracy_fused)
-    print(fused_accs)
+    print(fused_accs)"""
 
 
 

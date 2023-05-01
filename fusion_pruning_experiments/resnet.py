@@ -30,18 +30,22 @@ class BasicBlock(nn.Module):
         if not use_batchnorm:
             self.bn1 = self.bn2 = nn.Sequential()
 
-        #self.shortcut = nn.Sequential()
+        self.shortcut = nn.Sequential()
         #if stride != 1 or in_planes != self.expansion*planes:
-        self.shortcut = nn.Sequential(
-            nn.Conv2d(in_planes, self.expansion*planes, kernel_size=1, stride=stride, bias=linear_bias),
-            nn.BatchNorm2d(self.expansion*planes) if use_batchnorm else nn.Sequential()
-        )
+        if stride != 1 or in_planes != self.expansion*planes:
+            print("Need shortcut")
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_planes, self.expansion*planes, kernel_size=1, stride=stride, bias=linear_bias),
+                nn.BatchNorm2d(self.expansion*planes) if use_batchnorm else nn.Sequential()
+            )
+        else:
+            print("No shortcut")
 
     def forward(self, x):
-        out = self.relu1(self.bn1(self.conv1(x)))
+        out = F.relu(self.bn1(self.conv1(x)))
         out = self.bn2(self.conv2(out))
         out += self.shortcut(x)
-        out = self.relu2(out)
+        out = F.relu(out)
         return out
 
 
@@ -102,7 +106,7 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        out = self.relu1(self.bn1(self.conv1(x)))
+        out =F.relu(self.bn1(self.conv1(x)))
         out = self.layer1(out)
         out = self.layer2(out)
         out = self.layer3(out)

@@ -3,7 +3,12 @@ import torch
 import torch.nn.functional as F
 import torch.nn.utils.prune as prune
 import torch_pruning as tp
+<<<<<<< HEAD
 from torch import nn
+=======
+import copy
+
+>>>>>>> b446bcd (Extend fusion and intra-fusion to handle skip connections without shortcuts)
 
 ### TO-DO:
 ### RETURN MODEL
@@ -120,7 +125,74 @@ def prune_structured(
     # The model is returned, but the pruning is done in situ...
     return model
 
+def prune_structured_intra(net, loaders, num_epochs, example_inputs, out_features, prune_type, gpu_id, sparsity=0.5, total_steps=1,train_fct=None):
 
+    print(f"Structured pruning with type {prune_type} and channel sparsity {sparsity}")
+    ori_size = tp.utils.count_params(net)
+    imp = None
+
+    if prune_type == 'random':
+        imp = tp.importance.RandomImportance()
+    elif prune_type ==  'sensitivity':
+        imp = tp.importance.SensitivityImportance()
+    elif prune_type ==  'l1':
+        imp = tp.importance.MagnitudeImportance(1)
+    elif prune_type ==  'l2':
+        imp = tp.importance.MagnitudeImportance(2)
+    elif prune_type ==  'l_inf':
+        imp = tp.importance.MagnitudeImportance(np.inf)
+    elif prune_type ==  'hessian':
+        imp = tp.importance.HessianImportance()
+    elif prune_type ==  'bnscale':
+        imp = tp.importance.BNScaleImportance()
+    elif prune_type ==  'structural':
+        imp = tp.importance.StrcuturalImportance
+    elif prune_type ==  'lamp':
+        imp = tp.importance.LAMPImportance()
+    else:
+        raise ValueError("Prune type not supported")
+
+
+    ignored_layers = []
+    model = net #Correct????
+    for m in model.modules():
+        if isinstance(m, torch.nn.Linear) and m.out_features == out_features:
+            ignored_layers.append(m)
+
+    total_steps = int(total_steps)
+    
+    if next(model.parameters()).is_cuda:
+        model.to("cpu")
+    
+    pruner = tp.pruner.LocalMagnitudePruner( 
+        model,
+        example_inputs,
+        importance=imp,
+        total_steps=total_steps, # number of iterations
+        ch_sparsity=sparsity, # channel sparsity
+        ignored_layers=ignored_layers, # ignored_layers will not be pruned
+    )
+    models = []
+    for i in range(total_steps): # iterative pruning
+        print(i)
+        pruner.step()
+        print(
+            "  Params: %.2f M => %.2f M"
+            % (ori_size / 1e6, tp.utils.count_params(model) / 1e6)
+        )
+        models.append(copy.deepcopy(model))
+
+        #Potentially retrain the model
+        #The train function is a function that takes the model and does the training on it.
+        #It probably calls other training functions
+
+        if train_fct is not None:
+            model, val_acc_per_epoch = train_fct(model, loaders, num_epochs, gpu_id)
+
+    #The model is returned, but the pruning is done in situ...
+    return models
+
+from torch.autograd import Variable
 from torch import optim
 from torch.autograd import Variable
 
