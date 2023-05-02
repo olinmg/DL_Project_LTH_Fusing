@@ -5,6 +5,9 @@ import os
 
 import torch
 import torchvision.transforms as transforms
+from torchvision import datasets
+from torchvision.transforms import ToTensor
+
 from fusion_utils import FusionType
 from model_caching import (
     ensure_folder_existence,
@@ -20,11 +23,13 @@ from model_caching import (
 from models import get_model, get_pretrained_model_by_name, get_pretrained_models
 from parameters import get_parameters
 from performance_tester import (
+    evaluate_performance_imagenet,
     evaluate_performance_simple,
     float_format,
     fusion_test_manager,
     get_cifar10_data_loader,
     get_cifar100_data_loader,
+    get_imagenet_data_loader,
     get_mnist_data_loader,
     get_result_skeleton,
     original_test_manager,
@@ -34,8 +39,6 @@ from performance_tester import (
     wrapper_first_fusion,
     wrapper_structured_pruning,
 )
-from torchvision import datasets
-from torchvision.transforms import ToTensor
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -67,12 +70,14 @@ if __name__ == "__main__":
     use_iterative_pruning = (
         True
         if (
-            experiment_params["prune_iter_epochs"] > 0 and experiment_params["prune_iter_steps"] > 1
+            experiment_params["prune_iter_epochs"] > 0
+            and experiment_params["prune_iter_steps"] > 1
+            and use_iter_prune
         )
         else False
     )
     prune_iter_epochs = experiment_params["prune_iter_epochs"]
-    if use_iter_prune and prune_iter_epochs > 0:
+    if use_iterative_pruning:
         logging.info(
             f"Working with iterative pruning: {prune_iter_steps} steps with each {prune_iter_epochs} epochs retraining."
         )
@@ -98,7 +103,8 @@ if __name__ == "__main__":
         loaders = get_cifar100_data_loader()
         output_dim = 100
     elif dataset_name == "imagenet":
-        pass
+        loaders = get_imagenet_data_loader()
+        output_dim = 0
     else:
         raise Exception("Provided dataset does not exist.")
 
@@ -112,7 +118,11 @@ if __name__ == "__main__":
         else None,
     )
     pruning_function = wrapper_structured_pruning
-    eval_function = evaluate_performance_simple
+    eval_function = (
+        evaluate_performance_imagenet
+        if experiment_params["dataset"] == "imagenet"
+        else evaluate_performance_simple
+    )
 
     # collecting the experiment settings into a dict
     params = {}
