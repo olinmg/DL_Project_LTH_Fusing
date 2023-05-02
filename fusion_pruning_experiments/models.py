@@ -2,6 +2,7 @@ from collections import OrderedDict
 
 import torch
 import torch.nn as nn
+import torchvision.models as model_archs
 
 from mobilenetv1 import MobileNetV1
 from resnet import BasicBlock, Bottleneck, ResNet
@@ -25,7 +26,6 @@ class MLP(nn.Module):
         self.out = nn.Linear(int(512 * self.sparsity), 10, bias=bias)
 
     def forward(self, x):
-
         x = self.lin1(x.view(-1, 28 * 28))
         x = self.lin2(x)
         output = self.out(x)
@@ -208,9 +208,7 @@ def vgg11(bias=False, sparsity=1.0, output_dim=10):
     """VGG 11-layer model (configuration "A")"""
     params = cfg["A"]
     params = [
-        (round(i * sparsity) if round(i * sparsity) > 1 else 1)
-        if isinstance(i, int)
-        else i
+        (round(i * sparsity) if round(i * sparsity) > 1 else 1) if isinstance(i, int) else i
         for i in params
     ]
     print(params)
@@ -279,11 +277,16 @@ def get_model(model_name, sparsity=1.0, output_dim=10):
 
 
 def get_pretrained_model_by_name(model_file_path, gpu_id):
-    try:
-        model = torch.load(f"{model_file_path}.pth")
-    except:
-        model = torch.load(f"{model_file_path}.pth", map_location=torch.device("cpu"))
-    model = model.cuda(gpu_id) if gpu_id != -1 else model.to("cpu")
+    if "resnet50" in model_file_path:
+        model = model_archs.__dict__["resnet50"]()
+        checkpoint = torch.load(f"models/{model_file_path}.pth.tar")
+        model.load_state_dict(checkpoint["state_dict"])
+    else:
+        try:
+            model = torch.load(f"{model_file_path}.pth")
+        except:
+            model = torch.load(f"{model_file_path}.pth", map_location=torch.device("cpu"))
+        model = model.cuda(gpu_id) if gpu_id != -1 else model.to("cpu")
     return model
 
 
@@ -291,17 +294,22 @@ def get_pretrained_models(model_name, basis_name, gpu_id, num_models, output_dim
     models = []
 
     for idx in range(num_models):
-        try:
-            model = torch.load(f"models/{basis_name}_{idx}.pth")
-        except:
-            model = torch.load(
-                f"models/{basis_name}_{idx}.pth", map_location=torch.device("cpu")
-            )
+        if model_name == "resnet50":
+            model = model_archs.__dict__["resnet50"]()
+            checkpoint = torch.load(f"models/{basis_name}_{idx}.pth.tar")
+            model.load_state_dict(checkpoint["state_dict"])
+        else:
+            try:
+                model = torch.load(f"models/{basis_name}_{idx}.pth")
+            except:
+                model = torch.load(
+                    f"models/{basis_name}_{idx}.pth", map_location=torch.device("cpu")
+                )
 
         if gpu_id != -1:
             model = model.cuda(gpu_id)
         else:
-            modle = model.to("cpu")
+            model = model.to("cpu")
         models.append(model)
     return models
 
@@ -318,9 +326,7 @@ def get_pretrained_models_by_name(
         try:
             state = torch.load(f"./{model_file_names[idx]}.pth")
         except:
-            state = torch.load(
-                f"./{model_file_names[idx]}.pth", map_location=torch.device("cpu")
-            )
+            state = torch.load(f"./{model_file_names[idx]}.pth", map_location=torch.device("cpu"))
 
         print(f"Getting state from: ./{model_file_names[idx]}.pth")
 

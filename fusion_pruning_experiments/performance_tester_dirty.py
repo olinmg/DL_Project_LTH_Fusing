@@ -5,6 +5,9 @@ import os
 
 import torch
 import torchvision.transforms as transforms
+from torchvision import datasets
+from torchvision.transforms import ToTensor
+
 from fusion_utils import FusionType
 from model_caching import (
     ensure_folder_existence,
@@ -36,8 +39,6 @@ from performance_tester import (
     wrapper_first_fusion,
     wrapper_structured_pruning,
 )
-from torchvision import datasets
-from torchvision.transforms import ToTensor
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -69,7 +70,9 @@ if __name__ == "__main__":
     use_iterative_pruning = (
         True
         if (
-            experiment_params["prune_iter_epochs"] > 0 and experiment_params["prune_iter_steps"] > 1
+            experiment_params["prune_iter_epochs"] > 0
+            and experiment_params["prune_iter_steps"] > 1
+            and use_iter_prune
         )
         else False
     )

@@ -4,6 +4,7 @@ import math
 import os
 
 import torch
+import torch.distributed as dist
 import torchvision.transforms as transforms
 from torchvision import datasets
 from torchvision.transforms import ToTensor
@@ -776,7 +777,11 @@ if __name__ == "__main__":
     pruning_function = (
         wrapper_structured_pruning  # still need to implement the structured pruning function
     )
-    eval_function = evaluate_performance_simple
+    eval_function = (
+        evaluate_performance_imagenet
+        if experiment_params["dataset"] == "imagenet"
+        else evaluate_performance_simple
+    )
 
     new_result = {}
     for sparsity in result_final["experiment_parameters"]["sparsity"]:
