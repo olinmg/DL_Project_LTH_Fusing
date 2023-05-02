@@ -1,17 +1,19 @@
 import copy
 import json
 import math
+import os
 
 import torch
 import torchvision.transforms as transforms
+from torchvision import datasets
+from torchvision.transforms import ToTensor
+
 from fusion_utils import FusionType
 
 # import main #from main import get_data_loader, test
 from models import get_model, get_pretrained_models
 from parameters import get_parameters
 from pruning_modified import prune_unstructured
-from torchvision import datasets
-from torchvision.transforms import ToTensor
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -120,45 +122,60 @@ def get_cifar100_data_loader():
 
 
 def get_imagenet_data_loader():
+    traindir = os.path.join("/local/home/stuff/imagenet", "train")
+    valdir = os.path.join("/local/home/stuff/imagenet", "val")
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
-    # Initialize transformations for data augmentation
-    transforming = transforms.Compose(
-        [
-            transforms.Resize(256),
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomVerticalFlip(),
-            transforms.RandomRotation(degrees=45),
-            transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-        ]
+    train_dataset = datasets.ImageFolder(
+        traindir,
+        transforms.Compose(
+            [
+                transforms.RandomResizedCrop(224),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                normalize,
+            ]
+        ),
     )
 
+    val_dataset = datasets.ImageFolder(
+        valdir,
+        transforms.Compose(
+            [
+                transforms.Resize(256),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                normalize,
+            ]
+        ),
+    )
+
+    if False:
+        # can turn this on
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+        val_sampler = torch.utils.data.distributed.DistributedSampler(
+            val_dataset, shuffle=False, drop_last=True
+        )
+    else:
+        train_sampler = None
+        val_sampler = None
+
     train_loader = torch.utils.data.DataLoader(
-        datasets.ImageNet(root="./data", train=True, transform=transforming, download=True),
-        batch_size=128,
-        shuffle=True,
+        train_dataset,
+        batch_size=256,
+        shuffle=(train_sampler is None),
         num_workers=4,
         pin_memory=True,
+        sampler=train_sampler,
     )
 
     val_loader = torch.utils.data.DataLoader(
-        datasets.ImageNet(
-            root="./data",
-            train=False,
-            transform=transforms.Compose(
-                [
-                    transforms.ToTensor(),
-                    normalize,
-                ]
-            ),
-        ),
-        batch_size=128,
+        val_dataset,
+        batch_size=256,
         shuffle=False,
         num_workers=4,
         pin_memory=True,
+        sampler=val_sampler,
     )
 
     return {"train": train_loader, "test": val_loader}
@@ -188,6 +205,177 @@ def evaluate_performance_simple(input_model, loaders, gpu_id, prune=True):
     if prune:
         input_model.cpu()
     return accuracy_accumulated / total
+
+
+import time
+from enum import Enum
+
+from torch.utils.data import Subset
+
+
+def evaluate_performance_imagenet(
+    model, val_loader, gpu_id, prune=True, distributed=False, world_size=1
+):
+    # def validate(val_loader, model, criterion, args): # from main.py in https://github.com/pytorch/examples/tree/main/imagenet
+    criterion = nn.CrossEntropyLoss().to(device)
+
+    # Only used to work with imagenet
+    def run_validate(loader, base_progress=0):
+        with torch.no_grad():
+            end = time.time()
+            for i, (images, target) in enumerate(loader):
+                i = base_progress + i
+                if gpu_id is not None and torch.cuda.is_available():
+                    images = images.cuda(gpu_id, non_blocking=True)
+                if torch.backends.mps.is_available():
+                    images = images.to("mps")
+                    target = target.to("mps")
+                if torch.cuda.is_available():
+                    target = target.cuda(gpu_id, non_blocking=True)
+
+                # compute output
+                output = model(images)
+                loss = criterion(output, target)
+
+                # measure accuracy and record loss
+                acc1, acc5 = accuracy(output, target, topk=(1, 5))
+                losses.update(loss.item(), images.size(0))
+                top1.update(acc1[0], images.size(0))
+                top5.update(acc5[0], images.size(0))
+
+                # measure elapsed time
+                batch_time.update(time.time() - end)
+                end = time.time()
+
+                """
+                if i % args.print_freq == 0:
+                    progress.display(i + 1)
+                """
+
+    batch_time = AverageMeter("Time", ":6.3f", Summary.NONE)
+    losses = AverageMeter("Loss", ":.4e", Summary.NONE)
+    top1 = AverageMeter("Acc@1", ":6.2f", Summary.AVERAGE)
+    top5 = AverageMeter("Acc@5", ":6.2f", Summary.AVERAGE)
+    progress = ProgressMeter(
+        len(val_loader)
+        + (distributed and (len(val_loader.sampler) * world_size < len(val_loader.dataset))),
+        [batch_time, losses, top1, top5],
+        prefix="Test: ",
+    )
+
+    # switch to evaluate mode
+    model.eval()
+
+    run_validate(val_loader)
+    if distributed:
+        top1.all_reduce()
+        top5.all_reduce()
+
+    if distributed and (len(val_loader.sampler) * world_size < len(val_loader.dataset)):
+        aux_val_dataset = Subset(
+            val_loader.dataset,
+            range(len(val_loader.sampler) * world_size, len(val_loader.dataset)),
+        )
+        aux_val_loader = torch.utils.data.DataLoader(
+            aux_val_dataset,
+            batch_size=256,
+            shuffle=False,
+            num_workers=4,
+            pin_memory=True,
+        )
+        run_validate(aux_val_loader, len(val_loader))
+
+    progress.display_summary()
+
+    if prune:
+        model.cpu()
+    return top1.avg
+
+
+class Summary(Enum):
+    # Only used to work with imagenet
+    NONE = 0
+    AVERAGE = 1
+    SUM = 2
+    COUNT = 3
+
+
+class AverageMeter(object):
+    # Only used to work with imagenet
+
+    """Computes and stores the average and current value"""
+
+    def __init__(self, name, fmt=":f", summary_type=Summary.AVERAGE):
+        self.name = name
+        self.fmt = fmt
+        self.summary_type = summary_type
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
+
+    def all_reduce(self):
+        if torch.cuda.is_available():
+            device = torch.device("cuda")
+        elif torch.backends.mps.is_available():
+            device = torch.device("mps")
+        else:
+            device = torch.device("cpu")
+        total = torch.tensor([self.sum, self.count], dtype=torch.float32, device=device)
+        dist.all_reduce(total, dist.ReduceOp.SUM, async_op=False)
+        self.sum, self.count = total.tolist()
+        self.avg = self.sum / self.count
+
+    def __str__(self):
+        fmtstr = "{name} {val" + self.fmt + "} ({avg" + self.fmt + "})"
+        return fmtstr.format(**self.__dict__)
+
+    def summary(self):
+        fmtstr = ""
+        if self.summary_type is Summary.NONE:
+            fmtstr = ""
+        elif self.summary_type is Summary.AVERAGE:
+            fmtstr = "{name} {avg:.3f}"
+        elif self.summary_type is Summary.SUM:
+            fmtstr = "{name} {sum:.3f}"
+        elif self.summary_type is Summary.COUNT:
+            fmtstr = "{name} {count:.3f}"
+        else:
+            raise ValueError("invalid summary type %r" % self.summary_type)
+
+        return fmtstr.format(**self.__dict__)
+
+
+class ProgressMeter(object):
+    # Only used to work with imagenet
+    def __init__(self, num_batches, meters, prefix=""):
+        self.batch_fmtstr = self._get_batch_fmtstr(num_batches)
+        self.meters = meters
+        self.prefix = prefix
+
+    def display(self, batch):
+        entries = [self.prefix + self.batch_fmtstr.format(batch)]
+        entries += [str(meter) for meter in self.meters]
+        print("\t".join(entries))
+
+    def display_summary(self):
+        entries = [" *"]
+        entries += [meter.summary() for meter in self.meters]
+        print(" ".join(entries))
+
+    def _get_batch_fmtstr(self, num_batches):
+        num_digits = len(str(num_batches // 1))
+        fmt = "{:" + str(num_digits) + "d}"
+        return "[" + fmt + "/" + fmt.format(num_batches) + "]"
 
 
 def update_running_statistics(input_model, loaders, gpu_id, batches=10):
@@ -571,6 +759,9 @@ if __name__ == "__main__":
     elif experiment_params["dataset"] == "cifar100":
         loaders = get_cifar100_data_loader()
         output_dim = 100
+    elif experiment_params["dataset"] == "imagenet":
+        loaders = get_imagenet_data_loader()
+        output_dim = 0
     else:
         raise Exception("Provided dataset does not exist.")
 
@@ -630,7 +821,6 @@ if __name__ == "__main__":
                 "prune_type": result["prune_type"],
                 "sparsity": result["sparsity"],
                 "num_epochs": experiment_params["num_epochs"],
-
                 "example_input": torch.randn(1, 1, 28, 28)
                 if "cnn" in name
                 else torch.randn(1, 3, 32, 32),
