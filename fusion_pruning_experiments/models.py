@@ -286,7 +286,7 @@ def get_pretrained_model_by_name(model_file_path, gpu_id):
             model = torch.load(f"{model_file_path}.pth")
         except:
             model = torch.load(f"{model_file_path}.pth", map_location=torch.device("cpu"))
-        model = model.cuda(gpu_id) if gpu_id != -1 else model.to("cpu")
+    model = model.cuda(gpu_id) if gpu_id != -1 else model.to("cpu")
     return model
 
 
@@ -296,8 +296,10 @@ def get_pretrained_models(model_name, basis_name, gpu_id, num_models, output_dim
     for idx in range(num_models):
         if model_name == "resnet50":
             model = model_archs.__dict__["resnet50"]()
+            model = torch.nn.DataParallel(model)
             checkpoint = torch.load(f"models/{basis_name}_{idx}.pth.tar")
             model.load_state_dict(checkpoint["state_dict"])
+            model = model.module.to("cpu")
         else:
             try:
                 model = torch.load(f"models/{basis_name}_{idx}.pth")
@@ -305,11 +307,7 @@ def get_pretrained_models(model_name, basis_name, gpu_id, num_models, output_dim
                 model = torch.load(
                     f"models/{basis_name}_{idx}.pth", map_location=torch.device("cpu")
                 )
-
-        if gpu_id != -1:
-            model = model.cuda(gpu_id)
-        else:
-            model = model.to("cpu")
+        model = model.cuda(gpu_id) if gpu_id != -1 else model.to("cpu")
         models.append(model)
     return models
 

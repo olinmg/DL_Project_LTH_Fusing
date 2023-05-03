@@ -23,6 +23,7 @@ from model_caching import (
 from models import get_model, get_pretrained_model_by_name, get_pretrained_models
 from parameters import get_parameters
 from performance_tester import (
+    accuracy,
     evaluate_performance_imagenet,
     evaluate_performance_simple,
     float_format,
@@ -105,6 +106,7 @@ if __name__ == "__main__":
     elif dataset_name == "imagenet":
         loaders = get_imagenet_data_loader()
         output_dim = 0
+        print("Loading imagenet dataset worked :)")
     else:
         raise Exception("Provided dataset does not exist.")
 
@@ -153,12 +155,14 @@ if __name__ == "__main__":
         experiment_params["num_models"],
         output_dim=output_dim,
     )
+    print("Loading resnet50 model worked")
+
     for idx in range(experiment_params["num_models"]):
         logging.info(f"\tLoaded the model: ./models/{original_model_basis_name}_{idx}.pth")
 
     # measuring the performance of the original models
     logging.info("Basis Model Accuracies:")
-    original_model_accuracies = original_test_manager(input_model_list=models_original, **params)
+    original_model_accuracies = [0.0] #original_test_manager(input_model_list=models_original, **params)
     logging.info(f"\t{original_model_accuracies}")
 
     for idx_result, result in enumerate(result_final["results"]):

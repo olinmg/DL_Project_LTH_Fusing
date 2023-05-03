@@ -212,11 +212,34 @@ import time
 from enum import Enum
 
 from torch.utils.data import Subset
+def accuracy(output, target, topk=(1,)):
+    # only used for imagenet/resnet50
+    """Computes the accuracy over the k top predictions for the specified values of k"""
+    with torch.no_grad():
+        maxk = max(topk)
+        batch_size = target.size(0)
+
+        _, pred = output.topk(maxk, 1, True, True)
+        pred = pred.t()
+        correct = pred.eq(target.view(1, -1).expand_as(pred))
+
+        res = []
+        for k in topk:
+            correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
+            res.append(correct_k.mul_(100.0 / batch_size))
+        return res
+
 
 
 def evaluate_performance_imagenet(
-    model, val_loader, gpu_id, prune=True, distributed=False, world_size=1
+    input_model, loaders, gpu_id, prune=True, distributed=False, world_size=1
 ):
+    if gpu_id != -1:
+        input_model = input_model.cuda(gpu_id)
+
+    model = input_model
+    val_loader = loaders["test"]
+
     # def validate(val_loader, model, criterion, args): # from main.py in https://github.com/pytorch/examples/tree/main/imagenet
     criterion = nn.CrossEntropyLoss().to(device)
 
