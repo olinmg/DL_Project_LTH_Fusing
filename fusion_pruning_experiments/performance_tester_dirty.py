@@ -105,7 +105,7 @@ if __name__ == "__main__":
         output_dim = 100
     elif dataset_name == "imagenet":
         loaders = get_imagenet_data_loader()
-        output_dim = 0
+        output_dim = 1000
         print("Loading imagenet dataset worked :)")
     else:
         raise Exception("Provided dataset does not exist.")
@@ -162,7 +162,9 @@ if __name__ == "__main__":
 
     # measuring the performance of the original models
     logging.info("Basis Model Accuracies:")
-    original_model_accuracies = [0.0] #original_test_manager(input_model_list=models_original, **params)
+    original_model_accuracies = [
+        0.0
+    ]  # original_test_manager(input_model_list=models_original, **params)
     logging.info(f"\t{original_model_accuracies}")
 
     for idx_result, result in enumerate(result_final["results"]):

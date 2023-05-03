@@ -212,6 +212,8 @@ import time
 from enum import Enum
 
 from torch.utils.data import Subset
+
+
 def accuracy(output, target, topk=(1,)):
     # only used for imagenet/resnet50
     """Computes the accuracy over the k top predictions for the specified values of k"""
@@ -228,7 +230,6 @@ def accuracy(output, target, topk=(1,)):
             correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
             res.append(correct_k.mul_(100.0 / batch_size))
         return res
-
 
 
 def evaluate_performance_imagenet(
@@ -785,7 +786,7 @@ if __name__ == "__main__":
         output_dim = 100
     elif experiment_params["dataset"] == "imagenet":
         loaders = get_imagenet_data_loader()
-        output_dim = 0
+        output_dim = 1000
     else:
         raise Exception("Provided dataset does not exist.")
 
