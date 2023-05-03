@@ -23,13 +23,11 @@ from model_caching import (
 from models import get_model, get_pretrained_model_by_name, get_pretrained_models
 from parameters import get_parameters
 from performance_tester import (
-    evaluate_performance_imagenet,
     evaluate_performance_simple,
     float_format,
     fusion_test_manager,
     get_cifar10_data_loader,
     get_cifar100_data_loader,
-    get_imagenet_data_loader,
     get_mnist_data_loader,
     get_result_skeleton,
     original_test_manager,
@@ -102,9 +100,6 @@ if __name__ == "__main__":
     elif dataset_name == "cifar100":
         loaders = get_cifar100_data_loader()
         output_dim = 100
-    elif dataset_name == "imagenet":
-        loaders = get_imagenet_data_loader()
-        output_dim = 0
     else:
         raise Exception("Provided dataset does not exist.")
 
@@ -118,11 +113,7 @@ if __name__ == "__main__":
         else None,
     )
     pruning_function = wrapper_structured_pruning
-    eval_function = (
-        evaluate_performance_imagenet
-        if experiment_params["dataset"] == "imagenet"
-        else evaluate_performance_simple
-    )
+    eval_function = evaluate_performance_simple
 
     # collecting the experiment settings into a dict
     params = {}
