@@ -106,7 +106,6 @@ if __name__ == "__main__":
     elif dataset_name == "imagenet":
         loaders = get_imagenet_data_loader()
         output_dim = 1000
-        print("Loading imagenet dataset worked :)")
     else:
         raise Exception("Provided dataset does not exist.")
 
@@ -155,7 +154,6 @@ if __name__ == "__main__":
         experiment_params["num_models"],
         output_dim=output_dim,
     )
-    print("Loading resnet50 model worked")
 
     for idx in range(experiment_params["num_models"]):
         logging.info(f"\tLoaded the model: ./models/{original_model_basis_name}_{idx}.pth")
