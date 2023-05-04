@@ -13,6 +13,9 @@ def wrapper_intra_fusion(model, model_name: str, resnet: bool, sparsity: float, 
     :param model_name: The name of the model
     :param resnet: resnet = True means that the model is a resnet
     :param sparsity: The desired sparsity. sparsity = 0.9 means that 90% of the nodes within the layers are removed
+    :param prune_iter_steps: The amount of intermediate pruning steps it takes to arrive at the desired sparsity
+    :param num_epochs: The amount of epochs it retrains for the intermediate pruning steps (see prune_iter_steps)
+    :param loaders: The loaders containing the training and test data
     :param prune_type: The neuron importance metric. Options: "l1" and "l2"
     :param meta_prune_type: If meta_prune_type = MetaPruneType.DEFAULT then it will prune the model in the normal way. If meta_prune_type = MetaPruneType.IF it will do intrafusion
     :return: the pruned model
