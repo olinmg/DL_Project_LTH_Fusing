@@ -101,7 +101,7 @@ if __name__ == "__main__":
     }
 
     # Load the model that should be pruned and retraiend
-    model_path = f"./models/{experiment_params['models'][0]['basis_name']}_fullData"
+    model_path = f"./models/{experiment_params['models'][0]['basis_name']}_wholeData"
     logging.info(f"Loading model: {model_path}.")
     print(f"Loading model: {model_path}.")
     models_original = [get_pretrained_model_by_name(model_path, gpu_id=experiment_params["gpu_id"])]
