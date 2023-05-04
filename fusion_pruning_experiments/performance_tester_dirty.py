@@ -5,9 +5,6 @@ import os
 
 import torch
 import torchvision.transforms as transforms
-from torchvision import datasets
-from torchvision.transforms import ToTensor
-
 from fusion_utils import FusionType
 from model_caching import (
     ensure_folder_existence,
@@ -40,6 +37,8 @@ from performance_tester import (
     wrapper_first_fusion,
     wrapper_structured_pruning,
 )
+from torchvision import datasets
+from torchvision.transforms import ToTensor
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -279,6 +278,7 @@ if __name__ == "__main__":
                         num_epochs=num_epochs,
                         gpu_id=gpu_id,
                         prune=False,
+                        model_name=name,
                     )
                     this_pruned_model = this_pruned_model_lis[0]
                     if use_caching:
@@ -316,6 +316,7 @@ if __name__ == "__main__":
                             gpu_id=gpu_id,
                             prune=False,
                             performed_epochs=num_epochs,
+                            model_name=name,
                         )
                         epoch_acc_further = this_pruned_model_train_accuracies
                         epoch_acc_further.extend(epoch_accuracy_further_tr)
@@ -361,6 +362,7 @@ if __name__ == "__main__":
                     num_epochs=num_epochs,
                     gpu_id=gpu_id,
                     prune=False,
+                    model_name=name,
                 )
                 if num_epochs > 0:
                     result[name]["accuracy_fused"] = float_format(fused_model_accuracy_re[-1])
@@ -388,6 +390,7 @@ if __name__ == "__main__":
                         num_epochs=experiment_params["num_epochs"],
                         gpu_id=gpu_id,
                         prune=False,
+                        model_name=name,
                     )
                     for idx, accuracy in enumerate(epoch_accuracy):
                         result[name][f"model_{i}"]["accuracy_SSF"][idx] = float_format(accuracy)
@@ -446,6 +449,7 @@ if __name__ == "__main__":
                         num_epochs=num_epochs,
                         gpu_id=gpu_id,
                         prune=False,
+                        model_name=name,
                     )
                     if use_caching:
                         save_model(paf_model_path, paf_model)
@@ -475,6 +479,7 @@ if __name__ == "__main__":
                     num_epochs=experiment_params["num_epochs"],
                     gpu_id=gpu_id,
                     prune=False,
+                    model_name=name,
                 )
                 for idx, accuracy in enumerate(epoch_accuracy):
                     result[name]["accuracy_PaF_all"][idx] = float_format(accuracy)
@@ -493,6 +498,7 @@ if __name__ == "__main__":
                     num_epochs=experiment_params["num_epochs"],
                     gpu_id=gpu_id,
                     prune=False,
+                    model_name=name,
                 )
                 for idx, accuracy in enumerate(epoch_accuracy):
                     result[name]["accuracy_FaP"][idx] = float_format(accuracy)
@@ -508,6 +514,7 @@ if __name__ == "__main__":
                         num_epochs=experiment_params["num_epochs"] * 2,
                         gpu_id=gpu_id,
                         prune=False,
+                        model_name=name,
                     )
                     # intra_fusion_model, _,_ = fusion_test_manager(input_model_list=[intra_fusion_model, models_original[i]], **params, num_epochs = experiment_params["num_epochs"], name=name)
                     # m,epoch_accuracy = train_during_pruning(intra_fusion_model, loaders=loaders, num_epochs=experiment_params["num_epochs"], gpu_id =experiment_params["gpu_id"], prune=False)
@@ -560,6 +567,7 @@ if __name__ == "__main__":
                         num_epochs=experiment_params["num_epochs"],
                         gpu_id=gpu_id,
                         prune=False,
+                        model_name=name,
                     )
                     for idx, accuracy in enumerate(epoch_accuracy):
                         result[name][f"model_{i}"]["accuracy_MSF"][idx] = float_format(accuracy)

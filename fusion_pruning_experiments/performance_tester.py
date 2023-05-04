@@ -6,15 +6,14 @@ import os
 import torch
 import torch.distributed as dist
 import torchvision.transforms as transforms
-from torchvision import datasets
-from torchvision.transforms import ToTensor
-
 from fusion_utils import FusionType
 
 # import main #from main import get_data_loader, test
 from models import get_model, get_pretrained_models
 from parameters import get_parameters
 from pruning_modified import prune_unstructured
+from torchvision import datasets
+from torchvision.transforms import ToTensor
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -537,7 +536,81 @@ from torch import optim
 from torch.autograd import Variable
 
 
-def train_during_pruning(model, loaders, num_epochs, gpu_id, prune=True, performed_epochs=0):
+def train_during_pruning(
+    model, loaders, num_epochs, gpu_id, prune=True, performed_epochs=0, model_name="anything"
+):
+    if model_name == "resnet50":
+        return train_during_pruning_resnet50(
+            model, loaders, num_epochs, gpu_id, prune=prune, performed_epochs=performed_epochs
+        )
+    else:
+        return train_during_pruning_regular(
+            model, loaders, num_epochs, gpu_id, prune=prune, performed_epochs=performed_epochs
+        )
+
+
+def train_during_pruning_resnet50(
+    model, train_loader, epoch, gpu_id, prune=None, performed_epochs=0
+):
+    if gpu_id != -1:
+        model = model.cuda(gpu_id)
+    criterion = nn.CrossEntropyLoss().to(device)
+    optimizer = torch.optim.SGD(model.parameters(), 0.1, momentum=0.9, weight_decay=1e-4)
+
+    batch_time = AverageMeter("Time", ":6.3f")
+    data_time = AverageMeter("Data", ":6.3f")
+    losses = AverageMeter("Loss", ":.4e")
+    top1 = AverageMeter("Acc@1", ":6.2f")
+    top5 = AverageMeter("Acc@5", ":6.2f")
+    progress = ProgressMeter(
+        len(train_loader),
+        [batch_time, data_time, losses, top1, top5],
+        prefix="Epoch: [{}]".format(epoch),
+    )
+
+    # switch to train mode
+    model.train()
+    val_acc_per_epoch = []
+    end = time.time()
+    for i, (images, target) in enumerate(train_loader):
+        # measure data loading time
+        data_time.update(time.time() - end)
+
+        # move data to the same device as model
+        images = images.to(device, non_blocking=True)
+        target = target.to(device, non_blocking=True)
+
+        # compute output
+        output = model(images)
+        loss = criterion(output, target)
+
+        # measure accuracy and record loss
+        acc1, acc5 = accuracy(output, target, topk=(1, 5))
+        val_acc_per_epoch.append(acc1)
+        losses.update(loss.item(), images.size(0))
+        top1.update(acc1[0], images.size(0))
+        top5.update(acc5[0], images.size(0))
+
+        # compute gradient and do SGD step
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        # measure elapsed time
+        batch_time.update(time.time() - end)
+        end = time.time()
+
+        if i % 10 == 0:
+            progress.display(i + 1)
+
+    model.cpu()
+    # only returns the last model, not the best model!
+    return model, val_acc_per_epoch
+
+
+def train_during_pruning_regular(
+    model, loaders, num_epochs, gpu_id, prune=True, performed_epochs=0
+):
     # return model, [0 for i in range(num_epochs)]
     """
     Has to be a function that loads a dataset.
@@ -873,6 +946,7 @@ if __name__ == "__main__":
                     num_epochs=experiment_params["num_epochs"],
                     gpu_id=experiment_params["gpu_id"],
                     prune=False,
+                    model_name=name,
                 )
 
                 s = int(result["sparsity"] * 100)
@@ -887,6 +961,7 @@ if __name__ == "__main__":
                     gpu_id=experiment_params["gpu_id"],
                     prune=False,
                     performed_epochs=experiment_params["num_epochs"],
+                    model_name=experiment_params["name"],
                 )
                 epoch_accuracy = epoch_accuracy[:-1]
                 epoch_accuracy.extend(epoch_accuracy_1)
@@ -926,6 +1001,7 @@ if __name__ == "__main__":
                         num_epochs=experiment_params["num_epochs"],
                         gpu_id=experiment_params["gpu_id"],
                         prune=False,
+                        model_name=name,
                     )
                     for idx, accuracy in enumerate(epoch_accuracy):
                         result[name][f"model_{i}"]["accuracy_SSF"][idx] = float_format(accuracy)
@@ -943,6 +1019,7 @@ if __name__ == "__main__":
                     num_epochs=experiment_params["num_epochs"],
                     gpu_id=experiment_params["gpu_id"],
                     prune=False,
+                    model_name=name,
                 )
                 for idx, accuracy in enumerate(epoch_accuracy):
                     result[name]["accuracy_PaF"][idx] = float_format(accuracy)
@@ -967,6 +1044,7 @@ if __name__ == "__main__":
                     num_epochs=experiment_params["num_epochs"],
                     gpu_id=experiment_params["gpu_id"],
                     prune=False,
+                    model_name=name,
                 )
                 for idx, accuracy in enumerate(epoch_accuracy):
                     result[name]["accuracy_PaF_all"][idx] = float_format(accuracy)
@@ -981,6 +1059,7 @@ if __name__ == "__main__":
                     num_epochs=experiment_params["num_epochs"],
                     gpu_id=experiment_params["gpu_id"],
                     prune=False,
+                    model_name=name,
                 )
                 for idx, accuracy in enumerate(epoch_accuracy):
                     result[name]["accuracy_FaP"][idx] = float_format(accuracy)
@@ -996,6 +1075,7 @@ if __name__ == "__main__":
                         num_epochs=experiment_params["num_epochs"] * 2,
                         gpu_id=experiment_params["gpu_id"],
                         prune=False,
+                        model_name=name,
                     )
                     # intra_fusion_model, _,_ = fusion_test_manager(input_model_list=[intra_fusion_model, models_original[i]], **params, num_epochs = experiment_params["num_epochs"], name=name)
                     # m,epoch_accuracy = train_during_pruning(intra_fusion_model, loaders=loaders, num_epochs=experiment_params["num_epochs"], gpu_id =experiment_params["gpu_id"], prune=False)
@@ -1048,6 +1128,7 @@ if __name__ == "__main__":
                         num_epochs=experiment_params["num_epochs"],
                         gpu_id=experiment_params["gpu_id"],
                         prune=False,
+                        model_name=name,
                     )
                     for idx, accuracy in enumerate(epoch_accuracy):
                         result[name][f"model_{i}"]["accuracy_MSF"][idx] = float_format(accuracy)

@@ -15,6 +15,9 @@ from model_caching import (
     save_model,
     save_model_trainHistory,
 )
+
+# import main #from main import get_data_loader, test
+from models import get_pretrained_model_by_name, get_pretrained_models
 from parameters import get_parameters
 from performance_tester_dirty import (
     evaluate_performance_simple,
@@ -31,9 +34,6 @@ from performance_tester_dirty import (
 from torchvision import datasets
 from torchvision.transforms import ToTensor
 
-# import main #from main import get_data_loader, test
-from models import get_pretrained_model_by_name, get_pretrained_models
-
 
 def float_format(number):
     return float("{:.3f}".format(number))
@@ -45,7 +45,7 @@ if __name__ == "__main__":
         format="[%(asctime)s %(name)s %(levelname)s] %(message)s",
         level="INFO",
         filename=f"./logger_files/{date}_logger.txt",
-        force = True
+        force=True,
     )
 
     logging.info(f"Loading experiment and dataset...")
@@ -162,6 +162,7 @@ if __name__ == "__main__":
                     num_epochs=experiment_params["num_epochs"] * 2,
                     gpu_id=experiment_params["gpu_id"],
                     prune=False,
+                    model_name=name,
                 )
                 if use_caching:
                     save_model(pruned_model_path, pat_model)
