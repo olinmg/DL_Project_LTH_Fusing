@@ -6,14 +6,15 @@ import os
 import torch
 import torch.distributed as dist
 import torchvision.transforms as transforms
+from torchvision import datasets
+from torchvision.transforms import ToTensor
+
 from fusion_utils import FusionType
 
 # import main #from main import get_data_loader, test
 from models import get_model, get_pretrained_models
 from parameters import get_parameters
 from pruning_modified import prune_unstructured
-from torchvision import datasets
-from torchvision.transforms import ToTensor
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -544,6 +545,7 @@ def train_during_pruning(
             model, loaders, num_epochs, gpu_id, prune=prune, performed_epochs=performed_epochs
         )
     else:
+        print(f"Using regular train function - not the one for resnet50: {model_name}")
         return train_during_pruning_regular(
             model, loaders, num_epochs, gpu_id, prune=prune, performed_epochs=performed_epochs
         )
@@ -712,13 +714,22 @@ def wrapper_structured_pruning(input_model, prune_params):
     prune_type = prune_params.get("prune_type")
     sparsity = prune_params.get("sparsity")
     gpu_id = prune_params.get("gpu_id")
+    model_name = prune_params.get("model_name")
     print("gpu_id here is: ", gpu_id)
 
     # for iterative pruning, we need to handover:
     # num_epochs -> the number of epochs that should be trained between the pruning steps
     # total_steps -> number of intermediate prune steps that are taken before getting to the final sparsity
     #           after each step num_epochs many epochs are done in retraining
-    train_function = train_during_pruning if use_iter_prune else None
+    if use_iter_prune:
+        train_function = (
+            train_during_pruning_resnet50
+            if model_name == "resnet50"
+            else train_during_pruning_regular
+        )
+    else:
+        train_function = None
+
     if "prune_iter_steps" in prune_params.keys():
         prune_iter_steps = prune_params.get("prune_iter_steps")
         pruned_model = prune_structured(
@@ -932,6 +943,7 @@ if __name__ == "__main__":
                 "out_features": output_dim,
                 "loaders": loaders,
                 "gpu_id": experiment_params["gpu_id"],
+                "model_name": name,
             }
 
             pruned_models, pruned_model_accuracies, _ = pruning_test_manager(
@@ -1104,6 +1116,7 @@ if __name__ == "__main__":
                             "out_features": 10,
                             "loaders": loaders,
                             "gpu_id": experiment_params["gpu_id"],
+                            "model_name": name,
                         }
 
                         pruned_models_new, pruned_models_new_accuracies, _ = pruning_test_manager(

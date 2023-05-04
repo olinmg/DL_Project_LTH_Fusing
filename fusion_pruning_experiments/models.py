@@ -314,6 +314,7 @@ def get_pretrained_models(model_name, basis_name, gpu_id, num_models, output_dim
     return models
 
 
+"""
 def get_pretrained_models_by_name(
     model_name, diff_weight_init, gpu_id, num_models, model_file_names, output_dim=10
 ):
@@ -344,3 +345,4 @@ def get_pretrained_models_by_name(
             model = model.cuda(gpu_id)
         models.append(model)
     return models
+"""

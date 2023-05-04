@@ -1,24 +1,28 @@
 {
+    "use_caching": true,
     "FaP": false,
-    "PaF": true,
+    "PaF": false,
     "PaF_all": false,
     "SSF": false,
     "MSF": false,
     "IntraFusion": false,
+    "compute_prune_baseline": true,
+    "gpu_id": -1,
+    "dataset": "mnist",
     "models": [
         {
-            "name": "resnet50",
-            "basis_name": "models_resnet50/resnet50_imagenet_pretrained"
+            "name": "cnn",
+            "basis_name": "models_cnn/cnn_diff_weight_init_False_mnist"
         }
     ],
+    "num_models": 2,
+    "num_epochs": 3,
     "prune_type": [
         "l1"
     ],
-    "use_caching": true,
-    "use_iter_prune": false,
-    "prune_iter_steps": 3,
-    "prune_iter_epochs": 4,
-    "compute_prune_baseline": false,
+    "use_iter_prune": true,
+    "prune_iter_steps": 2,
+    "prune_iter_epochs": 1,
     "sparsity": [
         0.65
     ],
@@ -28,11 +32,7 @@
             0.5
         ]
     ],
-    "num_models": 1,
-    "num_epochs": 0,
     "diff_weight_init": false,
-    "gpu_id": 0,
-    "dataset": "imagenet",
     "fusion_type": "activation",
     "num_samples": 200
 }

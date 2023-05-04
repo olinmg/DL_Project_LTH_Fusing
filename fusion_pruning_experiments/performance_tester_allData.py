@@ -6,6 +6,9 @@ import math
 
 import torch
 import torchvision.transforms as transforms
+from torchvision import datasets
+from torchvision.transforms import ToTensor
+
 from model_caching import (
     ensure_folder_existence,
     file_already_exists,
@@ -31,8 +34,6 @@ from performance_tester_dirty import (
     wrapper_first_fusion,
     wrapper_structured_pruning,
 )
-from torchvision import datasets
-from torchvision.transforms import ToTensor
 
 
 def float_format(number):
@@ -136,6 +137,7 @@ if __name__ == "__main__":
             "out_features": output_dim,
             "loaders": loaders,
             "gpu_id": experiment_params["gpu_id"],
+            "model_name": name,
         }
 
         logging.info("(P) Pruning the original models...")

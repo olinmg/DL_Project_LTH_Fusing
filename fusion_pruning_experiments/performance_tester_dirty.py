@@ -5,6 +5,9 @@ import os
 
 import torch
 import torchvision.transforms as transforms
+from torchvision import datasets
+from torchvision.transforms import ToTensor
+
 from fusion_utils import FusionType
 from model_caching import (
     ensure_folder_existence,
@@ -37,8 +40,6 @@ from performance_tester import (
     wrapper_first_fusion,
     wrapper_structured_pruning,
 )
-from torchvision import datasets
-from torchvision.transforms import ToTensor
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -182,6 +183,7 @@ if __name__ == "__main__":
                 "prune_iter_epochs": prune_iter_epochs,
                 "loaders": loaders,
                 "gpu_id": gpu_id,
+                "model_name": name,
             }
 
             # Write original performance into results json
@@ -543,6 +545,7 @@ if __name__ == "__main__":
                             "out_features": 10,
                             "loaders": loaders,
                             "gpu_id": gpu_id,
+                            "model_name": name,
                         }
 
                         pruned_models_new, pruned_models_new_accuracies, _ = pruning_test_manager(
