@@ -18,6 +18,14 @@ class FusionType(str,BaseEnum):
     ACTIVATION = "activation"
     GRADIENT = "gradient"
 
+class MetaPruneType(str):
+    IF = "intra-fusion"
+    DEFAULT = "default"
+
+class PruneType(str):
+    L1 = "l1"
+    L2 = "l2"
+
 class Fusion_Layer():
     def __init__(self, super_type, weight, name, fusion_type, intrafusion=False, bias=None, bn=False, bn_mean=None, bn_var=None, bn_gamma=None, bn_beta=None):
         self.super_type = super_type
@@ -171,12 +179,12 @@ class Fusion_Layer():
             result.extend(self.skip_ot_2.create_comparison_vec())
         return result
     
-    def get_norm(self, metric):
+    def get_norm(self, prune_type):
         comp_vecs = self.create_comparison_vec()
         norm_layer = []
 
         for idx, comp_vec in enumerate(comp_vecs):
-            norm_layer.append(torch.norm(comp_vec, p=1, dim=1))
+            norm_layer.append(torch.norm(comp_vec, p=1 if prune_type == "l1" else 2, dim=1))
         
         norm_layer = torch.stack(norm_layer, dim=0)
         norm_layer = norm_layer.mean(dim=0)

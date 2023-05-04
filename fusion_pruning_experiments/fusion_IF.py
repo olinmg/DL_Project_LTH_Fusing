@@ -6,7 +6,7 @@ import numpy as np
 import ot
 import copy
 from torch import linalg as LA
-from fusion_utils_IF import preprocess_parameters, FusionType
+from fusion_utils_IF import MetaPruneType, preprocess_parameters, FusionType
 from sklearn.cluster import KMeans
 import torch.nn as nn
 from models import get_model
@@ -20,11 +20,29 @@ def get_histogram(cardinality, indices, add=False):
         return np.ones(cardinality)/cardinality # uniform probability distribution
 
     else:
+        result = np.zeros(cardinality)
+        for indice in indices:
+            result[indice] = cardinality/indices.size()[0]
+
+        return result/np.sum(result)
+
+def get_target_histogram(cardinality, indices, type="homogeneous"):
+    if type == "homogeneous":
+        return np.ones(cardinality)/cardinality
+    elif type == "default":
+        result = np.zeros(cardinality)
+        for indice in indices:
+            result[indice] = cardinality/indices.size()[0]
+
+        return result/np.sum(result)
+    else:
+        assert type == "radical"
         result = np.ones(cardinality)
         for indice in indices:
             result[indice] = cardinality/indices.size()[0]
 
         return result/np.sum(result)
+
 
 def normalize_vector(coordinates, eps=1e-9):
     norms = torch.norm(coordinates, dim=-1, keepdim=True)
@@ -541,7 +559,7 @@ def create_incoming_feat(incoming_feat):
     perm.insert(1, 0)
     return incoming_feat.permute(perm)
 
-def intrafusion_bn(network, fusion_type, sparsity, metric=-1, full_model = None, small_model=None, gpu_id = -1, eps=1e-7, resnet=False, train_loader=False, model_name=None, num_samples=200):
+def intrafusion_bn(network, fusion_type, sparsity, prune_type="l1", full_model = None, small_model=None, gpu_id = -1, eps=1e-7, resnet=False, train_loader=False, model_name=None, meta_prune_type=MetaPruneType.IF):
     """
     fusion fuses arbitrary many models into the model that is the smallest
     :param networks: A list of networks to be fused
@@ -561,8 +579,8 @@ def intrafusion_bn(network, fusion_type, sparsity, metric=-1, full_model = None,
 
 
     
-    t = prune_structured(net=copy.deepcopy(full_model), loaders=None, num_epochs=0, gpu_id=gpu_id, example_inputs=torch.randn(1, 3, 32, 32),
-                    out_features=10, prune_type="l1", sparsity=sparsity, train_fct=None, total_steps=1) if small_model == None else small_model
+    t = prune_structured(net=copy.deepcopy(full_model), loaders=None, gpu_id=gpu_id, example_inputs=torch.randn(1, 3, 32, 32),
+                    out_features=10, prune_type=prune_type, sparsity=sparsity, train_fct=None, prune_iter_epochs=0, prune_iter_steps=1) if small_model == None else small_model
     if gpu_id != -1:
         t = t.cuda(gpu_id)
     fusion_layers_2 = preprocess_parameters([t], resnet=resnet, intrafusion=True, fusion_type=fusion_type, train_loader=train_loader, model_name=model_name, gpu_id=gpu_id, num_samples=200)
@@ -609,7 +627,7 @@ def intrafusion_bn(network, fusion_type, sparsity, metric=-1, full_model = None,
         if idx == num_layers -1:
             break
         
-        norm_layer = fusion_layer.get_norm(metric)
+        norm_layer = fusion_layer.get_norm(prune_type)
 
         _, indices = torch.topk(norm_layer, amount_pruned)
 
@@ -634,8 +652,15 @@ def intrafusion_bn(network, fusion_type, sparsity, metric=-1, full_model = None,
 
         mu = get_histogram(basis_weight[0].shape[0], indices = None)
 
-        #nu = norm_layer.cpu().numpy()/np.sum(norm_layer.cpu().numpy())
-        nu = get_histogram(layer_shape[0], indices = indices, add=True)
+        if meta_prune_type == MetaPruneType.DEFAULT:
+            nu = get_target_histogram(layer_shape[0], indices=indices, type="default")
+            #nu = get_histogram(layer_shape[0], indices = indices, add=True)
+        elif "vgg" in model_name:
+            nu = get_target_histogram(layer_shape[0], indices=indices, type="homogeneous")
+        elif resnet:
+            nu = get_target_histogram(layer_shape[0], indices=indices, type="radical")
+        else:
+            raise Exception("Invalid prune type or invalid model name. Make sure you set resnet = True if you are pruning a resnet!")
 
         cpuM = M.data.cpu().numpy() # POT does not accept array on GPU
 
@@ -646,8 +671,8 @@ def intrafusion_bn(network, fusion_type, sparsity, metric=-1, full_model = None,
         else:
             T_var = torch.from_numpy(T).float()
         
-        #T_var /= torch.from_numpy(nu).cuda(0)[:,None]
-        T_var *= torch.pow(norm_layer, 1)[:,None]
+        if meta_prune_type == MetaPruneType.IF:
+            T_var *= torch.pow(norm_layer, 1)[:,None]
         if gpu_id != -1:
             marginals = torch.ones(T_var.shape[1]).cuda(gpu_id) / T_var.shape[0]
         else:
@@ -658,8 +683,10 @@ def intrafusion_bn(network, fusion_type, sparsity, metric=-1, full_model = None,
         T_var = T_var / T_var.sum(dim=0)
 
         #print("fusion layer before permute: ", fusion_layer.weight.view(fusion_layer.weight.shape[0], -1)[:,0])
-        #fusion_layer.permute_parameters(T_var)
-        fusion_layer.update_weights_intra(T_var)
+        if meta_prune_type == MetaPruneType.DEFAULT:
+            fusion_layer.permute_parameters(T_var)
+        else:
+            fusion_layer.update_weights_intra(T_var)
 
         #avg_layer.update_weights(fusion_layer, torch.sum(importance[:idx_model]), importance[idx_model])
 
