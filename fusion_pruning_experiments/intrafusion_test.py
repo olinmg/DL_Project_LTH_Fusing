@@ -35,9 +35,11 @@ Make sure of the following:
 meta_prune_type = MetaPruneType.IF
 prune_iter_steps = 4 (you can also try 5, seems to work better for sparsity = 0.9)
 num_epochs = 10
-It's also very important that you set resnet=True if you're using a resnet and that you pass in the correct model_name (i.e. don't pass in vgg11 if it's a resnet)
+It's also very important that you set resnet=True if you're using a resnet and that you pass in the correct model_name (i.e. don't pass in vgg11 if it's a resnet18)
+Since you probably want to compare Intra-Fusion with default pruning, please don't use the torch-pruning library directly! Instead, just use wrapper_intra_fusion BUT pass in: meta_prune_type = MetaPruneType.DEFAULT. Then it will do default pruning.
 The rest should be self-explanatory, otherwise message me :)
 
+------------------------------------------------------------------------
 
 For Friedrich::
 Make sure of the following:
