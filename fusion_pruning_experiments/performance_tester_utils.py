@@ -1,22 +1,28 @@
 import copy
-import json
 import math
 import os
+import time
+from enum import Enum
 
 import torch
 import torch.distributed as dist
+import torch.nn as nn
 import torchvision.transforms as transforms
+from torch import optim
+from torch.utils.data import Subset
 from torchvision import datasets
 from torchvision.transforms import ToTensor
 
+from fusion import fusion_bn
 from fusion_IF import intrafusion_bn
 from fusion_utils import FusionType
 from fusion_utils_IF import MetaPruneType, PruneType
-from models import get_pretrained_models
-from parameters import get_parameters
 from pruning_modified import prune_structured_intra
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+###################### Data loaders ################################################################
 
 
 def get_mnist_data_loader():
@@ -182,6 +188,183 @@ def get_imagenet_data_loader():
     return {"train": train_loader, "test": val_loader}
 
 
+###################### Retraining of Models ########################################################
+
+
+def train_during_pruning(
+    model, loaders, num_epochs, gpu_id, prune=True, performed_epochs=0, model_name="anything"
+):
+    if model_name == "resnet50":
+        return train_during_pruning_resnet50(
+            model, loaders, num_epochs, gpu_id, prune=prune, performed_epochs=performed_epochs
+        )
+    else:
+        print(f"Using regular train function - not the one for resnet50: {model_name}")
+        return train_during_pruning_regular(
+            model, loaders, num_epochs, gpu_id, prune=prune, performed_epochs=performed_epochs
+        )
+
+
+def train_during_pruning_regular(
+    model, loaders, num_epochs, gpu_id, prune=True, performed_epochs=0
+):
+    # return model, [0 for i in range(num_epochs)]
+    """
+    Has to be a function that loads a dataset.
+
+    A given model and an amount of epochs of training will be given.
+    """
+
+    if gpu_id != -1:
+        model = model.cuda(gpu_id)
+
+    loss_func = nn.CrossEntropyLoss()
+    # optimizer = optim.Adam(model.parameters(), lr = 0.01)
+    lr = 0.01
+    model.train()
+
+    # Train the model
+    total_step = len(loaders["train"])
+    best_model = model
+    best_accuracy = -1
+
+    val_acc_per_epoch = []
+    this_epoch_acc = evaluate_performance_simple(
+        input_model=model, loaders=loaders, gpu_id=gpu_id, prune=False
+    )
+    val_acc_per_epoch.append(this_epoch_acc)
+    is_nan = False
+    for epoch in range(num_epochs):
+        optimizer = optim.SGD(
+            model.parameters(), lr=lr * (0.5 ** ((epoch + performed_epochs) // 30)), momentum=0.9
+        )
+        for i, (images, labels) in enumerate(loaders["train"]):
+            if gpu_id != -1 and not next(model.parameters()).is_cuda:
+                model = model.cuda(gpu_id)
+            if gpu_id != -1:
+                images, labels = images.cuda(gpu_id), labels.cuda(gpu_id)
+            # gives batch data, normalize x when iterate train_loader
+
+            predictions = model(images)
+            loss = loss_func(predictions, labels)
+
+            # clear gradients for this training step
+            optimizer.zero_grad()
+
+            # backpropagation, compute gradients
+            loss.backward()
+            # apply gradients
+            optimizer.step()
+
+            if (i + 1) % 100 == 0:
+                print(
+                    "Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}".format(
+                        epoch + 1, num_epochs, i + 1, total_step, loss.item()
+                    )
+                )
+
+            if math.isnan(loss.item()):
+                is_nan = True
+                break
+
+        if is_nan:
+            print("Is NAN")
+            break
+        this_epoch_acc = evaluate_performance_simple(
+            input_model=model, loaders=loaders, gpu_id=gpu_id, prune=False
+        )
+        if this_epoch_acc > best_accuracy:
+            best_model = copy.deepcopy(model)
+            best_accuracy = this_epoch_acc
+        val_acc_per_epoch.append(this_epoch_acc)
+
+    model.cpu()
+    best_model.cpu()
+    val_acc_per_epoch.append(best_accuracy)
+    return best_model, val_acc_per_epoch
+
+
+def train_during_pruning_resnet50(
+    model, train_loader, epoch, gpu_id, prune=None, performed_epochs=0
+):
+    if gpu_id != -1:
+        model = model.cuda(gpu_id)
+    criterion = nn.CrossEntropyLoss().to(device)
+    optimizer = torch.optim.SGD(model.parameters(), 0.1, momentum=0.9, weight_decay=1e-4)
+
+    batch_time = AverageMeter("Time", ":6.3f")
+    data_time = AverageMeter("Data", ":6.3f")
+    losses = AverageMeter("Loss", ":.4e")
+    top1 = AverageMeter("Acc@1", ":6.2f")
+    top5 = AverageMeter("Acc@5", ":6.2f")
+    progress = ProgressMeter(
+        len(train_loader),
+        [batch_time, data_time, losses, top1, top5],
+        prefix="Epoch: [{}]".format(epoch),
+    )
+
+    # switch to train mode
+    model.train()
+    val_acc_per_epoch = []
+    end = time.time()
+    for i, (images, target) in enumerate(train_loader):
+        # measure data loading time
+        data_time.update(time.time() - end)
+
+        # move data to the same device as model
+        images = images.to(device, non_blocking=True)
+        target = target.to(device, non_blocking=True)
+
+        # compute output
+        output = model(images)
+        loss = criterion(output, target)
+
+        # measure accuracy and record loss
+        acc1, acc5 = accuracy(output, target, topk=(1, 5))
+        val_acc_per_epoch.append(acc1)
+        losses.update(loss.item(), images.size(0))
+        top1.update(acc1[0], images.size(0))
+        top5.update(acc5[0], images.size(0))
+
+        # compute gradient and do SGD step
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        # measure elapsed time
+        batch_time.update(time.time() - end)
+        end = time.time()
+
+        if i % 10 == 0:
+            progress.display(i + 1)
+
+    model.cpu()
+    # only returns the last model, not the best model!
+    return model, val_acc_per_epoch
+
+
+###################### Test Performance Mesurements ################################################
+
+
+def original_test_manager(
+    input_model_list, loaders, eval_function, pruning_function, fusion_function, gpu_id
+):
+    """
+    Mostly: eval_function = evaluate_performance_simple() or evaluate_performance_imagenet()
+    Evaluate the performance of a list of networks. Typically the original/unchanged networks.
+    """
+    # return [0 for i in input_model_list]
+
+    original_model_accuracies = []
+    print("The accuracies of the original models are:")
+    for i, input_model in enumerate(input_model_list):
+        acc_this_model = eval_function(input_model=input_model, loaders=loaders, gpu_id=gpu_id)
+        original_model_accuracies.append(acc_this_model)
+        print(f"Model {i}:\t{acc_this_model}")
+
+    return original_model_accuracies
+
+
 def evaluate_performance_simple(input_model, loaders, gpu_id, prune=True):
     """
     Computes the accuracy of a given model (input_model) on a given dataset (loaders["test"]).
@@ -206,30 +389,6 @@ def evaluate_performance_simple(input_model, loaders, gpu_id, prune=True):
     if prune:
         input_model.cpu()
     return accuracy_accumulated / total
-
-
-import time
-from enum import Enum
-
-from torch.utils.data import Subset
-
-
-def accuracy(output, target, topk=(1,)):
-    # only used for imagenet/resnet50
-    """Computes the accuracy over the k top predictions for the specified values of k"""
-    with torch.no_grad():
-        maxk = max(topk)
-        batch_size = target.size(0)
-
-        _, pred = output.topk(maxk, 1, True, True)
-        pred = pred.t()
-        correct = pred.eq(target.view(1, -1).expand_as(pred))
-
-        res = []
-        for k in topk:
-            correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
-            res.append(correct_k.mul_(100.0 / batch_size))
-        return res
 
 
 def evaluate_performance_imagenet(
@@ -317,130 +476,63 @@ def evaluate_performance_imagenet(
     return top1.avg
 
 
-class Summary(Enum):
-    # Only used to work with imagenet
-    NONE = 0
-    AVERAGE = 1
-    SUM = 2
-    COUNT = 3
+###################### Fusion of Models ############################################################
 
 
-class AverageMeter(object):
-    # Only used to work with imagenet
-
-    """Computes and stores the average and current value"""
-
-    def __init__(self, name, fmt=":f", summary_type=Summary.AVERAGE):
-        self.name = name
-        self.fmt = fmt
-        self.summary_type = summary_type
-        self.reset()
-
-    def reset(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
-
-    def update(self, val, n=1):
-        self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count
-
-    def all_reduce(self):
-        if torch.cuda.is_available():
-            device = torch.device("cuda")
-        elif torch.backends.mps.is_available():
-            device = torch.device("mps")
-        else:
-            device = torch.device("cpu")
-        total = torch.tensor([self.sum, self.count], dtype=torch.float32, device=device)
-        dist.all_reduce(total, dist.ReduceOp.SUM, async_op=False)
-        self.sum, self.count = total.tolist()
-        self.avg = self.sum / self.count
-
-    def __str__(self):
-        fmtstr = "{name} {val" + self.fmt + "} ({avg" + self.fmt + "})"
-        return fmtstr.format(**self.__dict__)
-
-    def summary(self):
-        fmtstr = ""
-        if self.summary_type is Summary.NONE:
-            fmtstr = ""
-        elif self.summary_type is Summary.AVERAGE:
-            fmtstr = "{name} {avg:.3f}"
-        elif self.summary_type is Summary.SUM:
-            fmtstr = "{name} {sum:.3f}"
-        elif self.summary_type is Summary.COUNT:
-            fmtstr = "{name} {count:.3f}"
-        else:
-            raise ValueError("invalid summary type %r" % self.summary_type)
-
-        return fmtstr.format(**self.__dict__)
-
-
-class ProgressMeter(object):
-    # Only used to work with imagenet
-    def __init__(self, num_batches, meters, prefix=""):
-        self.batch_fmtstr = self._get_batch_fmtstr(num_batches)
-        self.meters = meters
-        self.prefix = prefix
-
-    def display(self, batch):
-        entries = [self.prefix + self.batch_fmtstr.format(batch)]
-        entries += [str(meter) for meter in self.meters]
-        print("\t".join(entries))
-
-    def display_summary(self):
-        entries = [" *"]
-        entries += [meter.summary() for meter in self.meters]
-        print(" ".join(entries))
-
-    def _get_batch_fmtstr(self, num_batches):
-        num_digits = len(str(num_batches // 1))
-        fmt = "{:" + str(num_digits) + "d}"
-        return "[" + fmt + "/" + fmt.format(num_batches) + "]"
-
-
-def update_running_statistics(input_model, loaders, gpu_id, batches=10):
-    if gpu_id != -1:
-        input_model = input_model.cuda(gpu_id)
-    input_model.train()
-
-    accuracy_accumulated = 0
-    total = 0
-    batches_count = 0
-    with torch.no_grad():
-        for images, labels in loaders["train"]:
-            if batches_count == batches:
-                break
-            if gpu_id != -1:
-                images, labels = images.cuda(), labels.cuda()
-
-            test_output = input_model(images)
-
-            batches_count += 1
-
-    return input_model
-
-
-def original_test_manager(
-    input_model_list, loaders, eval_function, pruning_function, fusion_function, gpu_id
+def fusion_test_manager(
+    input_model_list,
+    loaders,
+    pruning_function,
+    fusion_function,
+    eval_function,
+    gpu_id,
+    num_epochs,
+    accuracies=None,
+    importance=None,
+    name="",
 ):
+    # return input_model_list[0], 0, ""
     """
-    Evaluate the performance of a list of networks. Typically the original/unchanged networks.
+    Most of the time: fusion_function = wrapper_first_fusion()
+    Does fusion of the models in input_model_list and evaluates the performance of the resulting model.
     """
-    # return [0 for i in input_model_list]
 
-    original_model_accuracies = []
-    print("The accuracies of the original models are:")
-    for i, input_model in enumerate(input_model_list):
-        acc_this_model = eval_function(input_model=input_model, loaders=loaders, gpu_id=gpu_id)
-        original_model_accuracies.append(acc_this_model)
-        print(f"Model {i}:\t{acc_this_model}")
+    print("name is: ", name)
 
-    return original_model_accuracies
+    fused_model, description_fusion = fusion_function(
+        input_model_list, gpu_id=gpu_id, accuracies=accuracies, importance=importance, name=name
+    )
+    # fused_model,_ = train_during_pruning(model=fused_model, loaders=loaders, num_epochs=num_epochs, gpu_id = gpu_id, prune=False)
+    acc_model_fused = eval_function(input_model=fused_model, loaders=loaders, gpu_id=gpu_id)
+    print(f"Fused model:\t{acc_model_fused}")
+
+    return fused_model, acc_model_fused, description_fusion
+
+
+def wrapper_first_fusion(fusion_type, train_loader, gpu_id, num_samples=None):
+    """
+    Uses the first simple fusion approach created by Alex in fusion.py.
+    So far this can only handle two (simple -> CNN and MLP) networks in list_of_models.
+    """
+
+    def fusion(list_of_models, gpu_id=-1, accuracies=None, importance=None, name=""):
+        fused_model = fusion_bn(
+            networks=list_of_models,
+            fusion_type=fusion_type,
+            gpu_id=gpu_id,
+            accuracies=accuracies,
+            importance=importance,
+            resnet="resnet" in name,
+            train_loader=train_loader if fusion_type != FusionType.WEIGHT else None,
+            num_samples=num_samples,
+        )
+        description = {"name": name}
+        return fused_model, description
+
+    return fusion
+
+
+###################### Pruning of Networks #########################################################
 
 
 def pruning_test_manager(
@@ -454,6 +546,7 @@ def pruning_test_manager(
 ):
     # return input_model_list, [0 for i in input_model_list], ""
     """
+    Most of the time: pruning_function = wrapper_structured_pruning()
     Does fusion on all models included in input_model_list and evaluates the performance of the resulting models.
     """
 
@@ -475,218 +568,6 @@ def pruning_test_manager(
         print(f"Model {i} pruned:\t{acc_model_pruned}")
 
     return pruned_models, pruned_models_accuracies, description_pruning
-
-
-# importance para not given
-# ATT: added importance para!
-def fusion_test_manager(
-    input_model_list,
-    loaders,
-    pruning_function,
-    fusion_function,
-    eval_function,
-    gpu_id,
-    num_epochs,
-    accuracies=None,
-    importance=None,
-    name="",
-):
-    # return input_model_list[0], 0, ""
-    """
-    Does fusion of the models in input_model_list and evaluates the performance of the resulting model.
-    """
-
-    print("name is: ", name)
-
-    fused_model, description_fusion = fusion_function(
-        input_model_list, gpu_id=gpu_id, accuracies=accuracies, importance=importance, name=name
-    )
-    # fused_model,_ = train_during_pruning(model=fused_model, loaders=loaders, num_epochs=num_epochs, gpu_id = gpu_id, prune=False)
-    acc_model_fused = eval_function(input_model=fused_model, loaders=loaders, gpu_id=gpu_id)
-    print(f"Fused model:\t{acc_model_fused}")
-
-    return fused_model, acc_model_fused, description_fusion
-
-
-"""
-from pruning_modified import prune_unstructured
-def wrapper_unstructured_pruning(input_model, para_dict):
-    '''
-    This is an example for how a pruning function should be build. It takes a single model and a dictionary of parameters (para_dict).
-
-    Checks if all arguments requiered for the wanted pruning function exist and then uses the pruning function accordingly.
-    '''
-
-    # check if necessary arguments are contained in kwargs
-    assert "amount" in para_dict.keys()
-    assert "prune_type" in para_dict.keys()
-
-    amount = para_dict.get("amount")
-    prune_type = para_dict.get("prune_type")
-
-    # following does the actual pruning in place
-    prune_unstructured(net=input_model, amount=amount, prune_type=prune_type)
-    description = {"name": "Unstructured Pruning", "amount": amount, "prune_type":prune_type}
-    return input_model, description
-"""
-
-import torch.nn as nn
-
-############################ WORK IN PROGRESS - STRUCTURED PRUNING ##########################
-from torch import optim
-from torch.autograd import Variable
-
-
-def train_during_pruning(
-    model, loaders, num_epochs, gpu_id, prune=True, performed_epochs=0, model_name="anything"
-):
-    if model_name == "resnet50":
-        return train_during_pruning_resnet50(
-            model, loaders, num_epochs, gpu_id, prune=prune, performed_epochs=performed_epochs
-        )
-    else:
-        print(f"Using regular train function - not the one for resnet50: {model_name}")
-        return train_during_pruning_regular(
-            model, loaders, num_epochs, gpu_id, prune=prune, performed_epochs=performed_epochs
-        )
-
-
-def train_during_pruning_resnet50(
-    model, train_loader, epoch, gpu_id, prune=None, performed_epochs=0
-):
-    if gpu_id != -1:
-        model = model.cuda(gpu_id)
-    criterion = nn.CrossEntropyLoss().to(device)
-    optimizer = torch.optim.SGD(model.parameters(), 0.1, momentum=0.9, weight_decay=1e-4)
-
-    batch_time = AverageMeter("Time", ":6.3f")
-    data_time = AverageMeter("Data", ":6.3f")
-    losses = AverageMeter("Loss", ":.4e")
-    top1 = AverageMeter("Acc@1", ":6.2f")
-    top5 = AverageMeter("Acc@5", ":6.2f")
-    progress = ProgressMeter(
-        len(train_loader),
-        [batch_time, data_time, losses, top1, top5],
-        prefix="Epoch: [{}]".format(epoch),
-    )
-
-    # switch to train mode
-    model.train()
-    val_acc_per_epoch = []
-    end = time.time()
-    for i, (images, target) in enumerate(train_loader):
-        # measure data loading time
-        data_time.update(time.time() - end)
-
-        # move data to the same device as model
-        images = images.to(device, non_blocking=True)
-        target = target.to(device, non_blocking=True)
-
-        # compute output
-        output = model(images)
-        loss = criterion(output, target)
-
-        # measure accuracy and record loss
-        acc1, acc5 = accuracy(output, target, topk=(1, 5))
-        val_acc_per_epoch.append(acc1)
-        losses.update(loss.item(), images.size(0))
-        top1.update(acc1[0], images.size(0))
-        top5.update(acc5[0], images.size(0))
-
-        # compute gradient and do SGD step
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        # measure elapsed time
-        batch_time.update(time.time() - end)
-        end = time.time()
-
-        if i % 10 == 0:
-            progress.display(i + 1)
-
-    model.cpu()
-    # only returns the last model, not the best model!
-    return model, val_acc_per_epoch
-
-
-def train_during_pruning_regular(
-    model, loaders, num_epochs, gpu_id, prune=True, performed_epochs=0
-):
-    # return model, [0 for i in range(num_epochs)]
-    """
-    Has to be a function that loads a dataset.
-
-    A given model and an amount of epochs of training will be given.
-    """
-
-    if gpu_id != -1:
-        model = model.cuda(gpu_id)
-
-    loss_func = nn.CrossEntropyLoss()
-    # optimizer = optim.Adam(model.parameters(), lr = 0.01)
-    lr = 0.01
-    model.train()
-
-    # Train the model
-    total_step = len(loaders["train"])
-    best_model = model
-    best_accuracy = -1
-
-    val_acc_per_epoch = []
-    this_epoch_acc = evaluate_performance_simple(
-        input_model=model, loaders=loaders, gpu_id=gpu_id, prune=False
-    )
-    val_acc_per_epoch.append(this_epoch_acc)
-    is_nan = False
-    for epoch in range(num_epochs):
-        optimizer = optim.SGD(
-            model.parameters(), lr=lr * (0.5 ** ((epoch + performed_epochs) // 30)), momentum=0.9
-        )
-        for i, (images, labels) in enumerate(loaders["train"]):
-            if gpu_id != -1 and not next(model.parameters()).is_cuda:
-                model = model.cuda(gpu_id)
-            if gpu_id != -1:
-                images, labels = images.cuda(gpu_id), labels.cuda(gpu_id)
-            # gives batch data, normalize x when iterate train_loader
-
-            predictions = model(images)
-            loss = loss_func(predictions, labels)
-
-            # clear gradients for this training step
-            optimizer.zero_grad()
-
-            # backpropagation, compute gradients
-            loss.backward()
-            # apply gradients
-            optimizer.step()
-
-            if (i + 1) % 100 == 0:
-                print(
-                    "Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}".format(
-                        epoch + 1, num_epochs, i + 1, total_step, loss.item()
-                    )
-                )
-
-            if math.isnan(loss.item()):
-                is_nan = True
-                break
-
-        if is_nan:
-            print("Is NAN")
-            break
-        this_epoch_acc = evaluate_performance_simple(
-            input_model=model, loaders=loaders, gpu_id=gpu_id, prune=False
-        )
-        if this_epoch_acc > best_accuracy:
-            best_model = copy.deepcopy(model)
-            best_accuracy = this_epoch_acc
-        val_acc_per_epoch.append(this_epoch_acc)
-
-    model.cpu()
-    best_model.cpu()
-    val_acc_per_epoch.append(best_accuracy)
-    return best_model, val_acc_per_epoch
 
 
 def wrapper_structured_pruning(input_model, prune_params):
@@ -717,7 +598,6 @@ def wrapper_structured_pruning(input_model, prune_params):
     )
 
     input_model = pruned_model
-
     return pruned_model, ""
 
 
@@ -873,32 +753,134 @@ def wrapper_structured_pruning_old(input_model, prune_params):
     return pruned_model, description
 '''
 
-from fusion import MSF, fusion_bn
+
+###################### Helpers used along the way ##################################################
 
 
-def wrapper_first_fusion(fusion_type, train_loader, gpu_id, num_samples=None):
-    """
-    Uses the first simple fusion approach created by Alex in fusion.py.
-    So far this can only handle two (simple -> CNN and MLP) networks in list_of_models.
-    """
+def accuracy(output, target, topk=(1,)):
+    # only used for imagenet/resnet50
+    """Computes the accuracy over the k top predictions for the specified values of k"""
+    with torch.no_grad():
+        maxk = max(topk)
+        batch_size = target.size(0)
 
-    def fusion(list_of_models, gpu_id=-1, accuracies=None, importance=None, name=""):
-        fused_model = fusion_bn(
-            networks=list_of_models,
-            fusion_type=fusion_type,
-            gpu_id=gpu_id,
-            accuracies=accuracies,
-            importance=importance,
-            resnet="resnet" in name,
-            train_loader=train_loader if fusion_type != FusionType.WEIGHT else None,
-            num_samples=num_samples,
-        )
+        _, pred = output.topk(maxk, 1, True, True)
+        pred = pred.t()
+        correct = pred.eq(target.view(1, -1).expand_as(pred))
 
-        description = {"name": name}
+        res = []
+        for k in topk:
+            correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
+            res.append(correct_k.mul_(100.0 / batch_size))
+        return res
 
-        return fused_model, description
 
-    return fusion
+class Summary(Enum):
+    # Only used to work with imagenet
+    NONE = 0
+    AVERAGE = 1
+    SUM = 2
+    COUNT = 3
+
+
+class AverageMeter(object):
+    # Only used to work with imagenet
+
+    """Computes and stores the average and current value"""
+
+    def __init__(self, name, fmt=":f", summary_type=Summary.AVERAGE):
+        self.name = name
+        self.fmt = fmt
+        self.summary_type = summary_type
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
+
+    def all_reduce(self):
+        if torch.cuda.is_available():
+            device = torch.device("cuda")
+        elif torch.backends.mps.is_available():
+            device = torch.device("mps")
+        else:
+            device = torch.device("cpu")
+        total = torch.tensor([self.sum, self.count], dtype=torch.float32, device=device)
+        dist.all_reduce(total, dist.ReduceOp.SUM, async_op=False)
+        self.sum, self.count = total.tolist()
+        self.avg = self.sum / self.count
+
+    def __str__(self):
+        fmtstr = "{name} {val" + self.fmt + "} ({avg" + self.fmt + "})"
+        return fmtstr.format(**self.__dict__)
+
+    def summary(self):
+        fmtstr = ""
+        if self.summary_type is Summary.NONE:
+            fmtstr = ""
+        elif self.summary_type is Summary.AVERAGE:
+            fmtstr = "{name} {avg:.3f}"
+        elif self.summary_type is Summary.SUM:
+            fmtstr = "{name} {sum:.3f}"
+        elif self.summary_type is Summary.COUNT:
+            fmtstr = "{name} {count:.3f}"
+        else:
+            raise ValueError("invalid summary type %r" % self.summary_type)
+
+        return fmtstr.format(**self.__dict__)
+
+
+class ProgressMeter(object):
+    # Only used to work with imagenet
+    def __init__(self, num_batches, meters, prefix=""):
+        self.batch_fmtstr = self._get_batch_fmtstr(num_batches)
+        self.meters = meters
+        self.prefix = prefix
+
+    def display(self, batch):
+        entries = [self.prefix + self.batch_fmtstr.format(batch)]
+        entries += [str(meter) for meter in self.meters]
+        print("\t".join(entries))
+
+    def display_summary(self):
+        entries = [" *"]
+        entries += [meter.summary() for meter in self.meters]
+        print(" ".join(entries))
+
+    def _get_batch_fmtstr(self, num_batches):
+        num_digits = len(str(num_batches // 1))
+        fmt = "{:" + str(num_digits) + "d}"
+        return "[" + fmt + "/" + fmt.format(num_batches) + "]"
+
+
+def update_running_statistics(input_model, loaders, gpu_id, batches=10):
+    if gpu_id != -1:
+        input_model = input_model.cuda(gpu_id)
+    input_model.train()
+
+    accuracy_accumulated = 0
+    total = 0
+    batches_count = 0
+    with torch.no_grad():
+        for images, labels in loaders["train"]:
+            if batches_count == batches:
+                break
+            if gpu_id != -1:
+                images, labels = images.cuda(), labels.cuda()
+
+            test_output = input_model(images)
+
+            batches_count += 1
+
+    return input_model
 
 
 def get_result_skeleton(parameters):
