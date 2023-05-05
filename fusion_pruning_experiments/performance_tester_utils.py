@@ -6,14 +6,15 @@ import os
 import torch
 import torch.distributed as dist
 import torchvision.transforms as transforms
+from torchvision import datasets
+from torchvision.transforms import ToTensor
+
 from fusion_IF import intrafusion_bn
 from fusion_utils import FusionType
 from fusion_utils_IF import MetaPruneType, PruneType
 from models import get_pretrained_models
 from parameters import get_parameters
 from pruning_modified import prune_structured_intra
-from torchvision import datasets
-from torchvision.transforms import ToTensor
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -712,6 +713,8 @@ def wrapper_structured_pruning(input_model, prune_params):
         meta_prune_type=meta_prune_type,  # pruning vs intra-fusion
         gpu_id=prune_params.get("gpu_id"),
     )
+
+    input_model = pruned_model
 
     return pruned_model, ""
 
