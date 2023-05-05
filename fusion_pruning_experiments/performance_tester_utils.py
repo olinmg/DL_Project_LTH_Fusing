@@ -462,7 +462,7 @@ def pruning_test_manager(
     for i, input_model in enumerate(input_model_list):
         input_model_copy = copy.deepcopy(input_model)
         # Prune the individual networks (in place)
-        _, description_pruning = pruning_function(
+        input_model_copy, description_pruning = pruning_function(
             input_model=input_model_copy, prune_params=prune_params
         )
         # input_model_copy,_ = train_during_pruning(model=input_model_copy, loaders=loaders, num_epochs=5, gpu_id = gpu_id, prune=False)
