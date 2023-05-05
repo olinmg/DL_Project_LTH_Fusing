@@ -194,50 +194,8 @@ if __name__ == "__main__":
                 )
 
             ##### STARTING WITH THE EXPERIMENTS #####
-            """
-            if experiment_params["num_epochs"] > 0:
-                logging.info(
-                    f"(PaT) Pruning and retraining ({experiment_params['num_epochs']}) the original models..."
-                )
-            else:
-                logging.info(f"(P) Pruning the original models...")
 
-            
-    ##### OLD STARTING PRUNE
-            pruned_models, pruned_model_accuracies, _ = pruning_test_manager(
-                input_model_list=models_original, prune_params=prune_params, **params
-            )
-            for i in range(len(pruned_models)):
-                # torch.save(pruned_models[i].state_dict(), "models/{}_pruned_{}_.pth".format(name, i))
-                pruned_models[i], epoch_accuracy = train_during_pruning(
-                    copy.deepcopy(pruned_models[i]),
-                    loaders=loaders,
-                    num_epochs=experiment_params["num_epochs"],
-                    gpu_id=gpu_id,
-                    prune=False,
-                )
-
-                # s = int(result["sparsity"] * 100)
-
-                pruned_model_accuracies[i] = epoch_accuracy[-1]
-
-                _, epoch_accuracy_1 = train_during_pruning(
-                    copy.deepcopy(pruned_models[i]),
-                    loaders=loaders,
-                    num_epochs=experiment_params["num_epochs"],
-                    gpu_id=gpu_id,
-                    prune=False,
-                    performed_epochs=experiment_params["num_epochs"],
-                )
-                epoch_accuracy = epoch_accuracy[:-1]
-                epoch_accuracy.extend(epoch_accuracy_1)
-                for idx, accuracy in enumerate(epoch_accuracy):
-                    result[name][f"model_{i}"]["accuracy_pruned"][idx] = float_format(accuracy)
-    #### HERE WE HAVE pruned_models[] and epoch accuracy in result json is set
-            """
-
-            ### NEW VERSION HERE ###
-            # 1. describe the needed model with a name
+            # describe the needed model with a name
             MODELS_CACHING_PATH = f"./models/models_{name}/cached_models"
             ensure_folder_existence(MODELS_CACHING_PATH)
             input_model_names = [
@@ -257,7 +215,7 @@ if __name__ == "__main__":
                     for in_mo in input_model_names
                 ]
 
-            # 2. get the P/PaT version of the "basis"-model
+            # get the Pruned(P)/PrunedAndTrained(PaT) version of the input-models
             pruned_models = []
             pruned_model_accuracies = []
             pruned_model_train_accuracies = []
@@ -341,12 +299,12 @@ if __name__ == "__main__":
                 pruned_models.append(this_pruned_model)
                 pruned_model_accuracies.append(this_pruned_model_accuracy)
                 pruned_model_train_accuracies.append(this_pruned_model_train_accuracies)
-            ####### END NEW VERSION ######
 
             fusion_params = get_parameters()
             fusion_weights = experiment_params["fusion_weights"][0]
             fusion_params.model_name = name
 
+            # FaP - 1: the first part of the FaP function: fusing
             if experiment_params["FaP"]:
                 if num_epochs > 0:
                     logging.info(f"(FaT) Fusing the original models...")
@@ -372,57 +330,7 @@ if __name__ == "__main__":
                 else:
                     result[name]["accuracy_fused"] = float_format(fused_model_accuracy)
 
-                # experimental(new_result, result["sparsity"], models_original, original_model_accuracies, pruned_models, pruned_model_accuracies, get_parameters(), loaders, experiment_params["gpu_id"], name, params, fused_model)
-                # break
-            """
-            if experiment_params["SSF"]:
-                for i in range(len(pruned_models)):
-                    (
-                        pruned_and_fused_model,
-                        pruned_and_fused_model_accuracy,
-                        _,
-                    ) = fusion_test_manager(
-                        input_model_list=[pruned_models[i], models_original[i]],
-                        **params,
-                        num_epochs=experiment_params["num_epochs"],
-                        name=name,
-                    )
-                    m, epoch_accuracy = train_during_pruning(
-                        copy.deepcopy(pruned_and_fused_model),
-                        loaders=loaders,
-                        num_epochs=experiment_params["num_epochs"],
-                        gpu_id=gpu_id,
-                        prune=False,
-                        model_name=name,
-                    )
-                    for idx, accuracy in enumerate(epoch_accuracy):
-                        result[name][f"model_{i}"]["accuracy_SSF"][idx] = float_format(accuracy)
-            """
-            """
-    ##### START of OLD VERSION of fusion part in PaF #########
-            if experiment_params["PaF"]:
-                if experiment_params["num_epochs"] > 0:
-                    logging.info(f"(PaTaFaT) Fusing the pruned models...")
-                else:
-                    logging.info(f"(PaF) Fusing the pruned models...")
-                paf_model, paf_model_accuracy, _ = fusion_test_manager(
-                    input_model_list=pruned_models,
-                    **params,
-                    num_epochs=experiment_params["num_epochs"],
-                    name=name,
-                )
-                m, epoch_accuracy = train_during_pruning(
-                    paf_model,
-                    loaders=loaders,
-                    num_epochs=experiment_params["num_epochs"],
-                    gpu_id=gpu_id,
-                    prune=False,
-                )
-                for idx, accuracy in enumerate(epoch_accuracy):
-                    result[name]["accuracy_PaF"][idx] = float_format(accuracy)
-    ##### END of OLD VERSION of fusion part in PaF #########
-            """
-
+            # PaF: pruning the half-data models and fusing the results
             if experiment_params["PaF"]:
                 if experiment_params["num_epochs"] > 0:
                     logging.info(
@@ -433,7 +341,6 @@ if __name__ == "__main__":
                     logging.info(f"(PaF) Fusing the pruned models...")
                     paf_model_path = f"{input_model_names[0][:-2]}_w{int(fusion_weights[0]*100)}_s{int(result['sparsity']*100)}_P{iterprune_text}_aF"
 
-                # 2. check if the model is already available
                 if model_already_exists(paf_model_path, loaders, gpu_id, use_caching):
                     logging.info(f"\t\tFound the model {paf_model_path}.pth in cache.")
                     paf_model = get_pretrained_model_by_name(this_model_path, gpu_id)
@@ -456,37 +363,11 @@ if __name__ == "__main__":
                     if use_caching:
                         save_model(paf_model_path, paf_model)
                         save_model_trainHistory(paf_model_path, paf_accuracy)
-
                 for idx, accuracy in enumerate(paf_accuracy):
                     result[name]["accuracy_PaF"][idx] = float_format(accuracy)
 
-            """
-            # PaF_all does the following: fuses following networks: pruned_model[0], original_model[0], original_model[1], ..., original_model[-1]
-            # PaF_all achieves higher accuracy than PaF, but when we finetune PaF achieves higher accuracy
-            if experiment_params["PaF_all"]:
-                paf_all_model, paf_all_model_accuracy, _ = fusion_test_manager(
-                    input_model_list=[
-                        *models_original,
-                        pruned_models[0]
-                        if pruned_model_accuracies[0] > pruned_model_accuracies[1]
-                        else pruned_models[1],
-                    ],
-                    **params,
-                    num_epochs=experiment_params["num_epochs"],
-                    name=name,
-                )
-                m, epoch_accuracy = train_during_pruning(
-                    paf_all_model,
-                    loaders=loaders,
-                    num_epochs=experiment_params["num_epochs"],
-                    gpu_id=gpu_id,
-                    prune=False,
-                    model_name=name,
-                )
-                for idx, accuracy in enumerate(epoch_accuracy):
-                    result[name]["accuracy_PaF_all"][idx] = float_format(accuracy)
-            """
-
+            # FaP - 2: the second part of the FaP function: pruning
+            # TODO: why split FaP in two???
             if experiment_params["FaP"]:
                 if experiment_params["num_epochs"] > 0:
                     logging.info(f"(FaTaPaT) Pruning the fused model...")
@@ -506,88 +387,15 @@ if __name__ == "__main__":
                 for idx, accuracy in enumerate(epoch_accuracy):
                     result[name]["accuracy_FaP"][idx] = float_format(accuracy)
 
-            """
-            if experiment_params["IntraFusion"]:
-                for i in range(len(pruned_models)):
-                    intra_fusion_model = MSF(
-                        models_original[i], gpu_id=-1, resnet=False, sparsity=result["sparsity"]
-                    )
-                    m, epoch_accuracy = train_during_pruning(
-                        intra_fusion_model,
-                        loaders=loaders,
-                        num_epochs=experiment_params["num_epochs"] * 2,
-                        gpu_id=gpu_id,
-                        prune=False,
-                        model_name=name,
-                    )
-                    # intra_fusion_model, _,_ = fusion_test_manager(input_model_list=[intra_fusion_model, models_original[i]], **params, num_epochs = experiment_params["num_epochs"], name=name)
-                    # m,epoch_accuracy = train_during_pruning(intra_fusion_model, loaders=loaders, num_epochs=experiment_params["num_epochs"], gpu_id =experiment_params["gpu_id"], prune=False)
-                    for idx, accuracy in enumerate(epoch_accuracy):
-                        result[name][f"model_{i}"]["accuracy_IntraFusion"][idx] = float_format(
-                            accuracy
-                        )
-
-            # Following code creates entries for our multi-sparsity fusion approach
-            if experiment_params["MSF"]:
-                for i in range(len(pruned_models)):
-                    models_sparsities = []
-                    models_sparsities_accuracies = []
-                    sparsity_iter = result["sparsity"]
-                    while sparsity_iter >= 0.1:
-                        prune_params = {
-                            "prune_type": result["prune_type"],
-                            "sparsity": sparsity_iter,
-                            "num_epochs": 0,
-                            "example_input": torch.randn(1, 1, 28, 28)
-                            if "cnn" in name
-                            else torch.randn(1, 3, 32, 32),
-                            "use_iter_prune": use_iter_prune,
-                            "prune_iter_steps": prune_iter_steps,
-                            "prune_iter_epochs": prune_iter_epochs,
-                            "out_features": 10,
-                            "loaders": loaders,
-                            "gpu_id": gpu_id,
-                            "model_name": name,
-                            "use_intrafusion_for_pruning": experiment_params["use_intrafusion_for_pruning"]
-                        }
-
-                        pruned_models_new, pruned_models_new_accuracies, _ = pruning_test_manager(
-                            input_model_list=[models_original[i]],
-                            prune_params=prune_params,
-                            **params,
-                        )
-                        models_sparsities.append(pruned_models_new[0])
-                        models_sparsities_accuracies.append(pruned_models_new_accuracies[0])
-                        sparsity_iter -= 0.1
-
-                    models_sparsities.append(models_original[i])
-                    model_sparsity, model_sparsity_accuracy, _ = fusion_test_manager(
-                        input_model_list=models_sparsities,
-                        **params,
-                        num_epochs=experiment_params["num_epochs"],
-                        name=name,
-                    )
-                    m, epoch_accuracy = train_during_pruning(
-                        copy.deepcopy(model_sparsity),
-                        loaders=loaders,
-                        num_epochs=experiment_params["num_epochs"],
-                        gpu_id=gpu_id,
-                        prune=False,
-                        model_name=name,
-                    )
-                    for idx, accuracy in enumerate(epoch_accuracy):
-                        result[name][f"model_{i}"]["accuracy_MSF"][idx] = float_format(accuracy)
-            """
-        # print(json.dumps(result_final, indent=4))
         result_final["results"][idx_result] = result
 
+        # storing the experiment results
         model_name = experiment_params["models"][0]["name"]
         fusion_add_numsamples = (
             str(experiment_params["num_samples"])
             if experiment_params["fusion_type"] != FusionType.WEIGHT
             else ""
         )
-
         result_folder_name = f"./results_and_plots_o/fullDict_results_{experiment_params['fusion_type']}{fusion_add_numsamples}_{model_name}"
         ensure_folder_existence(result_folder_name)
         save_experiment_results(
