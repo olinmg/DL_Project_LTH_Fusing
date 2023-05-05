@@ -274,9 +274,9 @@ class Fusion_Layer:
             self.permute_parameters(T_var)
             return
         if self.skip_ot != None:
-            self.skip_ot.update_weights_intra(T_var)
+            self.skip_ot.update_weights_intra(T_var, gpu_id)
         if self.skip_ot_2 != None:
-            self.skip_ot_2.update_weights_intra(T_var)
+            self.skip_ot_2.update_weights_intra(T_var, gpu_id)
 
         T_var_adjust = T_var.clone()
         for i in range(T_var.shape[1]):
