@@ -572,7 +572,8 @@ def intrafusion_bn(network, fusion_type, sparsity, prune_type="l1", full_model =
     T_var = None
     if gpu_id != -1:
         model = network.cuda(gpu_id)
-
+    else:
+        model = network.to("cpu")
 
     skip_T_var = None
     residual_T_var = None
