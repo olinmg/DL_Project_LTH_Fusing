@@ -28,7 +28,7 @@ def wrapper_intra_fusion(model, model_name: str, resnet: bool, sparsity: float, 
         fused_model_g = model
         for prune_step in prune_steps:
             fused_model_g = intrafusion_bn(fused_model_g, model_name = model_name, sparsity=sparsity, fusion_type="weight", full_model = model, small_model=prune_step, gpu_id = gpu_id, resnet = resnet, train_loader=None)
-            fused_model_g,_ = train_during_pruning(fused_model_g, loaders=loaders, num_epochs=num_epochs, gpu_id = gpu_id, prune=False, performed_epochs=0)
+            fused_model_g,_ = train_during_pruning(fused_model_g, loaders=loaders, num_epochs=num_epochs, gpu_id = gpu_id, prune=False, performed_epochs=0, model_name=model_name)
         return fused_model_g
 
 
