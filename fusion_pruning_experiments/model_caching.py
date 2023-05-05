@@ -4,9 +4,8 @@ import logging
 import os
 
 import torch
-
 from models import get_pretrained_model_by_name
-from performance_tester import (
+from performance_tester_utils import (
     get_cifar10_data_loader,
     get_cifar100_data_loader,
     get_mnist_data_loader,

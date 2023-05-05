@@ -22,7 +22,7 @@ from model_caching import (
 # import main #from main import get_data_loader, test
 from models import get_model, get_pretrained_model_by_name, get_pretrained_models
 from parameters import get_parameters
-from performance_tester import (
+from performance_tester_utils import (
     accuracy,
     evaluate_performance_imagenet,
     evaluate_performance_simple,
@@ -184,6 +184,7 @@ if __name__ == "__main__":
                 "loaders": loaders,
                 "gpu_id": gpu_id,
                 "model_name": name,
+                "use_intrafusion_for_pruning": experiment_params["use_intrafusion_for_pruning"],
             }
 
             # Write original performance into results json
@@ -373,7 +374,7 @@ if __name__ == "__main__":
 
                 # experimental(new_result, result["sparsity"], models_original, original_model_accuracies, pruned_models, pruned_model_accuracies, get_parameters(), loaders, experiment_params["gpu_id"], name, params, fused_model)
                 # break
-
+            """
             if experiment_params["SSF"]:
                 for i in range(len(pruned_models)):
                     (
@@ -396,7 +397,7 @@ if __name__ == "__main__":
                     )
                     for idx, accuracy in enumerate(epoch_accuracy):
                         result[name][f"model_{i}"]["accuracy_SSF"][idx] = float_format(accuracy)
-
+            """
             """
     ##### START of OLD VERSION of fusion part in PaF #########
             if experiment_params["PaF"]:
@@ -422,7 +423,6 @@ if __name__ == "__main__":
     ##### END of OLD VERSION of fusion part in PaF #########
             """
 
-            ####### START NEW VERSION (fusion part) ######
             if experiment_params["PaF"]:
                 if experiment_params["num_epochs"] > 0:
                     logging.info(
@@ -459,8 +459,8 @@ if __name__ == "__main__":
 
                 for idx, accuracy in enumerate(paf_accuracy):
                     result[name]["accuracy_PaF"][idx] = float_format(accuracy)
-            ####### END NEW VERSION (fusion part) ######
 
+            """
             # PaF_all does the following: fuses following networks: pruned_model[0], original_model[0], original_model[1], ..., original_model[-1]
             # PaF_all achieves higher accuracy than PaF, but when we finetune PaF achieves higher accuracy
             if experiment_params["PaF_all"]:
@@ -485,6 +485,7 @@ if __name__ == "__main__":
                 )
                 for idx, accuracy in enumerate(epoch_accuracy):
                     result[name]["accuracy_PaF_all"][idx] = float_format(accuracy)
+            """
 
             if experiment_params["FaP"]:
                 if experiment_params["num_epochs"] > 0:
@@ -505,6 +506,7 @@ if __name__ == "__main__":
                 for idx, accuracy in enumerate(epoch_accuracy):
                     result[name]["accuracy_FaP"][idx] = float_format(accuracy)
 
+            """
             if experiment_params["IntraFusion"]:
                 for i in range(len(pruned_models)):
                     intra_fusion_model = MSF(
@@ -546,6 +548,7 @@ if __name__ == "__main__":
                             "loaders": loaders,
                             "gpu_id": gpu_id,
                             "model_name": name,
+                            "use_intrafusion_for_pruning": experiment_params["use_intrafusion_for_pruning"]
                         }
 
                         pruned_models_new, pruned_models_new_accuracies, _ = pruning_test_manager(
@@ -574,7 +577,7 @@ if __name__ == "__main__":
                     )
                     for idx, accuracy in enumerate(epoch_accuracy):
                         result[name][f"model_{i}"]["accuracy_MSF"][idx] = float_format(accuracy)
-
+            """
         # print(json.dumps(result_final, indent=4))
         result_final["results"][idx_result] = result
 
