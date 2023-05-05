@@ -696,10 +696,10 @@ def wrapper_structured_pruning(input_model, prune_params):
 
     # killswitch for iterative pruning
     prune_iter_steps = prune_params.get("prune_iter_steps")
-    num_epochs = prune_params.get("prune_iter_epochs")
+    prune_iter_epochs = prune_params.get("prune_iter_epochs")
     if not prune_params.get("use_iter_prune"):
         prune_iter_steps = 1
-        num_epochs = 0
+        prune_iter_epochs = 0
 
     pruned_model = wrapper_intra_fusion(
         model=input_model,
@@ -707,11 +707,13 @@ def wrapper_structured_pruning(input_model, prune_params):
         resnet="resnet" in prune_params.get("model_name"),
         sparsity=prune_params.get("sparsity"),
         prune_iter_steps=prune_iter_steps,
-        num_epochs=num_epochs,
+        num_epochs=prune_iter_epochs,
         loaders=prune_params.get("loaders"),
         prune_type=prune_params.get("prune_type"),
         meta_prune_type=meta_prune_type,  # pruning vs intra-fusion
         gpu_id=prune_params.get("gpu_id"),
+        out_features=prune_params.get("out_features"),
+        example_input=prune_params.get("example_input"),
     )
 
     input_model = pruned_model
@@ -730,6 +732,8 @@ def wrapper_intra_fusion(
     prune_type: PruneType,
     meta_prune_type: MetaPruneType,
     gpu_id: int,
+    out_features: int,
+    example_input: torch,
 ):
     """
     :param model: The model to be pruned
@@ -762,8 +766,8 @@ def wrapper_intra_fusion(
             loaders=None,
             num_epochs=0,
             gpu_id=gpu_id,
-            example_inputs=torch.randn(1, 3, 32, 32),
-            out_features=10,
+            example_inputs=example_input,  # torch.randn(1, 3, 32, 32),
+            out_features=out_features,
             prune_type=prune_type,
             sparsity=sparsity,
             train_fct=None,
