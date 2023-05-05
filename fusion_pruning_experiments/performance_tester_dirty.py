@@ -138,9 +138,7 @@ if __name__ == "__main__":
     for sparsity in result_final["experiment_parameters"]["sparsity"]:
         new_result["sparstiy"] = {"paf": None, "pruned": None, "pruned_fused": None, "paf": None}
 
-    # Loading the "base"-models that are to be used for experiments
-    # ATTENTION: assuming we only have one model_dict (working on one model type per job)
-    # we can load the models at the very beginning
+    # loading the models that are going to be worked with
     logging.info("Loading basis models:")
     original_model_name, diff_weight_init = (
         experiment_params["models"][0]["name"],
@@ -160,9 +158,7 @@ if __name__ == "__main__":
 
     # measuring the performance of the original models
     logging.info("Basis Model Accuracies:")
-    original_model_accuracies = [
-        0.0
-    ]  # original_test_manager(input_model_list=models_original, **params)
+    original_model_accuracies = original_test_manager(input_model_list=models_original, **params)
     logging.info(f"\t{original_model_accuracies}")
 
     for idx_result, result in enumerate(result_final["results"]):
@@ -171,6 +167,7 @@ if __name__ == "__main__":
         for model_dict in experiment_params["models"]:
             name, diff_weight_init = model_dict["name"], experiment_params["diff_weight_init"]
 
+            # TODO: set example_input to work for resnet50!
             prune_params = {
                 "prune_type": result["prune_type"],
                 "sparsity": result["sparsity"],
@@ -193,8 +190,6 @@ if __name__ == "__main__":
                     original_model_accuracies[i]
                 )
 
-            ##### STARTING WITH THE EXPERIMENTS #####
-
             # describe the needed model with a name
             MODELS_CACHING_PATH = f"./models/models_{name}/cached_models"
             ensure_folder_existence(MODELS_CACHING_PATH)
@@ -215,7 +210,7 @@ if __name__ == "__main__":
                     for in_mo in input_model_names
                 ]
 
-            # get the Pruned(P)/PrunedAndTrained(PaT) version of the input-models
+            # P/PaT: get the Pruned (P) or PrunedAndTrained (PaT) version of the input-models
             pruned_models = []
             pruned_model_accuracies = []
             pruned_model_train_accuracies = []
