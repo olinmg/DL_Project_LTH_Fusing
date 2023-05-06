@@ -184,7 +184,7 @@ if __name__ == "__main__":
                 "loaders": loaders,
                 "gpu_id": gpu_id,
                 "model_name": name,
-                "use_intrafusion_for_pruning": experiment_params["use_intrafusion_for_pruning"],
+                "use_intrafusion_for_pruning": use_intrafusion_for_pruning,
             }
 
             # Write original performance into results json
@@ -302,33 +302,72 @@ if __name__ == "__main__":
             fusion_weights = experiment_params["fusion_weights"][0]
             fusion_params.model_name = name
 
-            # FaP - 1: the first part of the FaP function: fusing
+            # FaP: fusing the half-data models into one and then pruning the result
             if experiment_params["FaP"]:
+                # FaP - Step 1: fusing the half-data models
                 if num_epochs > 0:
-                    logging.info(f"(FaT) Fusing the original models...")
+                    logging.info(f"(FaT) Fusing the original models and retraining...")
+                    f_model_path = f"{input_model_names[0][:-2]}_w{int(fusion_weights[0]*100)}_s{int(result['sparsity']*100)}_FaT{int(num_epochs)}"
                 else:
                     logging.info(f"(F) Fusing the original models...")
-                fused_model, fused_model_accuracy, _ = fusion_test_manager(
-                    input_model_list=models_original,
-                    **params,
-                    accuracies=original_model_accuracies,
-                    num_epochs=0,
-                    name=name,
-                )
-                fused_model, fused_model_accuracy_re = train_during_pruning(
-                    fused_model,
-                    loaders=loaders,
-                    num_epochs=num_epochs,
-                    gpu_id=gpu_id,
-                    prune=False,
-                    model_name=name,
-                )
+                    f_model_path = f"{input_model_names[0][:-2]}_w{int(fusion_weights[0]*100)}_s{int(result['sparsity']*100)}_F"
+
+                if model_already_exists(f_model_path, loaders, gpu_id, use_caching):
+                    logging.info(f"\t\tFound the model {f_model_path}.pth in cache.")
+                    fused_model = get_pretrained_model_by_name(f_model_path, gpu_id)
+                    fused_model_accuracy_re = get_model_trainHistory(f_model_path)
+                else:
+                    fused_model, fused_model_accuracy, _ = fusion_test_manager(
+                        input_model_list=models_original,
+                        **params,
+                        accuracies=original_model_accuracies,
+                        num_epochs=0,
+                        name=name,
+                    )
+                    fused_model, fused_model_accuracy_re = train_during_pruning(
+                        fused_model,
+                        loaders=loaders,
+                        num_epochs=num_epochs,
+                        gpu_id=gpu_id,
+                        prune=False,
+                        model_name=name,
+                    )
+                    if use_caching:
+                        save_model(f_model_path, fused_model)
+                        save_model_trainHistory(f_model_path, fused_model_accuracy_re)
+
+                # FaP - Step 2: pruning the result of the fusion
                 if num_epochs > 0:
                     result[name]["accuracy_fused"] = float_format(fused_model_accuracy_re[-1])
+                    fap_model_path = f"{input_model_names[0][:-2]}_w{int(fusion_weights[0]*100)}_s{int(result['sparsity']*100)}_FaT{int(num_epochs)}_aP{iterprune_text}_aT{int(num_epochs)}"
                 else:
-                    result[name]["accuracy_fused"] = float_format(fused_model_accuracy)
+                    # result[name]["accuracy_fused"] = float_format(fused_model_accuracy)
+                    fap_model_path = f"{input_model_names[0][:-2]}_w{int(fusion_weights[0]*100)}_s{int(result['sparsity']*100)}_F_aP{iterprune_text}"
 
-            # PaF: pruning the half-data models and fusing the results
+                if model_already_exists(fap_model_path, loaders, gpu_id, use_caching):
+                    logging.info(f"\t\tFound the model {fap_model_path}.pth in cache.")
+                    fap_model = get_pretrained_model_by_name(fap_model_path, gpu_id)
+                    epoch_accuracy = get_model_trainHistory(fap_model_path)
+                else:
+                    fap_models, fap_model_accuracies, _ = pruning_test_manager(
+                        input_model_list=[fused_model], prune_params=prune_params, **params
+                    )
+                    fap_model, epoch_accuracy = train_during_pruning(
+                        fap_models[0],
+                        loaders=loaders,
+                        num_epochs=experiment_params["num_epochs"],
+                        gpu_id=gpu_id,
+                        prune=False,
+                        model_name=name,
+                    )
+                    if use_caching:
+                        save_model(fap_model_path, fap_model)
+                        save_model_trainHistory(fap_model_path, epoch_accuracy)
+
+                for idx, accuracy in enumerate(epoch_accuracy):
+                    result[name]["accuracy_FaP"][idx] = float_format(accuracy)
+
+            # PaF: pruning the half-data models individually and fusing the results
             if experiment_params["PaF"]:
                 if experiment_params["num_epochs"] > 0:
                     logging.info(
@@ -363,27 +402,6 @@ if __name__ == "__main__":
                         save_model_trainHistory(paf_model_path, paf_accuracy)
                 for idx, accuracy in enumerate(paf_accuracy):
                     result[name]["accuracy_PaF"][idx] = float_format(accuracy)
-
-            # FaP - 2: the second part of the FaP function: pruning
-            # TODO: why split FaP in two???
-            if experiment_params["FaP"]:
-                if experiment_params["num_epochs"] > 0:
-                    logging.info(f"(FaTaPaT) Pruning the fused model...")
-                else:
-                    logging.info(f"(FaP) Pruning the fused model...")
-                fap_models, fap_model_accuracies, _ = pruning_test_manager(
-                    input_model_list=[fused_model], prune_params=prune_params, **params
-                )
-                m, epoch_accuracy = train_during_pruning(
-                    fap_models[0],
-                    loaders=loaders,
-                    num_epochs=experiment_params["num_epochs"],
-                    gpu_id=gpu_id,
-                    prune=False,
-                    model_name=name,
-                )
-                for idx, accuracy in enumerate(epoch_accuracy):
-                    result[name]["accuracy_FaP"][idx] = float_format(accuracy)
 
         result_final["results"][idx_result] = result
 
