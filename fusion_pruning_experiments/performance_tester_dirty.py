@@ -68,6 +68,7 @@ if __name__ == "__main__":
     gpu_id = experiment_params["gpu_id"]
     prune_iter_steps = experiment_params["prune_iter_steps"]
     use_iter_prune = experiment_params["use_iter_prune"]
+    use_intrafusion_for_pruning = experiment_params["use_intrafusion_for_pruning"]
     use_iterative_pruning = (
         True
         if (
@@ -89,6 +90,8 @@ if __name__ == "__main__":
         if use_iterative_pruning
         else ""
     )
+    if use_intrafusion_for_pruning:
+        iterprune_text = "intra" + iterprune_text
 
     result_final = get_result_skeleton(experiment_params)
     loaders = None
