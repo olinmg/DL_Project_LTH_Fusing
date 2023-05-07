@@ -291,7 +291,7 @@ if __name__ == "__main__":
 
                 # store the performance development of the retraining of the pruned model in result
                 for idx, accuracy in enumerate(pruned_epoch_accuracy):
-                    result[name][f"model_{i}"]["accuracy_pruned"][idx] = float_format(accuracy)
+                    result[name][f"model_{k}"]["accuracy_pruned"][idx] = float_format(accuracy)
                 # here we should maybe also add the this_load_trainhist to result[PaF]
                 # so it does not only contain the fusion retrain accuracies, but its whole performance development in one dict entry
                 pruned_models.append(this_pruned_model)
