@@ -252,7 +252,7 @@ if __name__ == "__main__":
                     f"{this_model_path.rsplit('_', 1)[0]}_T{int(2*num_epochs)}"
                 )
                 pruned_epoch_accuracy = this_pruned_model_train_accuracies
-
+                print(f"254: {pruned_epoch_accuracy}")
                 # compute the benchmark pruned model with additional retrain epochs
                 if num_epochs > 0 and experiment_params["compute_prune_baseline"]:
                     if model_already_exists(
@@ -278,8 +278,11 @@ if __name__ == "__main__":
                             performed_epochs=num_epochs,
                             model_name=name,
                         )
+                        print(f"281: {epoch_acc_further}")
                         epoch_acc_further = this_pruned_model_train_accuracies
+                        print(f"283: {epoch_acc_further}")
                         epoch_acc_further.append(epoch_accuracy_further_tr)
+                        print(f"285: {epoch_acc_further}")
                         if use_caching:
                             save_model(
                                 pruned_model_further_trained_path, pruned_model_further_trained
@@ -289,8 +292,9 @@ if __name__ == "__main__":
                                 pruned_model_further_trained_path, epoch_acc_further
                             )
                     pruned_epoch_accuracy = epoch_acc_further
-
+                    print(f"294: {pruned_epoch_accuracy}")
                 # store the performance development of the retraining of the pruned model in result
+                print(f"297: {pruned_epoch_accuracy}")
                 for idx, accuracy in enumerate(pruned_epoch_accuracy):
                     result[name][f"model_{k}"]["accuracy_pruned"][idx] = float_format(accuracy)
                 # here we should maybe also add the this_load_trainhist to result[PaF]
