@@ -62,17 +62,9 @@ def normalize_ground_metric(t):
     t  = (t-mean)/std
     return t
 
-# get_ground_metric computes the cost matrix
-# if bias is present, the bias will be appended to the weight matrix and subsequently used to calculate the cost
-# cost matrix is based on the weights, not the activations
-def get_ground_metric(coordinates1, coordinates2, bias1, bias2):
-    if bias1 != None: # and bias2 != None
-        assert bias2 != None
-        coordinates1 = torch.cat((coordinates1, bias1.view(bias1.shape[0], -1)), 1)
-        coordinates2 = torch.cat((coordinates2, bias2.view(bias2.shape[0], -1)), 1)
-    coordinates1 = normalize_vector(coordinates1)
-    coordinates2 = normalize_vector(coordinates2)
-    return compute_euclidian_distance_matrix(coordinates1, coordinates2)
+
+def get_ground_metric(coordinates1, coordiantes2, bias1, bias2):
+    return torch.cdist(coordinates1, coordiantes2, p=1)
 
 # create_network_from_params creates a network given the list of weights
 def create_network_from_params(reference_model, param_list, gpu_id = -1,sparsity=1.0):
@@ -105,7 +97,10 @@ def create_network_from_parameters(reference_model, param_list, gpu_id = -1):
     processed_keys = []
 
     def process_layer(layer, idx):
-        model_state_dict[keys[idx]] = layer.weight.view(model_state_dict[keys[idx]].shape)
+        if layer.is_conv:
+            model_state_dict[keys[idx]] = layer.weight.view(layer.weight.shape[0], layer.weight.shape[1], model_state_dict[keys[idx]].shape[2], model_state_dict[keys[idx]].shape[3])
+        else:
+            model_state_dict[keys[idx]] = layer.weight
         if layer.bias != None:
             idx += 1
             model_state_dict[keys[idx]] = layer.bias
@@ -595,7 +590,6 @@ def intrafusion_bn(network, fusion_type, sparsity, prune_type="l1", full_model =
     actualized_sparsities = [1]*num_layers
 
     for idx in range(num_layers):
-
         fusion_layers[idx] = list(fusion_layers[idx])
         fusion_layers_2[idx] = list(fusion_layers_2[idx])
 
@@ -620,7 +614,7 @@ def intrafusion_bn(network, fusion_type, sparsity, prune_type="l1", full_model =
             fusion_layer.align_weights(T_var)
 
         
-        if amount_pruned == layer_shape[0]:
+        if amount_pruned == layer_shape[0] and fusion_layer.T != None: # Changed  this
             assert idx == num_layers - 1 or fusion_layer.T != None
             T_var = fusion_layer.T
             continue

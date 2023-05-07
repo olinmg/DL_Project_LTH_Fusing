@@ -7,7 +7,7 @@ from performance_tester import train_during_pruning, update_running_statistics
 from parameters import get_parameters
 from train import get_model
 import torch
-from fusion_IF import MSF, IntraFusion_Clustering, fusion, fusion_bn, fusion_old, fusion_sidak_multimodel, fusion_bn_alt, intrafusion_bn
+from fusion import MSF, IntraFusion_Clustering, fusion, fusion_bn, fusion_old, fusion_sidak_multimodel, fusion_bn_alt, intrafusion_bn
 from sklearn.model_selection import train_test_split
 from torchvision.transforms import ToTensor
 from torch.utils.data import DataLoader
@@ -126,7 +126,7 @@ if __name__ == '__main__':
     dict = {}
     it = 9
 
-    models = get_pretrained_models(args.model_name, "vgg11_diff_weight_init_True_cifar10", args.gpu_id, num_models, output_dim=10)
+    models = get_pretrained_models(args.model_name, "resnet50_diff_weight_init_True_cifar10", args.gpu_id, num_models, output_dim=10)
 
     loaders = None
     if "vgg" not in args.model_name and "resnet" not in args.model_name:
@@ -161,14 +161,16 @@ if __name__ == '__main__':
     exit()"""
 
 
-    """for idx, ((layer0_name, fc_layer0_weight), (layer1_name, fc_layer1_weight)) in \
+    for idx, ((layer0_name, fc_layer0_weight), (layer1_name, fc_layer1_weight)) in \
             enumerate(zip(models[0].named_parameters(), models[0].named_parameters())):
         print(f"{layer0_name} : {fc_layer0_weight.shape}")
 
-    fused_model_g = fusion_bn(models, fusion_type="weight", gpu_id=args.gpu_id, resnet=False, train_loader=get_cifar_data_loader(shuffle=True)["train"])
+
+    fused_model_g = fusion_bn(models, model_name = args.model_name, fusion_type="activation", gpu_id=-1, resnet=True, train_loader=get_cifar_data_loader(shuffle=True)["train"])
+    #fused_model_g = wrapper_intra_fusion(model=models[0], model_name=args.model_name, resnet=True, sparsity=0.1, prune_iter_steps=0, num_epochs=0, loaders=loaders, prune_type=PruneType.L2, meta_prune_type=MetaPruneType.IF, gpu_id=0)
     #fused_model_g = fusion(models, gpu_id=args.gpu_id, resnet=True)
     print(evaluate_performance_simple(fused_model_g, loaders, 0, eval=True))
-    exit()"""
+    exit()
     """fused_model_g = intrafusion_bn(models[0], full_model = models[0], sparsity=0.9, fusion_type="weight", gpu_id = args.gpu_id, resnet = True, train_loader=get_cifar_data_loader(shuffle=True)["train"])
     print(evaluate_performance_simple(fused_model_g, loaders, 0, eval=True))
     exit()"""
