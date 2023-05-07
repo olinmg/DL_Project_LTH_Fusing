@@ -231,6 +231,8 @@ if __name__ == "__main__":
                     this_pruned_model_lis, this_pruned_model_accuracies, _ = pruning_test_manager(
                         input_model_list=this_original_model, prune_params=prune_params, **params
                     )
+                    this_pruned_model_accuracies = this_pruned_model_accuracies[0]
+                    print(f"this_pruned_model_accuracies 234: {this_pruned_model_accuracies}")
                     this_pruned_model, epoch_accuracy = train_during_pruning(
                         copy.deepcopy(this_pruned_model_lis[0]),
                         loaders=loaders,
@@ -239,6 +241,7 @@ if __name__ == "__main__":
                         prune=False,
                         model_name=name,
                     )
+                    print(f"epoch_accuracy 242: {epoch_accuracy}")
                     this_pruned_model_accuracies = this_pruned_model_accuracies[0]
                     this_pruned_model_accuracies.extend(epoch_accuracy)
                     this_pruned_model = this_pruned_model_lis[0]
