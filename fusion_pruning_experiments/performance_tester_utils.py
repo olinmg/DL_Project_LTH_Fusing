@@ -682,7 +682,7 @@ def wrapper_intra_fusion(
                 performed_epochs=0,
                 model_name=model_name,
             )
-            iterative_retrain_accuracies.append(iterative_retrain_accuracies_this_iter)
+            iterative_retrain_accuracies.extend(iterative_retrain_accuracies_this_iter)
         return fused_model_g, iterative_retrain_accuracies
 
 
