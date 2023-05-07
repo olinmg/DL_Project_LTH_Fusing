@@ -242,7 +242,7 @@ if __name__ == "__main__":
                         model_name=name,
                     )
                     print(f"epoch_accuracy 242: {epoch_accuracy}")
-                    this_pruned_model_accuracies = this_pruned_model_accuracies[0]
+                    this_pruned_model_accuracies = this_pruned_model_accuracies
                     this_pruned_model_accuracies.extend(epoch_accuracy)
                     this_pruned_model = this_pruned_model_lis[0]
                     if use_caching:
