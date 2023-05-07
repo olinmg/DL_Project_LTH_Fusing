@@ -279,7 +279,7 @@ if __name__ == "__main__":
                             model_name=name,
                         )
                         epoch_acc_further = this_pruned_model_train_accuracies
-                        epoch_acc_further.extend(epoch_accuracy_further_tr)
+                        epoch_acc_further.append(epoch_accuracy_further_tr)
                         if use_caching:
                             save_model(
                                 pruned_model_further_trained_path, pruned_model_further_trained
