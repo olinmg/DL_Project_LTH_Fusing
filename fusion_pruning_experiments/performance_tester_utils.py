@@ -553,9 +553,10 @@ def pruning_test_manager(
     pruned_models = []
     pruned_models_accuracies = []
     for i, input_model in enumerate(input_model_list):
+        this_model_iter_retrain = []
         input_model_copy = copy.deepcopy(input_model)
         # Prune the individual networks (in place)
-        input_model_copy, description_pruning = pruning_function(
+        input_model_copy, description_pruning, retrain_accuracies = pruning_function(
             input_model=input_model_copy, prune_params=prune_params
         )
         # input_model_copy,_ = train_during_pruning(model=input_model_copy, loaders=loaders, num_epochs=5, gpu_id = gpu_id, prune=False)
@@ -564,7 +565,8 @@ def pruning_test_manager(
         acc_model_pruned = eval_function(
             input_model=pruned_models[i], loaders=loaders, gpu_id=gpu_id
         )
-        pruned_models_accuracies.append(acc_model_pruned)
+        this_model_iter_retrain.append(acc_model_pruned)
+        pruned_models_accuracies.append(this_model_iter_retrain)
         print(f"Model {i} pruned:\t{acc_model_pruned}")
 
     return pruned_models, pruned_models_accuracies, description_pruning
@@ -582,7 +584,7 @@ def wrapper_structured_pruning(input_model, prune_params):
         prune_iter_steps = 1
         prune_iter_epochs = 0
 
-    pruned_model = wrapper_intra_fusion(
+    pruned_model, retrain_accuracies = wrapper_intra_fusion(
         model=input_model,
         model_name=prune_params.get("model_name"),
         resnet="resnet" in prune_params.get("model_name"),
@@ -598,7 +600,7 @@ def wrapper_structured_pruning(input_model, prune_params):
     )
 
     input_model = pruned_model
-    return pruned_model, ""
+    return pruned_model, "", retrain_accuracies
 
 
 def wrapper_intra_fusion(
@@ -628,17 +630,20 @@ def wrapper_intra_fusion(
     :return: the pruned model
     """
     if prune_iter_steps == 0:
-        return intrafusion_bn(
-            model,
-            full_model=model,
-            meta_prune_type=meta_prune_type,
-            prune_type=prune_type,
-            model_name=model_name,
-            sparsity=sparsity,
-            fusion_type="weight",
-            gpu_id=gpu_id,
-            resnet=resnet,
-            train_loader=None,
+        return (
+            intrafusion_bn(
+                model,
+                full_model=model,
+                meta_prune_type=meta_prune_type,
+                prune_type=prune_type,
+                model_name=model_name,
+                sparsity=sparsity,
+                fusion_type="weight",
+                gpu_id=gpu_id,
+                resnet=resnet,
+                train_loader=None,
+            ),
+            [],
         )
     else:
         prune_steps = prune_structured_intra(
@@ -654,6 +659,7 @@ def wrapper_intra_fusion(
             total_steps=prune_iter_steps,
         )
         fused_model_g = model
+        iterative_retrain_accuracies = []
         for prune_step in prune_steps:
             fused_model_g = intrafusion_bn(
                 fused_model_g,
@@ -666,7 +672,7 @@ def wrapper_intra_fusion(
                 resnet=resnet,
                 train_loader=None,
             )
-            fused_model_g, _ = train_during_pruning(
+            fused_model_g, iterative_retrain_accuracies_this_iter = train_during_pruning(
                 fused_model_g,
                 loaders=loaders,
                 num_epochs=num_epochs,
@@ -675,7 +681,8 @@ def wrapper_intra_fusion(
                 performed_epochs=0,
                 model_name=model_name,
             )
-        return fused_model_g
+            iterative_retrain_accuracies.append(iterative_retrain_accuracies_this_iter)
+        return fused_model_g, iterative_retrain_accuracies
 
 
 '''

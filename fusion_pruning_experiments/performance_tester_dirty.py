@@ -228,7 +228,7 @@ if __name__ == "__main__":
                     this_pruned_model_train_accuracies = this_load_trainhist[:-1]
                 else:
                     this_original_model = [models_original[k]]
-                    this_pruned_model_lis, _, _ = pruning_test_manager(
+                    this_pruned_model_lis, this_pruned_model_accuracies, _ = pruning_test_manager(
                         input_model_list=this_original_model, prune_params=prune_params, **params
                     )
                     this_pruned_model, epoch_accuracy = train_during_pruning(
@@ -239,12 +239,13 @@ if __name__ == "__main__":
                         prune=False,
                         model_name=name,
                     )
+                    this_pruned_model_accuracies.append(epoch_accuracy)
                     this_pruned_model = this_pruned_model_lis[0]
                     if use_caching:
                         save_model(this_model_path, this_pruned_model)
-                        save_model_trainHistory(this_model_path, epoch_accuracy)
-                    this_pruned_model_accuracy = epoch_accuracy[-1]
-                    this_pruned_model_train_accuracies = epoch_accuracy[:-1]
+                        save_model_trainHistory(this_model_path, this_pruned_model_accuracies)
+                    this_pruned_model_accuracy = this_pruned_model_accuracies[-1]
+                    this_pruned_model_train_accuracies = this_pruned_model_accuracies[:-1]
 
                 # train for another num_epochs epochs to create the prune benchmark performance
                 pruned_model_further_trained_path = (
@@ -383,7 +384,7 @@ if __name__ == "__main__":
                 if model_already_exists(fap_model_path, loaders, gpu_id, use_caching):
                     logging.info(f"\t\tFound the model {fap_model_path}.pth in cache.")
                     fap_model = get_pretrained_model_by_name(fap_model_path, gpu_id)
-                    epoch_accuracy = get_model_trainHistory(fap_model_path)
+                    fap_model_accuracies = get_model_trainHistory(fap_model_path)
                 else:
                     fap_models, fap_model_accuracies, _ = pruning_test_manager(
                         input_model_list=[fused_model], prune_params=prune_params, **params
@@ -396,11 +397,12 @@ if __name__ == "__main__":
                         prune=False,
                         model_name=name,
                     )
+                    fap_model_accuracies.append(epoch_accuracy)
                     if use_caching:
                         save_model(fap_model_path, fap_model)
-                        save_model_trainHistory(fap_model_path, epoch_accuracy)
+                        save_model_trainHistory(fap_model_path, fap_model_accuracies)
 
-                for idx, accuracy in enumerate(epoch_accuracy):
+                for idx, accuracy in enumerate(fap_model_accuracies):
                     result[name]["accuracy_FaP"][idx] = float_format(accuracy)
 
         result_final["results"][idx_result] = result
