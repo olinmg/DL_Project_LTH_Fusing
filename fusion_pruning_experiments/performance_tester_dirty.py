@@ -239,6 +239,7 @@ if __name__ == "__main__":
                         prune=False,
                         model_name=name,
                     )
+                    this_pruned_model_accuracies = this_pruned_model_accuracies[0]
                     this_pruned_model_accuracies.extend(epoch_accuracy)
                     this_pruned_model = this_pruned_model_lis[0]
                     if use_caching:
@@ -281,7 +282,7 @@ if __name__ == "__main__":
                         print(f"281: {epoch_acc_further}")
                         epoch_acc_further = this_pruned_model_train_accuracies
                         print(f"283: {epoch_acc_further}")
-                        epoch_acc_further.append(epoch_accuracy_further_tr)
+                        epoch_acc_further.extend(epoch_accuracy_further_tr)
                         print(f"285: {epoch_acc_further}")
                         if use_caching:
                             save_model(

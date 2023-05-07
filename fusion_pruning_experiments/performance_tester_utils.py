@@ -559,14 +559,15 @@ def pruning_test_manager(
         input_model_copy, description_pruning, retrain_accuracies = pruning_function(
             input_model=input_model_copy, prune_params=prune_params
         )
+        this_model_iter_retrain.extend(retrain_accuracies)
         # input_model_copy,_ = train_during_pruning(model=input_model_copy, loaders=loaders, num_epochs=5, gpu_id = gpu_id, prune=False)
         pruned_models.append(input_model_copy)
         # Evaluate the performance on the given data (loaders)
         acc_model_pruned = eval_function(
             input_model=pruned_models[i], loaders=loaders, gpu_id=gpu_id
         )
-        this_model_iter_retrain.extend(acc_model_pruned)
-        pruned_models_accuracies.extend(this_model_iter_retrain)
+        this_model_iter_retrain.append(acc_model_pruned)
+        pruned_models_accuracies.append(this_model_iter_retrain)
         print(f"Model {i} pruned:\t{acc_model_pruned}")
 
     return pruned_models, pruned_models_accuracies, description_pruning
