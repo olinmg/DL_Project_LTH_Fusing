@@ -51,7 +51,7 @@ from fusion import fusion_bn
 from fusion_IF import intrafusion_bn
 from fusion_utils_IF import MetaPruneType, PruneType
 from pruning_modified import prune_structured_intra
-from train_resnet50 import train_resnet50
+from train_resnet50 import train_resnet50, validate
 
 
 def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, sparsity):
@@ -91,7 +91,10 @@ def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, spar
                 resnet=True,
                 train_loader=None,
             )
-            after_prune_acc = evaluate_performance_imagenet(fused_model_g, loaders["test"], gpu_id)
+
+            after_prune_acc = validate(
+                model=fused_model_g, val_loader=loaders["test"], gpu_id=gpu_id
+            )
             accuarcies_between_prunesteps.append(after_prune_acc)
             # 2. store the prune model
             optimizer = torch.optim.SGD(model.parameters(), 0.1, momentum=0.9, weight_decay=1e-4)
@@ -122,8 +125,8 @@ def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, spar
             model = torch.nn.DataParallel(model)
             checkpoint = torch.load(last_model_path)
             model.load_state_dict(checkpoint["state_dict"])
-
-            after_retrain_acc = evaluate_performance_imagenet(model, loaders["test"], gpu_id)
+            after_retrain_acc = validate(model=model, val_loader=loaders["test"], gpu_id=gpu_id)
+            # after_retrain_acc = evaluate_performance_imagenet(model, loaders["test"], gpu_id)
             accuarcies_between_prunesteps.append(after_retrain_acc)
             model = model.module.to("cpu")
 
@@ -179,7 +182,7 @@ from performance_tester_utils import evaluate_performance_imagenet
 
 # 0. original model accuracy
 print("Starting to evaluate the original model performance ...")
-original_acc = evaluate_performance_imagenet(loaded_model, loaders, gpu_id)
+original_acc = validate(loaders["test"], loaded_model, gpu_id)
 model_accuracy_development["original_accuracy"] = original_acc
 
 # 1. prune the model - possibly iteratively
@@ -215,7 +218,8 @@ final_model = model_archs.__dict__["resnet50"]()
 final_model = torch.nn.DataParallel(final_model)
 checkpoint = torch.load(final_model_path)
 final_model.load_state_dict(checkpoint["state_dict"])
-after_retrain_acc = evaluate_performance_imagenet(final_model, loaders["test"], gpu_id)
+after_retrain_acc = validate(loaders["test"], final_model, gpu_id)
+# after_retrain_acc = evaluate_performance_imagenet(final_model, loaders["test"], gpu_id)
 
 model_accuracy_development["retraining"] = after_retrain_acc
 with open(f"./results_of_pruning_experiment/all_accuracies_{model_file}.json", "w") as outfile:
