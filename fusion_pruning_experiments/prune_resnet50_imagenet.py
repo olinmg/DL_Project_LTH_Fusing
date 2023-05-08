@@ -112,7 +112,7 @@ pruned_model_lis, pruned_model_accuracies, _ = pruning_test_manager(
 pruned_model = pruned_model_lis[0]
 # store the model after iterative pruning
 iterprune_text = f"{prune_params['prune_iter_steps']}iter{prune_params['prune_iter_epochs']}"
-torch.save(pruned_model, filename=f"./{model_file}_{iterprune_text}.pth.tar")
+torch.save(pruned_model, f"./{model_file}_{iterprune_text}.pth.tar")
 model_accuracy_development["pruning_accuracies"] = pruned_model_accuracies
 with open(f"./pruning_accuracies_{model_file}.json", "w") as outfile:
     json.dump(model_accuracy_development, outfile, indent=4)
