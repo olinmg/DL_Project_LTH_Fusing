@@ -320,10 +320,10 @@ def train_during_pruning_resnet50(model, loaders, epoch, gpu_id, prune=None, per
 
         # measure accuracy and record loss
         acc1, acc5 = accuracy(output, target, topk=(1, 5))
-        acc1_val = evaluate_performance_imagenet(
-            input_model=model, loaders=loaders, gpu_id=gpu_id, prune=False
-        )
-        val_acc_per_epoch.append(acc1_val)
+        # acc1_val = evaluate_performance_imagenet(
+        #    input_model=model, loaders=loaders, gpu_id=gpu_id, prune=False
+        # )
+        val_acc_per_epoch.append(acc1)
         losses.update(loss.item(), images.size(0))
         top1.update(acc1[0], images.size(0))
         top5.update(acc5[0], images.size(0))
