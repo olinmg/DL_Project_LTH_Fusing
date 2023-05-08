@@ -132,7 +132,7 @@ retrained_pruned_model, val_acc_per_epoch = train_during_pruning(
 )
 torch.save(
     retrained_pruned_model,
-    filename=f"./{model_file}_{iterprune_text}_T{retrain_epochs}.pth.tar",
+    f"./{model_file}_{iterprune_text}_T{retrain_epochs}.pth.tar",
 )
 model_accuracy_development["retraining_accuracies"] = val_acc_per_epoch
 
