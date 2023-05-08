@@ -109,7 +109,7 @@ def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, spar
                 "scheduler": scheduler.state_dict(),
             }
             store_model_path = f"{model_file}_{iter_step}iter"
-            torch.save(state, store_model_path)
+            torch.save(state, f"{store_model_path}.pth.tar")
 
             # 3. retrain the stored pruned model (using train_resnet50/main.py)
             last_model_path = f"{model_file}_{iter_step}iter{iter_num_epochs}"
