@@ -92,10 +92,10 @@ def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, spar
                 train_loader=None,
             )
 
-            after_prune_acc = validate(
-                model=fused_model_g, val_loader=loaders["test"], gpu_id=gpu_id
-            )
-            accuarcies_between_prunesteps.append(after_prune_acc)
+            # after_prune_acc = validate(
+            #     model=fused_model_g, val_loader=loaders["test"], gpu_id=gpu_id
+            # )
+            # accuarcies_between_prunesteps.append(after_prune_acc)
             # 2. store the prune model
             optimizer = torch.optim.SGD(model.parameters(), 0.1, momentum=0.9, weight_decay=1e-4)
             scheduler = StepLR(optimizer, step_size=5, gamma=0.1)
