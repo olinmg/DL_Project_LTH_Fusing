@@ -135,10 +135,10 @@ def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, spar
 
 gpu_id = 0
 retrain_epochs = 1
-model_name = "resnet18"
-model_file = "resnet18_withBN_diff_weight_init_False_cifar10_eps300_1"
-model_path = f"./models/models_resnet18/{model_file}"
-dataset_name = "cifar10"
+model_name = "resnet50"
+model_file = "resnet50_imagenet_eps90_datasplit_0"
+model_path = f"./models/models_resnet50/{model_file}"
+dataset_name = "imagenet"
 
 print("Loading resnet50 model ...")
 loaded_model = get_pretrained_model_by_name(model_path, gpu_id=0)
