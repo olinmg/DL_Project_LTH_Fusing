@@ -463,9 +463,10 @@ def train(train_loader, model, criterion, optimizer, epoch, device, args):
             progress.display(i + 1)
 
 
-def validate(val_loader, model, criterion, gpu_id):
+def validate(val_loader, model, gpu_id, criterion=None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    criterion = nn.CrossEntropyLoss().to(device)
+    if criterion is None:
+        criterion = nn.CrossEntropyLoss().to(device)
 
     def run_validate(loader, base_progress=0):
         with torch.no_grad():
