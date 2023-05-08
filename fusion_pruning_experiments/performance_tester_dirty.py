@@ -176,7 +176,7 @@ if __name__ == "__main__":
                 "sparsity": result["sparsity"],
                 "example_input": torch.randn(1, 1, 28, 28)
                 if "cnn" in name
-                else torch.randn(1, 3, 32, 32),
+                else (torch.randn(1, 3, 224, 224) if "resnet50" else torch.randn(1, 3, 32, 32)),
                 "out_features": output_dim,
                 "use_iter_prune": use_iter_prune,
                 "prune_iter_steps": prune_iter_steps,
