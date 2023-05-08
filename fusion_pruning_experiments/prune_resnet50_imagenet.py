@@ -141,7 +141,12 @@ model_path = f"./models/models_resnet50/{model_file}"
 dataset_name = "imagenet"
 
 print("Loading resnet50 model ...")
-loaded_model = get_pretrained_model_by_name(model_path, gpu_id=0)
+# loaded_model = get_pretrained_model_by_name(model_path, gpu_id=0)
+loaded_model = model_archs.__dict__["resnet50"]()
+loaded_model = torch.nn.DataParallel(loaded_model)
+checkpoint = torch.load(f"{model_path}.pth.tar")
+loaded_model.load_state_dict(checkpoint["state_dict"])
+# loaded_model = loaded_model.module.to("cpu")
 
 print("Loading imagenet dataset ...")
 loaders = get_imagenet_data_loader()
