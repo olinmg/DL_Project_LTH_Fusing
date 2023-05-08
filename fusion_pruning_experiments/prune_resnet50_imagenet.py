@@ -122,10 +122,11 @@ def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, spar
             )
 
             # 4. load the retrained model
-            model = model_archs.__dict__["resnet50"]()
+            # model = model_archs.__dict__["resnet50"]()
+            # checkpoint = torch.load(f"{last_model_path}_checkpoint.pth")
+            model = torch.load(f"{last_model_path}_best_model.pth")
             model = torch.nn.DataParallel(model)
-            checkpoint = torch.load(last_model_path)
-            model.load_state_dict(checkpoint["state_dict"])
+            # model.load_state_dict(checkpoint["state_dict"])
             after_retrain_acc = validate(model=model, val_loader=loaders["test"], gpu_id=gpu_id)
             # after_retrain_acc = evaluate_performance_imagenet(model, loaders["test"], gpu_id)
             accuarcies_between_prunesteps.append(after_retrain_acc)
@@ -163,7 +164,7 @@ prune_params = {
     "out_features": out_features,
     "use_iter_prune": True,
     "prune_iter_steps": 4,
-    "prune_iter_epochs": 1,
+    "prune_iter_epochs": 2,
     "loaders": loaders,
     "gpu_id": gpu_id,
     "model_name": model_name,
