@@ -198,8 +198,6 @@ def train_resnet50(
         # Simply call main_worker function
         main_worker(args.gpu, ngpus_per_node, args)
 
-    return best_model
-
 
 def main_worker(gpu, ngpus_per_node, args):
     global best_acc1
@@ -298,7 +296,8 @@ def main_worker(gpu, ngpus_per_node, args):
             if args.gpu is not None:
                 # best_acc1 may be from a checkpoint from a different GPU
                 best_acc1 = best_acc1.to(args.gpu)
-            model.load_state_dict(checkpoint["state_dict"])
+            # model.load_state_dict(checkpoint["state_dict"])
+            model = torch.load(f"{args.resume}.pth")
             optimizer.load_state_dict(checkpoint["optimizer"])
             scheduler.load_state_dict(checkpoint["scheduler"])
             print("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint["epoch"]))
