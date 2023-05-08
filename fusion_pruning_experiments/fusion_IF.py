@@ -9,7 +9,7 @@ import torch.nn as nn
 from sklearn.cluster import KMeans
 from torch import linalg as LA
 
-from fusion_utils_IF_old import FusionType, MetaPruneType, preprocess_parameters
+from fusion_utils_IF import FusionType, MetaPruneType, preprocess_parameters
 from models import get_model
 from pruning_modified import prune_structured
 
