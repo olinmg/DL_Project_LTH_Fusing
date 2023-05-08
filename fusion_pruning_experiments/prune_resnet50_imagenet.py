@@ -48,7 +48,7 @@ gpu_id = 0
 retrain_epochs = 2
 model_name = "resnet18"
 model_file = "resnet18_withBN_diff_weight_init_False_cifar10_eps300_1"
-model_path = f"../models/models_resnet18/{model_file}"
+model_path = f"./models/models_resnet18/{model_file}"
 dataset_name = "cifar10"
 
 
@@ -113,9 +113,9 @@ pruned_model_lis, pruned_model_accuracies, _ = pruning_test_manager(
 pruned_model = pruned_model_lis[0]
 # store the model after iterative pruning
 iterprune_text = f"{prune_params['prune_iter_steps']}iter{prune_params['prune_iter_epochs']}"
-torch.save(pruned_model, f"./{model_file}_{iterprune_text}.pth.tar")
+torch.save(pruned_model, f"./results_of_pruning_experiment/{model_file}_{iterprune_text}.pth.tar")
 model_accuracy_development["pruning_accuracies"] = pruned_model_accuracies
-with open(f"./pruning_accuracies_{model_file}.json", "w") as outfile:
+with open(f"./results_of_pruning_experiment/pruning_accuracies_{model_file}.json", "w") as outfile:
     json.dump(model_accuracy_development, outfile, indent=4)
 print(f"Model pruning is done. Final accuracy: {pruned_model_accuracies[-1]}")
 
@@ -132,14 +132,18 @@ retrained_pruned_model, val_acc_per_epoch = train_during_pruning(
 )
 torch.save(
     retrained_pruned_model,
-    f"./{model_file}_{iterprune_text}_T{retrain_epochs}.pth.tar",
+    f"./results_of_pruning_experiment/{model_file}_{iterprune_text}_T{retrain_epochs}.pth.tar",
 )
 model_accuracy_development["retraining_accuracies"] = val_acc_per_epoch
 
-with open(f"./retraining_accuracies_{model_file}.json", "w") as outfile:
+with open(
+    f"./results_of_pruning_experiment/retraining_accuracies_{model_file}.json", "w"
+) as outfile:
     json.dump(model_accuracy_development, outfile, indent=4)
 pruned_model_accuracies.extend(val_acc_per_epoch)
 model_accuracy_development["all_accuracies"] = pruned_model_accuracies
-with open(f"./overall_pruning_retraining_accuracies_{model_file}.json", "w") as outfile:
+with open(
+    f"./results_of_pruning_experiment/overall_pruning_retraining_accuracies_{model_file}.json", "w"
+) as outfile:
     json.dump(model_accuracy_development, outfile, indent=4)
 print("Done.")
