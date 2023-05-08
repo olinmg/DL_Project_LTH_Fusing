@@ -177,6 +177,10 @@ model_accuracy_development = {}
 
 from performance_tester_utils import evaluate_performance_imagenet
 
+# 0. original model accuracy
+original_acc = evaluate_performance_imagenet(loaded_model, loaders["test"], gpu_id)
+model_accuracy_development["original_accuracy"] = original_acc
+
 # 1. prune the model - possibly iteratively
 print("Starting the (iterative) pruning ...")
 pruned_model, accuarcies_between_prunesteps, last_model_path = iterative_pruning(
