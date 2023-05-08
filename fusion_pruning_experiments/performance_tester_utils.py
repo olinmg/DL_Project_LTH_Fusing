@@ -664,6 +664,8 @@ def wrapper_intra_fusion(
         for prune_step in prune_steps:
             fused_model_g = intrafusion_bn(
                 fused_model_g,
+                meta_prune_type=meta_prune_type,
+                prune_type=prune_type,
                 model_name=model_name,
                 sparsity=sparsity,
                 fusion_type="weight",
