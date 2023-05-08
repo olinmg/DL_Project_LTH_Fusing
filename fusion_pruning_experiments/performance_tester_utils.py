@@ -294,12 +294,36 @@ def save_checkpoint(state, is_best, filename="./models/models_resnet50/checkpoin
         shutil.copyfile(filename, "./models/models_resnet50/model_best.pth.tar")
 
 
+"""
+def train_during_pruning_resnet50(model, loaders, num_epochs, gpu_id, prune=None, performed_epochs=0
+):
+    # attempt to make code parallelizable - not done yet
+    # call the train that was doen in train_resnet50/main.py
+    optimizer = torch.optim.SGD(model.parameters(), 0.1, momentum=0.9, weight_decay=1e-4)
+    criterion = nn.CrossEntropyLoss().to(device)
+    scheduler = StepLR(optimizer, step_size=5, gamma=0.1)
+    
+    state = {
+        "epoch": 1,
+        "arch": "resnet50",
+        "state_dict": model.state_dict(),
+        "best_acc1": 0,
+        "optimizer": optimizer.state_dict(),
+        "scheduler": scheduler.state_dict(),
+    }
+    torch.save(model, "./models/models_resnet50/retrain_after_pruning_intermediate_model")
+
+    return
+"""
+
+
 def train_during_pruning_resnet50(
     model, loaders, num_epochs, gpu_id, prune=None, performed_epochs=0
 ):
+    # can only run on one gpu
     optimizer = torch.optim.SGD(model.parameters(), 0.1, momentum=0.9, weight_decay=1e-4)
     criterion = nn.CrossEntropyLoss().to(device)
-    scheduler = StepLR(optimizer, step_size=30, gamma=0.1)
+    scheduler = StepLR(optimizer, step_size=5, gamma=0.1)
     val_acc_per_epoch = []
     best_acc1 = 0
     for epoch in range(0, num_epochs):
