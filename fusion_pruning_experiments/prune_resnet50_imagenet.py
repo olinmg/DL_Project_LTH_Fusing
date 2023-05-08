@@ -99,11 +99,11 @@ def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, spar
             # 2. store the prune model
             optimizer = torch.optim.SGD(model.parameters(), 0.1, momentum=0.9, weight_decay=1e-4)
             scheduler = StepLR(optimizer, step_size=5, gamma=0.1)
-
+            fused_model_g = torch.nn.DataParallel(fused_model_g).cuda()
             state = {
                 "epoch": 1,
                 "arch": "resnet50",
-                "state_dict": model.state_dict(),
+                "state_dict": fused_model_g.state_dict(),
                 "best_acc1": 0,
                 "optimizer": optimizer.state_dict(),
                 "scheduler": scheduler.state_dict(),
