@@ -195,7 +195,7 @@ model_accuracy_development["original_accuracy"] = original_acc
 print("Starting the (iterative) pruning ...")
 pruned_model, accuarcies_between_prunesteps, last_model_path = iterative_pruning(
     model=loaded_model,
-    num_epochs=prune_params.get("prune_iter_epochs"),
+    iter_num_epochs=prune_params.get("prune_iter_epochs"),
     prune_iter_steps=prune_params.get("prune_iter_steps"),
     prune_type=prune_params.get("prune_type"),
     sparsity=prune_params.get("sparsity"),
