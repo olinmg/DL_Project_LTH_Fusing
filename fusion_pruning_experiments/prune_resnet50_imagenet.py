@@ -99,7 +99,7 @@ def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, spar
             # 2. store the prune model
             optimizer = torch.optim.SGD(model.parameters(), 0.1, momentum=0.9, weight_decay=1e-4)
             scheduler = StepLR(optimizer, step_size=5, gamma=0.1)
-            # fused_model_g = torch.nn.DataParallel(fused_model_g).cuda()
+            fused_model_g = torch.nn.DataParallel(fused_model_g).cuda()
             state = {
                 "epoch": 1,
                 "arch": "resnet50",
@@ -110,7 +110,7 @@ def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, spar
             }
             store_model_path = f"{model_file}_{iter_step}iter"
             torch.save(state, f"{store_model_path}.pth.tar")
-
+            torch.save(fused_model_g, f"{store_model_path}.pth")
             # 3. retrain the stored pruned model (using train_resnet50/main.py)
             last_model_path = f"{model_file}_{iter_step}iter{iter_num_epochs}"
             print("Handing over to train_resnet50()")
