@@ -1,17 +1,15 @@
-import copy
 import functools
 import itertools
-
+from pruning_modified import prune_structured
+import torch
 import numpy as np
 import ot
-import torch
-import torch.nn as nn
-from sklearn.cluster import KMeans
+import copy
 from torch import linalg as LA
-
-from fusion_utils_IF import FusionType, MetaPruneType, preprocess_parameters
+from fusion_utils_IF import MetaPruneType, preprocess_parameters, FusionType
+from sklearn.cluster import KMeans
+import torch.nn as nn
 from models import get_model
-from pruning_modified import prune_structured
 
 # from scipy.optimize import linear_sum_assignment # Could accomplish the same as OT with Hungarian Algorithm
 
@@ -806,7 +804,7 @@ def intrafusion_bn(
         if meta_prune_type == MetaPruneType.DEFAULT:
             fusion_layer.permute_parameters(T_var)
         else:
-            fusion_layer.update_weights_intra(T_var, gpu_id)
+            fusion_layer.update_weights_intra(T_var)
 
         # avg_layer.update_weights(fusion_layer, torch.sum(importance[:idx_model]), importance[idx_model])
 
