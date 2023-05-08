@@ -267,24 +267,21 @@ class Fusion_Layer:
 
         return adjust
 
-    def update_weights_intra(self, T_var, gpu_id):
+    def update_weights_intra(self, T_var):
         self.T = T_var
         w_shape = self.weight.shape
         if not self.bn:
             self.permute_parameters(T_var)
             return
         if self.skip_ot != None:
-            self.skip_ot.update_weights_intra(T_var, gpu_id)
+            self.skip_ot.update_weights_intra(T_var)
         if self.skip_ot_2 != None:
-            self.skip_ot_2.update_weights_intra(T_var, gpu_id)
+            self.skip_ot_2.update_weights_intra(T_var)
 
         T_var_adjust = T_var.clone()
         for i in range(T_var.shape[1]):
             adjust = self.get_intra_weights(T_var_adjust[:, i])
-            if gpu_id != -1:
-                temp = torch.zeros(T_var_adjust[:, i].shape).cuda(0)
-            else:
-                temp = torch.zeros(T_var_adjust[:, i].shape)
+            temp = torch.zeros(T_var_adjust[:, i].shape).cuda(0)
 
             temp = temp.index_copy_(0, T_var_adjust[:, i].nonzero().flatten(), adjust.flatten())
 
@@ -526,12 +523,17 @@ def preprocess_parameters(
                     bias=module.bias,
                     fusion_type=fusion_type,
                 )
-                if (
-                    resnet
-                    and len(fusion_layers) > 1
-                    and fusion_layers[-2].weight.shape[0] == fusion_layers[-2].weight.shape[1]
-                ):
-                    fusion_layers[-3].skip_ot_2 = fusion_layers[-1]
+                if resnet and len(fusion_layers) > 1:
+                    if (
+                        model_name != "resnet50"
+                        and model_name != "resnet101"
+                        and model_name != "resnet152"
+                    ):
+                        if fusion_layers[-2].weight.shape[0] == fusion_layers[-2].weight.shape[1]:
+                            fusion_layers[-3].skip_ot_2 = fusion_layers[-1]
+                    else:
+                        if fusion_layers[-1].skip_ot == None:
+                            fusion_layers[-4].skip_ot_2 = fusion_layers[-1]
 
             elif isinstance(module, nn.Conv2d):
                 fusion_layer = Fusion_Layer(
@@ -543,19 +545,41 @@ def preprocess_parameters(
                     fusion_type=fusion_type,
                 )
                 if resnet and len(fusion_layers) > 0:
-                    if module.weight.shape[2] == 1 and module.weight.shape[3] == 1:
-                        fusion_layers[-1].skip_ot = fusion_layer
-                        assert fusion_layers[-2].weight.shape[:2] == fusion_layer.weight.shape[:2]
-                        fusion_layers[-2].skip_align = fusion_layer
-                        fusion_layers[-3].skip_next = fusion_layer
-
-                        continue
                     if (
-                        len(fusion_layers) > 1
-                        and "conv1" in name
-                        and fusion_layers[-2].weight.shape[0] == fusion_layers[-2].weight.shape[1]
+                        model_name != "resnet50"
+                        and model_name != "resnet101"
+                        and model_name != "resnet152"
                     ):
-                        fusion_layers[-3].skip_ot_2 = fusion_layers[-1]
+                        if module.weight.shape[2] == 1 and module.weight.shape[3] == 1:
+                            fusion_layers[-1].skip_ot = fusion_layer
+                            assert (
+                                fusion_layers[-2].weight.shape[:2] == fusion_layer.weight.shape[:2]
+                            )
+                            fusion_layers[-2].skip_align = fusion_layer
+                            fusion_layers[-3].skip_next = fusion_layer
+
+                            continue
+                        if (
+                            len(fusion_layers) > 1
+                            and "conv1" in name
+                            and fusion_layers[-2].weight.shape[0]
+                            == fusion_layers[-2].weight.shape[1]
+                        ):
+                            fusion_layers[-3].skip_ot_2 = fusion_layers[-1]
+                    else:
+                        if "shortcut" in name:
+                            fusion_layers[-1].skip_ot = fusion_layer
+                            assert fusion_layers[-3].weight.shape[1] == fusion_layer.weight.shape[1]
+                            fusion_layers[-3].skip_align = fusion_layer
+                            fusion_layers[-4].skip_next = fusion_layer
+
+                            continue
+                        elif (
+                            len(fusion_layers) > 1
+                            and "conv1" in name
+                            and fusion_layers[-1].skip_ot == None
+                        ):
+                            fusion_layers[-4].skip_ot_2 = fusion_layers[-1]
 
             elif isinstance(module, nn.BatchNorm2d):
                 ########## IMPORTANT: CHANGE TO NAME AGAIN!!!!!
