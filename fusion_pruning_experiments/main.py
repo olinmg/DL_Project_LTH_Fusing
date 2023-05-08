@@ -1,7 +1,6 @@
 from collections import OrderedDict
 import copy
 from pruning_modified import prune_structured, prune_structured_intra
-from performance_tester import train_during_pruning, update_running_statistics
 from parameters import get_parameters
 from train import get_model
 import torch
@@ -17,6 +16,9 @@ import torchvision.transforms as transforms
 from models import get_pretrained_models
 import json
 import re
+#from intrafusion_test_del import wrapper_intra_fusion
+from fusion_utils_IF import MetaPruneType
+from performance_tester_utils import wrapper_intra_fusion
 
 
 def get_cifar_data_loader(shuffle=True):
@@ -124,7 +126,7 @@ if __name__ == '__main__':
     dict = {}
     it = 9
 
-    models = get_pretrained_models(args.model_name, "vgg11_bn_diff_weight_init_True_cifar10", args.gpu_id, num_models, output_dim=10)
+    models = get_pretrained_models(args.model_name, "resnet18_diff_weight_init_True_cifar10", args.gpu_id, num_models, output_dim=10)
 
     loaders = None
     if "vgg" not in args.model_name and "resnet" not in args.model_name:
@@ -157,13 +159,19 @@ if __name__ == '__main__':
             enumerate(zip(models[0].named_parameters(), models[0].named_parameters())):
         print(f"{layer0_name} : {fc_layer0_weight.shape}")
 
-    fused_model_g = fusion_bn(models, fusion_type="weight", gpu_id=args.gpu_id, resnet=False, train_loader=get_cifar_data_loader(shuffle=True)["train"])
+    
+    fused_model_g = wrapper_intra_fusion(models[0], args.model_name, resnet="resnet" in args.model_name, sparsity=0.65, prune_iter_steps=2, num_epochs=1,
+                                         loaders=loaders, prune_type="l1", meta_prune_type=MetaPruneType.IF, gpu_id=0, out_features=10, example_input=torch.randn(1, 3, 32, 32))
+    print(evaluate_performance_simple(fused_model_g[0], loaders, 0, eval=True))
+    exit()
+
+    """fused_model_g = fusion_bn(models, fusion_type="weight", gpu_id=args.gpu_id, resnet=False, train_loader=get_cifar_data_loader(shuffle=True)["train"])
     #fused_model_g = fusion(models, gpu_id=args.gpu_id, resnet=True)
     print(evaluate_performance_simple(fused_model_g, loaders, 0, eval=True))
-    exit()
-    """fused_model_g = intrafusion_bn(models[0], full_model = models[0], sparsity=0.9, fusion_type="weight", gpu_id = args.gpu_id, resnet = True, train_loader=get_cifar_data_loader(shuffle=True)["train"])
-    print(evaluate_performance_simple(fused_model_g, loaders, 0, eval=True))
     exit()"""
+    fused_model_g = intrafusion_bn(models[0], full_model = models[0], sparsity=0.9, fusion_type="weight", gpu_id = args.gpu_id, resnet = True, train_loader=get_cifar_data_loader(shuffle=True)["train"])
+    print(evaluate_performance_simple(fused_model_g, loaders, 0, eval=True))
+    exit()
 
 
     result = {}

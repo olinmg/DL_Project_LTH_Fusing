@@ -629,6 +629,8 @@ def intrafusion_bn(
     network,
     fusion_type,
     sparsity,
+    out_features,
+    example_inputs,
     prune_type="l1",
     full_model=None,
     small_model=None,
@@ -637,7 +639,7 @@ def intrafusion_bn(
     resnet=False,
     train_loader=False,
     model_name=None,
-    meta_prune_type=MetaPruneType.IF,
+    meta_prune_type=MetaPruneType.IF
 ):
     """
     fusion fuses arbitrary many models into the model that is the smallest
@@ -662,8 +664,8 @@ def intrafusion_bn(
             net=copy.deepcopy(full_model),
             loaders=None,
             gpu_id=gpu_id,
-            example_inputs=torch.randn(1, 3, 32, 32),
-            out_features=10,
+            example_inputs=example_inputs,
+            out_features=out_features,
             prune_type=prune_type,
             sparsity=sparsity,
             train_fct=None,

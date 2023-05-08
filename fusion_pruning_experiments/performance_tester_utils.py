@@ -635,6 +635,8 @@ def wrapper_intra_fusion(
             intrafusion_bn(
                 model,
                 full_model=model,
+                out_features = out_features,
+                example_input = example_input,
                 meta_prune_type=meta_prune_type,
                 prune_type=prune_type,
                 model_name=model_name,
@@ -665,6 +667,8 @@ def wrapper_intra_fusion(
             fused_model_g = intrafusion_bn(
                 fused_model_g,
                 meta_prune_type=meta_prune_type,
+                out_features = out_features,
+                example_inputs = example_input,
                 prune_type=prune_type,
                 model_name=model_name,
                 sparsity=sparsity,

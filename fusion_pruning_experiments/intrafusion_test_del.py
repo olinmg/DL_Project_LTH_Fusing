@@ -3,7 +3,7 @@ import copy
 import torch
 from fusion_IF import intrafusion_bn
 from fusion_utils_IF import MetaPruneType, PruneType
-from performance_tester import train_during_pruning
+from performance_tester_utils import train_during_pruning
 from pruning_modified import prune_structured_intra
 
 
@@ -62,6 +62,8 @@ def wrapper_intra_fusion(
             fused_model_g = intrafusion_bn(
                 fused_model_g,
                 model_name=model_name,
+                meta_prune_type=meta_prune_type,
+                prune_type=prune_type,
                 sparsity=sparsity,
                 fusion_type="weight",
                 full_model=model,
