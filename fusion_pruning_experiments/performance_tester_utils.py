@@ -284,9 +284,8 @@ def train_during_pruning_regular(
     return best_model, val_acc_per_epoch
 
 
-def train_during_pruning_resnet50(
-    model, train_loader, epoch, gpu_id, prune=None, performed_epochs=0
-):
+def train_during_pruning_resnet50(model, loaders, epoch, gpu_id, prune=None, performed_epochs=0):
+    train_loader = loaders["train"]
     if gpu_id != -1:
         model = model.cuda(gpu_id)
     criterion = nn.CrossEntropyLoss().to(device)
@@ -321,7 +320,10 @@ def train_during_pruning_resnet50(
 
         # measure accuracy and record loss
         acc1, acc5 = accuracy(output, target, topk=(1, 5))
-        val_acc_per_epoch.append(acc1)
+        acc1_val = evaluate_performance_imagenet(
+            input_model=model, loaders=loaders, gpu_id=gpu_id, prune=False
+        )
+        val_acc_per_epoch.append(acc1_val)
         losses.update(loss.item(), images.size(0))
         top1.update(acc1[0], images.size(0))
         top5.update(acc5[0], images.size(0))
@@ -635,8 +637,8 @@ def wrapper_intra_fusion(
             intrafusion_bn(
                 model,
                 full_model=model,
-                out_features = out_features,
-                example_input = example_input,
+                out_features=out_features,
+                example_input=example_input,
                 meta_prune_type=meta_prune_type,
                 prune_type=prune_type,
                 model_name=model_name,
@@ -667,8 +669,8 @@ def wrapper_intra_fusion(
             fused_model_g = intrafusion_bn(
                 fused_model_g,
                 meta_prune_type=meta_prune_type,
-                out_features = out_features,
-                example_inputs = example_input,
+                out_features=out_features,
+                example_inputs=example_input,
                 prune_type=prune_type,
                 model_name=model_name,
                 sparsity=sparsity,
