@@ -178,6 +178,7 @@ model_accuracy_development = {}
 from performance_tester_utils import evaluate_performance_imagenet
 
 # 0. original model accuracy
+print("Starting to evaluate the original model performance ...")
 original_acc = evaluate_performance_imagenet(loaded_model, loaders, gpu_id)
 model_accuracy_development["original_accuracy"] = original_acc
 
