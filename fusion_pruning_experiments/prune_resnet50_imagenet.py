@@ -45,9 +45,10 @@ from performance_tester_utils import (
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 gpu_id = 0
+retrain_epochs = 2
 model_name = "resnet18"
 model_file = "resnet18_withBN_diff_weight_init_False_cifar10_eps300_1"
-model_path = f"./models/models_resnet18/{model_file}"
+model_path = f"../models/models_resnet18/{model_file}"
 dataset_name = "cifar10"
 
 
@@ -76,12 +77,12 @@ elif dataset_name == "imagenet":
 
 prune_params = {
     "prune_type": "l1",
-    "sparsity": 0.6,
+    "sparsity": 0.8,
     "example_input": example_input,
     "out_features": output_dim,
     "use_iter_prune": True,
     "prune_iter_steps": 4,
-    "prune_iter_epochs": 10,
+    "prune_iter_epochs": 1,
     "loaders": loaders,
     "gpu_id": gpu_id,
     "model_name": model_name,
@@ -119,7 +120,6 @@ with open(f"./pruning_accuracies_{model_file}.json", "w") as outfile:
 print(f"Model pruning is done. Final accuracy: {pruned_model_accuracies[-1]}")
 
 # additional retraining of the model
-retrain_epochs = 0
 print(f"Starting additional training for {retrain_epochs} epochs ...")
 retrained_pruned_model, val_acc_per_epoch = train_during_pruning(
     pruned_model,
@@ -138,6 +138,8 @@ model_accuracy_development["retraining_accuracies"] = val_acc_per_epoch
 
 with open(f"./retraining_accuracies_{model_file}.json", "w") as outfile:
     json.dump(model_accuracy_development, outfile, indent=4)
-model_accuracy_development["all_accuracies"] = pruned_model_accuracies.extend(val_acc_per_epoch)
+pruned_model_accuracies.extend(val_acc_per_epoch)
+model_accuracy_development["all_accuracies"] = pruned_model_accuracies
 with open(f"./overall_pruning_retraining_accuracies_{model_file}.json", "w") as outfile:
     json.dump(model_accuracy_development, outfile, indent=4)
+print("Done.")
