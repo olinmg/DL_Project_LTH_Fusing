@@ -7,12 +7,12 @@
     "MSF": false,
     "IntraFusion": false,
     "compute_prune_baseline": true,
-    "gpu_id": -1,
+    "gpu_id": 0,
     "dataset": "cifar10",
     "models": [
         {
-            "name": "vgg11_bn",
-            "basis_name": "models_vgg11_bn/vgg11_bn_diff_weight_init_False_cifar10_eps300"
+            "name": "resnet18",
+            "basis_name": "models_resnet18/resnet18_withBN_diff_weight_init_False_cifar10_eps300"
         }
     ],
     "num_models": 2,
