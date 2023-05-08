@@ -113,6 +113,7 @@ def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, spar
 
             # 3. retrain the stored pruned model (using train_resnet50/main.py)
             last_model_path = f"{model_file}_{iter_step}iter{iter_num_epochs}"
+            print("Handing over to train_resnet50()")
             train_resnet50(
                 num_epochs_to_train=iter_num_epochs,
                 dataset_path="/local/home/stuff/imagenet",
