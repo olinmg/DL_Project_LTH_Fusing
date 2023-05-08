@@ -19,6 +19,7 @@ import torchvision.transforms as transforms
 from models import get_pretrained_models
 import json
 import re
+import pprint
 
 
 def get_cifar_data_loader(shuffle=True):
@@ -32,7 +33,7 @@ def get_cifar_data_loader(shuffle=True):
             transforms.ToTensor(),
             normalize,
         ]), download=True),
-        batch_size=128, shuffle=shuffle,
+        batch_size=128, shuffle=true,
         num_workers=4, pin_memory=True)
 
     val_loader = torch.utils.data.DataLoader(
@@ -97,7 +98,7 @@ def get_data_loader(shuffle=True):
                                             num_workers=1),
         "train": torch.utils.data.DataLoader(train_data, 
                                             batch_size=100, 
-                                            shuffle=shuffle, 
+                                            shuffle=False, 
                                             num_workers=1)
     }
     return loaders
@@ -126,7 +127,7 @@ if __name__ == '__main__':
     dict = {}
     it = 9
 
-    models = get_pretrained_models(args.model_name, "resnet50_diff_weight_init_True_cifar10", args.gpu_id, num_models, output_dim=10)
+    models = get_pretrained_models(args.model_name, f"{args.model_name}_diff_weight_init_True_cifar10", args.gpu_id, num_models, output_dim=10)
 
     loaders = None
     if "vgg" not in args.model_name and "resnet" not in args.model_name:
@@ -166,8 +167,8 @@ if __name__ == '__main__':
         print(f"{layer0_name} : {fc_layer0_weight.shape}")
 
 
-    fused_model_g = fusion_bn(models, model_name = args.model_name, fusion_type="activation", gpu_id=-1, resnet=True, train_loader=get_cifar_data_loader(shuffle=True)["train"])
-    #fused_model_g = wrapper_intra_fusion(model=models[0], model_name=args.model_name, resnet=True, sparsity=0.1, prune_iter_steps=0, num_epochs=0, loaders=loaders, prune_type=PruneType.L2, meta_prune_type=MetaPruneType.IF, gpu_id=0)
+    #fused_model_g = fusion_bn(models, model_name = args.model_name, fusion_type="activation", gpu_id=-1, resnet=True, train_loader=get_cifar_data_loader(shuffle=True)["train"])
+    fused_model_g = wrapper_intra_fusion(model=models[0], model_name=args.model_name, resnet=True, sparsity=0.0, prune_iter_steps=0, num_epochs=0, loaders=loaders["train"], prune_type=PruneType.L2, meta_prune_type=MetaPruneType.IF, gpu_id=0)
     #fused_model_g = fusion(models, gpu_id=args.gpu_id, resnet=True)
     print(evaluate_performance_simple(fused_model_g, loaders, 0, eval=True))
     exit()

@@ -678,6 +678,7 @@ def intrafusion_bn(network, fusion_type, sparsity, prune_type="l1", full_model =
         T_var = T_var / T_var.sum(dim=0)
 
         #print("fusion layer before permute: ", fusion_layer.weight.view(fusion_layer.weight.shape[0], -1)[:,0])
+        #fusion_layer.permute_parameters(T_var)
         if meta_prune_type == MetaPruneType.DEFAULT:
             fusion_layer.permute_parameters(T_var)
         else:

@@ -20,15 +20,16 @@ def wrapper_intra_fusion(model, model_name: str, resnet: bool, sparsity: float, 
     :param meta_prune_type: If meta_prune_type = MetaPruneType.DEFAULT then it will prune the model in the normal way. If meta_prune_type = MetaPruneType.IF it will do intrafusion
     :return: the pruned model
     """ 
+
     if prune_iter_steps == 0:
-        return intrafusion_bn(model, full_model = model, meta_prune_type = meta_prune_type, prune_type=prune_type, model_name=model_name, sparsity=sparsity, fusion_type="weight", gpu_id = gpu_id, resnet = resnet, train_loader=None)
+        return intrafusion_bn(model, full_model = model, meta_prune_type = meta_prune_type, prune_type=prune_type, model_name=model_name, sparsity=sparsity, fusion_type="weight", gpu_id = gpu_id, resnet = resnet, train_loader=loaders)
     else:
         prune_steps = prune_structured_intra(net=copy.deepcopy(model), loaders=None, num_epochs=0, gpu_id=gpu_id, example_inputs=torch.randn(1, 3, 32, 32),
                     out_features=10, prune_type=prune_type, sparsity=sparsity, train_fct=None, total_steps=prune_iter_steps)
         fused_model_g = model
         for prune_step in prune_steps:
-            fused_model_g = intrafusion_bn(fused_model_g, model_name = model_name, sparsity=sparsity, fusion_type="weight", full_model = model, small_model=prune_step, gpu_id = gpu_id, resnet = resnet, train_loader=None)
-            fused_model_g,_ = train_during_pruning(fused_model_g, loaders=loaders, num_epochs=num_epochs, gpu_id = gpu_id, prune=False, performed_epochs=0, model_name=model_name)
+            fused_model_g = intrafusion_bn(fused_model_g, model_name = model_name, meta_prune_type = meta_prune_type, prune_type = prune_type, sparsity=sparsity, fusion_type="weight", full_model = model, small_model=prune_step, gpu_id = gpu_id, resnet = resnet, train_loader=None)
+            fused_model_g,_= train_during_pruning(fused_model_g, loaders=loaders, num_epochs=num_epochs, gpu_id = gpu_id, prune=False, performed_epochs=0)
         return fused_model_g
 
 

@@ -124,42 +124,39 @@ class Fusion_Layer():
         
         self.weight = aligned_wt
     
-    def create_comparison_vec(self):
-        if self.fusion_type != FusionType.WEIGHT:
+    def create_comparison_vec(self, norm=False):
+        if self.fusion_type != FusionType.WEIGHT and (not norm):
             assert self.proxy != None
             result = [self.proxy.reshape(self.proxy.shape[0], -1).contiguous()]
-            if self.skip_ot != None:
-                result.extend(self.skip_ot.create_comparison_vec())
-            if self.skip_ot_2 != None:
-                result.extend(self.skip_ot_2.create_comparison_vec())
-            return result
+            #return result
 
-        concat = None
-        if self.bias != None:
-            concat = self.bias
-        if self.bn:
+        else: 
+            concat = None
+            if self.bias != None:
+                concat = self.bias
+            if self.bn:
+                if concat != None:
+                    concat = concat.clone() - self.bn_mean
+                else:
+                    concat = -self.bn_mean.clone()
+            
+            comparison = self.weight.clone().contiguous().view(self.weight.shape[0], -1)
+
+            if self.bn:
+                comparison /= self.bn_var[:, None]
+                concat /= self.bn_var
+
+
+                if self.bn_gamma != None:
+                    assert self.bn_beta != None
+                    comparison *= self.bn_gamma[:, None]
+                    concat *= self.bn_gamma
+                    concat += self.bn_beta
+            
             if concat != None:
-                concat = concat.clone() - self.bn_mean
-            else:
-                concat = -self.bn_mean.clone()
-        
-        comparison = self.weight.clone().contiguous().view(self.weight.shape[0], -1)
-
-        if self.bn:
-            comparison /= self.bn_var[:, None]
-            concat /= self.bn_var
-
-
-            if self.bn_gamma != None:
-                assert self.bn_beta != None
-                comparison *= self.bn_gamma[:, None]
-                concat *= self.bn_gamma
-                concat += self.bn_beta
-        
-        if concat != None:
-            comparison = torch.cat((comparison, concat.view(concat.shape[0], -1)), 1)
-        
-        result = [comparison]
+                comparison = torch.cat((comparison, concat.view(concat.shape[0], -1)), 1)
+            
+            result = [comparison]
         """if concat != None:
             result.append(concat.view(-1,1))"""
         
@@ -174,13 +171,13 @@ class Fusion_Layer():
                 result.append(next_incoming_feat.reshape(next_incoming_feat.shape[0], -1).contiguous())
         
         if self.skip_ot != None:
-            result.extend(self.skip_ot.create_comparison_vec())
+            result.extend(self.skip_ot.create_comparison_vec(norm=norm))
         if self.skip_ot_2 != None:
-            result.extend(self.skip_ot_2.create_comparison_vec())
+            result.extend(self.skip_ot_2.create_comparison_vec(norm=norm))
         return result
     
     def get_norm(self, prune_type):
-        comp_vecs = self.create_comparison_vec()
+        comp_vecs = self.create_comparison_vec(norm=True)
         norm_layer = []
 
         for idx, comp_vec in enumerate(comp_vecs):
@@ -263,6 +260,7 @@ class Fusion_Layer():
         self.bn_mean = torch.matmul(T_var_adjust.t(), self.bn_mean).flatten()
         self.bn_var = torch.ones(self.bn_mean.shape)
         self.bn_gamma = torch.ones(self.bn_mean.shape)
+
         self.bn_beta = torch.matmul(T_var.t(), self.bn_beta).flatten()
 
         if len(w_shape) == 3:
