@@ -9,6 +9,7 @@ import torch.distributed as dist
 import torch.nn as nn
 import torchvision.transforms as transforms
 from torch import optim
+from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import Subset
 from torchvision import datasets
 from torchvision.transforms import ToTensor
@@ -284,8 +285,102 @@ def train_during_pruning_regular(
     return best_model, val_acc_per_epoch
 
 
-def train_during_pruning_resnet50(model, loaders, epoch, gpu_id, prune=None, performed_epochs=0):
-    train_loader = loaders["train"]
+import shutil
+
+
+def save_checkpoint(state, is_best, filename="checkpoint.pth.tar"):
+    torch.save(state, filename)
+    if is_best:
+        shutil.copyfile(filename, "model_best.pth.tar")
+
+
+def train_during_pruning_resnet50(
+    model, loaders, num_epochs, gpu_id, prune=None, performed_epochs=0
+):
+    optimizer = torch.optim.SGD(model.parameters(), 0.1, momentum=0.9, weight_decay=1e-4)
+    criterion = nn.CrossEntropyLoss().to(device)
+    scheduler = StepLR(optimizer, step_size=30, gamma=0.1)
+    val_acc_per_epoch = []
+    best_acc1 = 0
+    for epoch in range(0, num_epochs):
+        # train for one epoch
+        train_during_pruning_resnet50_single(
+            loaders["train"], model, criterion, optimizer, epoch, device
+        )
+
+        # evaluate on validation set
+        acc1 = evaluate_performance_imagenet(loaders["test"], model, criterion)
+        val_acc_per_epoch.append(acc1)
+        scheduler.step()
+
+        # remember best acc@1 and save checkpoint
+        is_best = acc1 > best_acc1
+        best_acc1 = max(acc1, best_acc1)
+
+        save_checkpoint(
+            {
+                "epoch": epoch + 1,
+                "arch": "resnet50",
+                "state_dict": model.state_dict(),
+                "best_acc1": best_acc1,
+                "optimizer": optimizer.state_dict(),
+                "scheduler": scheduler.state_dict(),
+            },
+            is_best,
+        )
+
+    return model, val_acc_per_epoch
+
+
+def train_during_pruning_resnet50_single(train_loader, model, criterion, optimizer, epoch, device):
+    batch_time = AverageMeter("Time", ":6.3f")
+    data_time = AverageMeter("Data", ":6.3f")
+    losses = AverageMeter("Loss", ":.4e")
+    top1 = AverageMeter("Acc@1", ":6.2f")
+    top5 = AverageMeter("Acc@5", ":6.2f")
+    progress = ProgressMeter(
+        len(train_loader),
+        [batch_time, data_time, losses, top1, top5],
+        prefix="Epoch: [{}]".format(epoch),
+    )
+
+    # switch to train mode
+    model.train()
+
+    end = time.time()
+    for i, (images, target) in enumerate(train_loader):
+        # measure data loading time
+        data_time.update(time.time() - end)
+
+        # move data to the same device as model
+        images = images.to(device, non_blocking=True)
+        target = target.to(device, non_blocking=True)
+
+        # compute output
+        output = model(images)
+        loss = criterion(output, target)
+
+        # measure accuracy and record loss
+        acc1, acc5 = accuracy(output, target, topk=(1, 5))
+        losses.update(loss.item(), images.size(0))
+        top1.update(acc1[0], images.size(0))
+        top5.update(acc5[0], images.size(0))
+
+        # compute gradient and do SGD step
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        # measure elapsed time
+        batch_time.update(time.time() - end)
+        end = time.time()
+
+        if i % 10 == 0:
+            progress.display(i + 1)
+
+
+"""
+def train_during_pruning_resnet50_single(model, train_loader, epoch, gpu_id, prune=None, performed_epochs=0):
     if gpu_id != -1:
         model = model.cuda(gpu_id)
     criterion = nn.CrossEntropyLoss().to(device)
@@ -343,7 +438,7 @@ def train_during_pruning_resnet50(model, loaders, epoch, gpu_id, prune=None, per
     model.cpu()
     # only returns the last model, not the best model!
     return model, val_acc_per_epoch
-
+"""
 
 ###################### Test Performance Mesurements ################################################
 
