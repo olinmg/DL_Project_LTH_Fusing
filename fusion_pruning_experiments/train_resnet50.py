@@ -463,19 +463,22 @@ def train(train_loader, model, criterion, optimizer, epoch, device, args):
             progress.display(i + 1)
 
 
-def validate(val_loader, model, criterion, args):
+def validate(val_loader, model, criterion, gpu_id):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    criterion = nn.CrossEntropyLoss().to(device)
+
     def run_validate(loader, base_progress=0):
         with torch.no_grad():
             end = time.time()
             for i, (images, target) in enumerate(loader):
                 i = base_progress + i
-                if args.gpu is not None and torch.cuda.is_available():
-                    images = images.cuda(args.gpu, non_blocking=True)
+                if gpu_id is not None and torch.cuda.is_available():
+                    images = images.cuda(gpu_id, non_blocking=True)
                 if torch.backends.mps.is_available():
                     images = images.to("mps")
                     target = target.to("mps")
                 if torch.cuda.is_available():
-                    target = target.cuda(args.gpu, non_blocking=True)
+                    target = target.cuda(gpu_id, non_blocking=True)
 
                 # compute output
                 output = model(images)
@@ -491,7 +494,7 @@ def validate(val_loader, model, criterion, args):
                 batch_time.update(time.time() - end)
                 end = time.time()
 
-                if i % args.print_freq == 0:
+                if i % 10 == 0:
                     progress.display(i + 1)
 
     batch_time = AverageMeter("Time", ":6.3f", Summary.NONE)
@@ -500,10 +503,7 @@ def validate(val_loader, model, criterion, args):
     top5 = AverageMeter("Acc@5", ":6.2f", Summary.AVERAGE)
     progress = ProgressMeter(
         len(val_loader)
-        + (
-            args.distributed
-            and (len(val_loader.sampler) * args.world_size < len(val_loader.dataset))
-        ),
+        + (False and (len(val_loader.sampler) * args.world_size < len(val_loader.dataset))),
         [batch_time, losses, top1, top5],
         prefix="Test: ",
     )
@@ -512,11 +512,11 @@ def validate(val_loader, model, criterion, args):
     model.eval()
 
     run_validate(val_loader)
-    if args.distributed:
+    if False:  # args.distributed:
         top1.all_reduce()
         top5.all_reduce()
 
-    if args.distributed and (len(val_loader.sampler) * args.world_size < len(val_loader.dataset)):
+    if False and (len(val_loader.sampler) * 1 < len(val_loader.dataset)):
         aux_val_dataset = Subset(
             val_loader.dataset,
             range(len(val_loader.sampler) * args.world_size, len(val_loader.dataset)),
