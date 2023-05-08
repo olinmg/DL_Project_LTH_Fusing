@@ -288,10 +288,10 @@ def train_during_pruning_regular(
 import shutil
 
 
-def save_checkpoint(state, is_best, filename="checkpoint.pth.tar"):
+def save_checkpoint(state, is_best, filename="./models/models_resnet50/checkpoint.pth.tar"):
     torch.save(state, filename)
     if is_best:
-        shutil.copyfile(filename, "model_best.pth.tar")
+        shutil.copyfile(filename, "./models/models_resnet50/model_best.pth.tar")
 
 
 def train_during_pruning_resnet50(
