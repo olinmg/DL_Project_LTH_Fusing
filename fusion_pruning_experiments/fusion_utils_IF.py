@@ -267,21 +267,24 @@ class Fusion_Layer:
 
         return adjust
 
-    def update_weights_intra(self, T_var):
+    def update_weights_intra(self, T_var, gpu_id):
         self.T = T_var
         w_shape = self.weight.shape
         if not self.bn:
             self.permute_parameters(T_var)
             return
         if self.skip_ot != None:
-            self.skip_ot.update_weights_intra(T_var)
+            self.skip_ot.update_weights_intra(T_var, gpu_id)
         if self.skip_ot_2 != None:
-            self.skip_ot_2.update_weights_intra(T_var)
+            self.skip_ot_2.update_weights_intra(T_var, gpu_id)
 
         T_var_adjust = T_var.clone()
         for i in range(T_var.shape[1]):
             adjust = self.get_intra_weights(T_var_adjust[:, i])
-            temp = torch.zeros(T_var_adjust[:, i].shape).cuda(0)
+            if gpu_id != -1:
+                temp = torch.zeros(T_var_adjust[:, i].shape).cuda(0)
+            else:
+                temp = torch.zeros(T_var_adjust[:, i].shape)
 
             temp = temp.index_copy_(0, T_var_adjust[:, i].nonzero().flatten(), adjust.flatten())
 
