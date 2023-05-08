@@ -169,7 +169,7 @@ def get_imagenet_data_loader():
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
-        batch_size=256,
+        batch_size=128,
         shuffle=(train_sampler is None),
         num_workers=4,
         pin_memory=True,
@@ -178,7 +178,7 @@ def get_imagenet_data_loader():
 
     val_loader = torch.utils.data.DataLoader(
         val_dataset,
-        batch_size=256,
+        batch_size=128,
         shuffle=False,
         num_workers=4,
         pin_memory=True,
