@@ -567,7 +567,7 @@ def preprocess_parameters(
                         ):
                             fusion_layers[-3].skip_ot_2 = fusion_layers[-1]
                     else:
-                        if "shortcut" in name:
+                        if "shortcut" in name or "downsample" in name:
                             fusion_layers[-1].skip_ot = fusion_layer
                             assert fusion_layers[-3].weight.shape[1] == fusion_layer.weight.shape[1]
                             fusion_layers[-3].skip_align = fusion_layer
