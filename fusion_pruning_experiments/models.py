@@ -280,7 +280,7 @@ def get_pretrained_model_by_name(model_file_path, gpu_id):
     if "resnet50" in model_file_path:
         model = model_archs.__dict__["resnet50"]()
         model = torch.nn.DataParallel(model)
-        checkpoint = torch.load(f"models/{model_file_path}.pth.tar")
+        checkpoint = torch.load(f"{model_file_path}.pth.tar")
         model.load_state_dict(checkpoint["state_dict"])
         model = model.module.to("cpu")
     else:
