@@ -50,7 +50,7 @@ from torch.optim.lr_scheduler import StepLR
 from fusion import fusion_bn
 from fusion_IF import intrafusion_bn
 from fusion_utils_IF import MetaPruneType, PruneType
-from pruning_modified import prune_structured_intra
+from pruning_modified import prune_structured, prune_structured_intra
 from train_resnet50 import train_resnet50, validate
 
 
@@ -60,6 +60,7 @@ def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, spar
     last_model_path = 0
     for iter_step in range(prune_iter_steps):
         # just to figure out the prune step sizes
+
         prune_steps = prune_structured_intra(
             net=copy.deepcopy(model),
             loaders=None,
@@ -73,10 +74,10 @@ def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, spar
             total_steps=prune_iter_steps,
         )
 
-        fused_model_g = model
+        pruned_model_g = model
         for prune_step in prune_steps:
             # 1. do the pruning of the network
-            fused_model_g = intrafusion_bn(
+            """fused_model_g = intrafusion_bn(
                 fused_model_g,
                 meta_prune_type=meta_prune_type,
                 out_features=out_features,
@@ -90,6 +91,18 @@ def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, spar
                 gpu_id=gpu_id,
                 resnet=True,
                 train_loader=None,
+            )"""
+            pruned_model_g = prune_structured(
+                net=pruned_model_g,
+                loaders=loaders,
+                prune_iter_epochs=0,
+                prune_iter_steps=0,
+                gpu_id=gpu_id,
+                example_inputs=example_input,
+                out_features=out_features,
+                prune_type=prune_type,
+                sparsity=sparsity,
+                train_fct=None,
             )
 
             # after_prune_acc = validate(
@@ -99,18 +112,18 @@ def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, spar
             # 2. store the prune model
             optimizer = torch.optim.SGD(model.parameters(), 0.1, momentum=0.9, weight_decay=1e-4)
             scheduler = StepLR(optimizer, step_size=5, gamma=0.1)
-            fused_model_g = torch.nn.DataParallel(fused_model_g).cuda()
+            pruned_model_g = torch.nn.DataParallel(pruned_model_g).cuda()
             state = {
                 "epoch": 1,
                 "arch": "resnet50",
-                "state_dict": fused_model_g.state_dict(),
+                "state_dict": pruned_model_g.state_dict(),
                 "best_acc1": 0,
                 "optimizer": optimizer.state_dict(),
                 "scheduler": scheduler.state_dict(),
             }
             store_model_path = f"{model_file}_{iter_step}iter"
             torch.save(state, f"{store_model_path}.pth.tar")
-            torch.save(fused_model_g, f"{store_model_path}.pth")
+            torch.save(pruned_model_g, f"{store_model_path}.pth")
             # 3. retrain the stored pruned model (using train_resnet50/main.py)
             last_model_path = f"{model_file}_{iter_step}iter{iter_num_epochs}"
             print("Handing over to train_resnet50()")
@@ -159,7 +172,7 @@ eval_func = evaluate_performance_imagenet
 
 prune_params = {
     "prune_type": "l1",
-    "sparsity": 0.8,
+    "sparsity": 0.2,
     "example_input": example_input,
     "out_features": out_features,
     "use_iter_prune": True,
