@@ -161,9 +161,7 @@ if __name__ == "__main__":
 
     # measuring the performance of the original models
     logging.info("Basis Model Accuracies:")
-    original_model_accuracies = [
-        0.0
-    ]  # original_test_manager(input_model_list=models_original, **params)
+    original_model_accuracies = original_test_manager(input_model_list=models_original, **params)
     logging.info(f"\t{original_model_accuracies}")
 
     for idx_result, result in enumerate(result_final["results"]):
@@ -401,12 +399,12 @@ if __name__ == "__main__":
                         prune=False,
                         model_name=name,
                     )
+
                     fap_model_accuracies = fap_model_accuracies[0]
                     fap_model_accuracies.extend(epoch_accuracy)
                     if use_caching:
                         save_model(fap_model_path, fap_model)
                         save_model_trainHistory(fap_model_path, fap_model_accuracies)
-                print(fap_model_accuracies)
                 for idx, accuracy in enumerate(fap_model_accuracies):
                     result[name]["accuracy_FaP"][idx] = float_format(accuracy)
 
