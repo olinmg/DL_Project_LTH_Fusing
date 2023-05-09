@@ -401,6 +401,7 @@ if __name__ == "__main__":
                         prune=False,
                         model_name=name,
                     )
+                    fap_model_accuracies = fap_model_accuracies[0]
                     fap_model_accuracies.append(epoch_accuracy)
                     if use_caching:
                         save_model(fap_model_path, fap_model)
