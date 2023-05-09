@@ -264,7 +264,6 @@ print("Loading imagenet dataset ...")
 loaders = get_imagenet_data_loader()
 out_features = 1000
 example_input = torch.randn(1, 3, 224, 224)
-eval_func = evaluate_performance_imagenet
 
 prune_params = {
     "prune_type": "l1",
@@ -288,14 +287,11 @@ params = {
         gpu_id=gpu_id,
         num_samples=200,
     ),
-    "eval_function": eval_func,
     "loaders": loaders,
     "gpu_id": gpu_id,
 }
 
 model_accuracy_development = {}
-
-from performance_tester_utils import evaluate_performance_imagenet
 
 # 0. original model accuracy
 print("Starting to evaluate the original model performance ...")
@@ -316,10 +312,10 @@ pruned_model, accuarcies_between_prunesteps, last_model_path = prune_structured_
     net=loaded_model,
     loaders=loaders,
     prune_iter_epochs=prune_params.get("prune_iter_epochs"),
-    example_inputs=prune_params.get("example_inputs"),
-    out_features=prune_params.get("out_features"),
+    example_inputs=example_input,
+    out_features=out_features,
     prune_type=prune_params.get("prune_type"),
-    gpu_id=prune_params.get("gpu_id"),
+    gpu_id=gpu_id,
     sparsity=prune_params.get("sparsity"),
     prune_iter_steps=prune_params.get("prune_iter_steps"),
 )
