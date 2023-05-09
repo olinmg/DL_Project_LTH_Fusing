@@ -113,13 +113,18 @@ def prune_structured_resnet50(
     accuarcies_between_prunesteps = []
     for i in range(prune_iter_steps):  # iterative pruning
         print(f"\n{i}")
-        model.to("cpu")
+
+        for m in model.modules():
+            if isinstance(m, torch.nn.Linear) and m.out_features == out_features:
+                ignored_layers.append(m)
+        if next(model.parameters()).is_cuda:
+            model.to("cpu")
 
         pruner.model = model
         pruner.step()
         print("  Params: %.2f M => %.2f M" % (ori_size / 1e6, tp.utils.count_params(model) / 1e6))
         model.cuda()
-        after_prune_acc = 0.007  # validate(model=model, val_loader=loaders["test"], gpu_id=gpu_id)
+        after_prune_acc = validate(model=model, val_loader=loaders["test"], gpu_id=gpu_id)
         accuarcies_between_prunesteps.append(after_prune_acc)
 
         print(f"Doing iterative retraining for {prune_iter_epochs} epochs")

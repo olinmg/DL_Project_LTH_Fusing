@@ -538,7 +538,7 @@ def validate(val_loader, model, gpu_id, criterion=None):
 
     progress.display_summary()
 
-    return top1.avg
+    return (top1.avg).item()
 
 
 def save_checkpoint(model, state, is_best, filename="some_model"):
