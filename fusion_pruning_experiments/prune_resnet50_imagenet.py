@@ -117,9 +117,6 @@ def prune_structured_resnet50(
             print(name, type(module))
 
         pruner.model = model
-        pruner.module2node = pruner._trace(
-            model, example_inputs, output_transform=pruner.output_transform
-        )
         pruner.step()
         print("  Params: %.2f M => %.2f M" % (ori_size / 1e6, tp.utils.count_params(model) / 1e6))
         model.cuda()
