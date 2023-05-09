@@ -149,7 +149,8 @@ def prune_structured_resnet50(
         # after_retrain_acc = validate(model=model, val_loader=loaders["test"], gpu_id=gpu_id)
         accuarcies_between_prunesteps.append(after_retrain_acc)
         model = model.module.to("cpu")
-
+        print(type(accuarcies_between_prunesteps))
+        print(accuarcies_between_prunesteps)
     return model, accuarcies_between_prunesteps, last_model_path
 
 
@@ -277,7 +278,7 @@ prune_params = {
     "example_input": example_input,
     "out_features": out_features,
     "use_iter_prune": True,
-    "prune_iter_steps": 4,
+    "prune_iter_steps": 2,
     "prune_iter_epochs": 2,
     "loaders": loaders,
     "gpu_id": gpu_id,
@@ -327,7 +328,8 @@ pruned_model, accuarcies_between_prunesteps, last_model_path = prune_structured_
 )
 val_perf = accuarcies_between_prunesteps[-1]
 model_accuracy_development["iterative_pruning"] = accuarcies_between_prunesteps
-
+print(model_accuracy_development)
+print([type(a) for a in model_accuracy_development])
 with open(
     f"./results_of_pruning_experiment/retraining_accuracies_{model_file}.json", "w"
 ) as outfile:
