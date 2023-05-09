@@ -113,6 +113,7 @@ def prune_structured_resnet50(
     accuarcies_between_prunesteps = []
     for i in range(prune_iter_steps):  # iterative pruning
         print(f"\n{i}")
+        pruner.model = model
         pruner.step()
         print("  Params: %.2f M => %.2f M" % (ori_size / 1e6, tp.utils.count_params(model) / 1e6))
         model.cuda()
@@ -276,7 +277,7 @@ example_input = torch.randn(1, 3, 224, 224)
 
 prune_params = {
     "prune_type": "l1",
-    "sparsity": 0.2,
+    "sparsity": 0.5,
     "example_input": example_input,
     "out_features": out_features,
     "use_iter_prune": True,
