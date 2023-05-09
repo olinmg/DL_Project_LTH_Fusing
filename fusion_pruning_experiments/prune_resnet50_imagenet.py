@@ -65,7 +65,6 @@ def prune_structured_resnet50(
     gpu_id,
     sparsity=0.5,
     prune_iter_steps=3,
-    train_fct=None,
 ):
     print(f"Structured pruning with type {prune_type} and channel sparsity {sparsity}")
     ori_size = tp.utils.count_params(net)
@@ -313,7 +312,17 @@ pruned_model, accuarcies_between_prunesteps, last_model_path = iterative_pruning
     prune_type=prune_params.get("prune_type"),
     sparsity=prune_params.get("sparsity"),
 )"""
-pruned_model, accuarcies_between_prunesteps, last_model_path = prune_structured_resnet50()
+pruned_model, accuarcies_between_prunesteps, last_model_path = prune_structured_resnet50(
+    net=loaded_model,
+    loaders=loaders,
+    prune_iter_epochs=prune_params.get("prune_iter_epochs"),
+    example_inputs=prune_params.get("example_inputs"),
+    out_features=prune_params.get("out_features"),
+    prune_type=prune_params.get("prune_type"),
+    gpu_id=prune_params.get("gpu_id"),
+    sparsity=prune_params.get("sparsity"),
+    prune_iter_steps=prune_params.get("prune_iter_steps"),
+)
 val_perf = accuarcies_between_prunesteps[-1]
 model_accuracy_development["iterative_pruning"] = accuarcies_between_prunesteps
 
