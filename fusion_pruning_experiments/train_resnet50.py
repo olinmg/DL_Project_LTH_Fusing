@@ -200,7 +200,7 @@ def train_resnet50(
         main_worker(args.gpu, ngpus_per_node, args)
     print(best_acc1)
     print(type(best_acc1))
-    return best_acc1
+    return best_acc1.item()
 
 
 def main_worker(gpu, ngpus_per_node, args):

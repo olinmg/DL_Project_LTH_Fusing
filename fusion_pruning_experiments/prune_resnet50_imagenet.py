@@ -144,6 +144,7 @@ def prune_structured_resnet50(
             result_model_path_=last_model_path,
             ext_gpu=gpu_id,
         )
+        print("Loding result of retraining into pruner....")
         model = torch.load(f"{last_model_path}_best_model.pth")
         model = torch.nn.DataParallel(model)
         # after_retrain_acc = validate(model=model, val_loader=loaders["test"], gpu_id=gpu_id)
