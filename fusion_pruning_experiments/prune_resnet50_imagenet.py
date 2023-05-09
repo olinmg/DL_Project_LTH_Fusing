@@ -114,7 +114,8 @@ def prune_structured_resnet50(
     for i in range(prune_iter_steps):  # iterative pruning
         print(f"\n{i}")
         model.to("cpu")
-        model = model.module.to("cpu")
+        if i > 0:
+            model = model.module.to("cpu")
         pruner.model = model
         pruner.step()
         print("  Params: %.2f M => %.2f M" % (ori_size / 1e6, tp.utils.count_params(model) / 1e6))
