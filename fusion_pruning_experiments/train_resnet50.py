@@ -309,7 +309,7 @@ def main_worker(gpu, ngpus_per_node, args):
             print("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint["epoch"]))
         else:
             print("=> no checkpoint found at '{}'".format(args.resume))
-        model.to(device)
+        model = model.to(device)
 
     # Data loading code
     if args.dummy:
