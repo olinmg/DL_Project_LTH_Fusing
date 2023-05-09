@@ -114,8 +114,7 @@ def prune_structured_resnet50(
     for i in range(prune_iter_steps):  # iterative pruning
         print(f"\n{i}")
         model.to("cpu")
-        if i > 0:
-            model = model.module.to("cpu")
+
         pruner.model = model
         pruner.step()
         print("  Params: %.2f M => %.2f M" % (ori_size / 1e6, tp.utils.count_params(model) / 1e6))
@@ -151,7 +150,7 @@ def prune_structured_resnet50(
         print("Loding result of retraining into pruner....")
         model = torch.load(f"{last_model_path}_best_model.pth")
         # model = torch.nn.DataParallel(model)
-        # after_retrain_acc = validate(model=model, val_loader=loaders["test"], gpu_id=gpu_id)
+        after_retrain_acc = validate(model=model, val_loader=loaders["test"], gpu_id=gpu_id)
         accuarcies_between_prunesteps.append(after_retrain_acc)
         model = model.module.to("cpu")
         print(type(accuarcies_between_prunesteps))
