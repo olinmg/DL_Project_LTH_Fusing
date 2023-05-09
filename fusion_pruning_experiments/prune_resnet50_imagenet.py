@@ -110,6 +110,7 @@ def prune_structured_resnet50(
         ch_sparsity=sparsity,  # channel sparsity
         ignored_layers=ignored_layers,  # ignored_layers will not be pruned
     )
+    accuarcies_between_prunesteps = []
     for i in range(prune_iter_steps):  # iterative pruning
         print(i)
         pruner.step()
@@ -148,7 +149,7 @@ def prune_structured_resnet50(
         accuarcies_between_prunesteps.append(after_retrain_acc)
         model = model.module.to("cpu")
 
-    return model
+    return model, accuarcies_between_prunesteps
 
 
 def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, sparsity):
