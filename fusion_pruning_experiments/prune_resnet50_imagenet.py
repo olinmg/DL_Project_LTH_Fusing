@@ -113,7 +113,7 @@ def prune_structured_resnet50(
     accuarcies_between_prunesteps = []
     for i in range(prune_iter_steps):  # iterative pruning
         print(f"\n{i}")
-
+        print(model.modules())
         for m in model.modules():
             if isinstance(m, torch.nn.Linear) and m.out_features == out_features:
                 ignored_layers.append(m)
