@@ -546,6 +546,7 @@ def save_checkpoint(model, state, is_best, filename="some_model"):
     torch.save(state, f"{filename}.pth.tar")
     if is_best:
         shutil.copyfile(filename, f"{filename}_best_model.pth.tar")
+
         torch.save(model, f"{filename}_best_model.pth")
 
 
