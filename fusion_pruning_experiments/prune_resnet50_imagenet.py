@@ -149,7 +149,7 @@ def prune_structured_resnet50(
         accuarcies_between_prunesteps.append(after_retrain_acc)
         model = model.module.to("cpu")
 
-    return model, accuarcies_between_prunesteps
+    return model, accuarcies_between_prunesteps, last_model_path
 
 
 def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, sparsity):
