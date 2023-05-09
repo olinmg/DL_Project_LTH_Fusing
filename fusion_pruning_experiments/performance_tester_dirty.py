@@ -401,12 +401,15 @@ if __name__ == "__main__":
                         prune=False,
                         model_name=name,
                     )
+                    print(fap_model_accuracies)
                     fap_model_accuracies = fap_model_accuracies[0]
+                    print(fap_model_accuracies)
                     fap_model_accuracies.append(epoch_accuracy)
+                    print(fap_model_accuracies)
                     if use_caching:
                         save_model(fap_model_path, fap_model)
                         save_model_trainHistory(fap_model_path, fap_model_accuracies)
-
+                print(fap_model_accuracies)
                 for idx, accuracy in enumerate(fap_model_accuracies):
                     result[name]["accuracy_FaP"][idx] = float_format(accuracy)
 
