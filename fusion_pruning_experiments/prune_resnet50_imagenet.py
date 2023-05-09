@@ -47,11 +47,107 @@ import torch.nn as nn
 import torchvision.models as model_archs
 from torch.optim.lr_scheduler import StepLR
 
+import torch_pruning as tp
 from fusion import fusion_bn
 from fusion_IF import intrafusion_bn
 from fusion_utils_IF import MetaPruneType, PruneType
 from pruning_modified import prune_structured, prune_structured_intra
 from train_resnet50 import train_resnet50, validate
+
+
+def prune_structured_resnet50(
+    net,
+    loaders,
+    prune_iter_epochs,
+    example_inputs,
+    out_features,
+    prune_type,
+    gpu_id,
+    sparsity=0.5,
+    prune_iter_steps=3,
+    train_fct=None,
+):
+    print(f"Structured pruning with type {prune_type} and channel sparsity {sparsity}")
+    ori_size = tp.utils.count_params(net)
+    imp = None
+
+    if prune_type == "random":
+        imp = tp.importance.RandomImportance()
+    elif prune_type == "sensitivity":
+        imp = tp.importance.SensitivityImportance()
+    elif prune_type == "l1":
+        imp = tp.importance.MagnitudeImportance(1)
+    elif prune_type == "l2":
+        imp = tp.importance.MagnitudeImportance(2)
+    elif prune_type == "l_inf":
+        imp = tp.importance.MagnitudeImportance(np.inf)
+    elif prune_type == "hessian":
+        imp = tp.importance.HessianImportance()
+    elif prune_type == "bnscale":
+        imp = tp.importance.BNScaleImportance()
+    elif prune_type == "structural":
+        imp = tp.importance.StrcuturalImportance
+    elif prune_type == "lamp":
+        imp = tp.importance.LAMPImportance()
+    else:
+        raise ValueError("Prune type not supported")
+
+    ignored_layers = []
+    model = net  # Correct????
+    for m in model.modules():
+        if isinstance(m, torch.nn.Linear) and m.out_features == out_features:
+            ignored_layers.append(m)
+
+    prune_iter_steps = int(prune_iter_steps)
+
+    if next(model.parameters()).is_cuda:
+        model.to("cpu")
+
+    pruner = tp.pruner.LocalMagnitudePruner(
+        model,
+        example_inputs,
+        importance=imp,
+        total_steps=prune_iter_steps,  # number of iterations
+        ch_sparsity=sparsity,  # channel sparsity
+        ignored_layers=ignored_layers,  # ignored_layers will not be pruned
+    )
+    for i in range(prune_iter_steps):  # iterative pruning
+        print(i)
+        pruner.step()
+        print("  Params: %.2f M => %.2f M" % (ori_size / 1e6, tp.utils.count_params(model) / 1e6))
+        after_prune_acc = validate(model=model, val_loader=loaders["test"], gpu_id=gpu_id)
+        accuarcies_between_prunesteps.append(after_prune_acc)
+
+        print(f"Doing iterative retraining for {prune_iter_epochs} epochs")
+        optimizer = torch.optim.SGD(model.parameters(), 0.1, momentum=0.9, weight_decay=1e-4)
+        scheduler = StepLR(optimizer, step_size=5, gamma=0.1)
+        pruned_model_g = torch.nn.DataParallel(pruned_model_g).cuda()
+        state = {
+            "epoch": 0,
+            "arch": "resnet50",
+            "state_dict": model.state_dict(),
+            "best_acc1": after_prune_acc,
+            "optimizer": optimizer.state_dict(),
+            "scheduler": scheduler.state_dict(),
+        }
+        store_model_path = f"{model_file}_{i}iter"
+        torch.save(state, f"{store_model_path}.pth.tar")
+        torch.save(pruned_model_g, f"{store_model_path}.pth")
+        last_model_path = f"{model_file}_{i}iter{prune_iter_epochs}"
+        print("Handing over to train_resnet50()")
+        after_retrain_acc = train_resnet50(
+            num_epochs_to_train=prune_iter_epochs,
+            dataset_path="/local/home/stuff/imagenet",
+            checkpoint_path=store_model_path,
+            result_model_path_=last_model_path,
+        )
+        model = torch.load(f"{last_model_path}_best_model.pth")
+        model = torch.nn.DataParallel(model)
+        # after_retrain_acc = validate(model=model, val_loader=loaders["test"], gpu_id=gpu_id)
+        accuarcies_between_prunesteps.append(after_retrain_acc)
+        model = model.module.to("cpu")
+
+    return model
 
 
 def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, sparsity):
@@ -77,8 +173,8 @@ def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, spar
         pruned_model_g = model
         for prune_step in prune_steps:
             # 1. do the pruning of the network
-            """fused_model_g = intrafusion_bn(
-                fused_model_g,
+            pruned_model_g = intrafusion_bn(
+                pruned_model_g,
                 meta_prune_type=meta_prune_type,
                 out_features=out_features,
                 example_inputs=example_input,
@@ -91,8 +187,10 @@ def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, spar
                 gpu_id=gpu_id,
                 resnet=True,
                 train_loader=None,
-            )"""
-            pruned_model_g = prune_structured(
+            )
+            """
+            ## VS
+            pruned_model_g = prune_structured_resnet50(
                 net=pruned_model_g,
                 loaders=loaders,
                 prune_iter_epochs=0,
@@ -104,7 +202,7 @@ def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, spar
                 sparsity=sparsity,
                 train_fct=None,
             )
-
+            """
             # after_prune_acc = validate(
             #     model=fused_model_g, val_loader=loaders["test"], gpu_id=gpu_id
             # )
@@ -127,7 +225,7 @@ def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, spar
             # 3. retrain the stored pruned model (using train_resnet50/main.py)
             last_model_path = f"{model_file}_{iter_step}iter{iter_num_epochs}"
             print("Handing over to train_resnet50()")
-            train_resnet50(
+            after_retrain_acc = train_resnet50(
                 num_epochs_to_train=iter_num_epochs,
                 dataset_path="/local/home/stuff/imagenet",
                 checkpoint_path=store_model_path,
@@ -140,7 +238,6 @@ def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, spar
             model = torch.load(f"{last_model_path}_best_model.pth")
             model = torch.nn.DataParallel(model)
             # model.load_state_dict(checkpoint["state_dict"])
-            after_retrain_acc = validate(model=model, val_loader=loaders["test"], gpu_id=gpu_id)
             # after_retrain_acc = evaluate_performance_imagenet(model, loaders["test"], gpu_id)
             accuarcies_between_prunesteps.append(after_retrain_acc)
             model = model.module.to("cpu")
@@ -208,13 +305,15 @@ model_accuracy_development["original_accuracy"] = original_acc
 
 # 1. prune the model - possibly iteratively
 print("Starting the (iterative) pruning ...")
+"""
 pruned_model, accuarcies_between_prunesteps, last_model_path = iterative_pruning(
     model=loaded_model,
     iter_num_epochs=prune_params.get("prune_iter_epochs"),
     prune_iter_steps=prune_params.get("prune_iter_steps"),
     prune_type=prune_params.get("prune_type"),
     sparsity=prune_params.get("sparsity"),
-)
+)"""
+pruned_model, accuarcies_between_prunesteps, last_model_path = prune_structured_resnet50()
 val_perf = accuarcies_between_prunesteps[-1]
 model_accuracy_development["iterative_pruning"] = accuarcies_between_prunesteps
 
