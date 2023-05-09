@@ -127,7 +127,7 @@ def prune_structured_resnet50(
             "epoch": 0,
             "arch": "resnet50",
             "state_dict": model.state_dict(),
-            "best_acc1": after_prune_acc,
+            "best_acc1": -1,  # after_prune_acc,
             "optimizer": optimizer.state_dict(),
             "scheduler": scheduler.state_dict(),
         }
@@ -142,6 +142,7 @@ def prune_structured_resnet50(
             dataset_path=dataset_path,
             checkpoint_path=store_model_path,
             result_model_path_=last_model_path,
+            ext_gpu_id=gpu_id,
         )
         model = torch.load(f"{last_model_path}_best_model.pth")
         model = torch.nn.DataParallel(model)
@@ -229,9 +230,10 @@ def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, spar
             print("Handing over to train_resnet50()")
             after_retrain_acc = train_resnet50(
                 num_epochs_to_train=iter_num_epochs,
-                dataset_path="/local/home/stuff/imagenet",
+                dataset_path=dataset_path,
                 checkpoint_path=store_model_path,
                 result_model_path_=last_model_path,
+                ext_gpu_id=gpu_id,
             )
 
             # 4. load the retrained model
@@ -342,6 +344,7 @@ after_retrain_acc = train_resnet50(
     dataset_path=dataset_path,
     checkpoint_path=last_model_path,
     result_model_path_=final_model_path,
+    ext_gpu_id=gpu_id,
 )
 print(f"The final pruned and retrained model is stored in: {final_model_path}_best_model.pth")
 
