@@ -198,7 +198,8 @@ def train_resnet50(
     else:
         # Simply call main_worker function
         main_worker(args.gpu, ngpus_per_node, args)
-
+    print(best_acc1)
+    print(type(best_acc1))
     return best_acc1
 
 
@@ -544,7 +545,7 @@ def save_checkpoint(model, state, is_best, filename="some_model"):
     torch.save(model, f"{filename}.pth")
     torch.save(state, f"{filename}_checkpoint.pth.tar")
     torch.save(state, f"{filename}.pth.tar")
-    if True:  # is_best:
+    if is_best:
         print("Carefull! Always storing last model as best: go to train_resnet50.py - 548")
         # shutil.copyfile(filename, f"{filename}_best_model.pth.tar")
         torch.save(model, f"{filename}_best_model.pth")

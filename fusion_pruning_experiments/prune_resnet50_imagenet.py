@@ -112,7 +112,7 @@ def prune_structured_resnet50(
     )
     accuarcies_between_prunesteps = []
     for i in range(prune_iter_steps):  # iterative pruning
-        print(i)
+        print(f"\n{i}")
         pruner.step()
         print("  Params: %.2f M => %.2f M" % (ori_size / 1e6, tp.utils.count_params(model) / 1e6))
         model.cuda()
@@ -136,7 +136,7 @@ def prune_structured_resnet50(
         torch.save(model, f"{store_model_path}.pth")
 
         last_model_path = f"{model_file}_{i}iter{prune_iter_epochs}"
-        print("Handing over to train_resnet50()")
+        print("\nHanding over to train_resnet50()")
         after_retrain_acc = train_resnet50(
             num_epochs_to_train=prune_iter_epochs,
             dataset_path=dataset_path,
@@ -151,6 +151,7 @@ def prune_structured_resnet50(
         model = model.module.to("cpu")
         print(type(accuarcies_between_prunesteps))
         print(accuarcies_between_prunesteps)
+        print("\n ---------------------------------------------")
     return model, accuarcies_between_prunesteps, last_model_path
 
 
