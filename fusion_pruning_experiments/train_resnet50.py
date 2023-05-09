@@ -198,6 +198,8 @@ def train_resnet50(
         # Simply call main_worker function
         main_worker(args.gpu, ngpus_per_node, args)
 
+    return best_acc1
+
 
 def main_worker(gpu, ngpus_per_node, args):
     global best_acc1
@@ -395,13 +397,12 @@ def main_worker(gpu, ngpus_per_node, args):
         # remember best acc@1 and save checkpoint
         is_best = acc1 > best_acc1
         best_acc1 = max(acc1, best_acc1)
-        if is_best:
-            best_model = model
 
         if not args.multiprocessing_distributed or (
             args.multiprocessing_distributed and args.rank % ngpus_per_node == 0
         ):
             save_checkpoint(
+                model,
                 {
                     "epoch": epoch + 1,
                     "arch": args.arch,
@@ -535,10 +536,14 @@ def validate(val_loader, model, gpu_id, criterion=None):
     return top1.avg
 
 
-def save_checkpoint(state, is_best, filename="some_model"):
+def save_checkpoint(model, state, is_best, filename="some_model"):
+    torch.save(model, f"{filename}_checkpoint.pth")
+    torch.save(model, f"{filename}.pth")
     torch.save(state, f"{filename}_checkpoint.pth.tar")
+    torch.save(state, f"{filename}.pth.tar")
     if is_best:
         shutil.copyfile(filename, f"{filename}_best_model.pth.tar")
+        torch.save(model, f"{filename}_best_model.pth")
 
 
 class Summary(Enum):
