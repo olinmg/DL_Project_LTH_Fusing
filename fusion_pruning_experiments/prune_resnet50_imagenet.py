@@ -139,7 +139,7 @@ def prune_structured_resnet50(
         print("Handing over to train_resnet50()")
         after_retrain_acc = train_resnet50(
             num_epochs_to_train=prune_iter_epochs,
-            dataset_path="/local/home/stuff/imagenet",
+            dataset_path=dataset_path,
             checkpoint_path=store_model_path,
             result_model_path_=last_model_path,
         )
