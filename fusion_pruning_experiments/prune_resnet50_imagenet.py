@@ -120,7 +120,7 @@ def prune_structured_resnet50(
         print(f"Doing iterative retraining for {prune_iter_epochs} epochs")
         optimizer = torch.optim.SGD(model.parameters(), 0.1, momentum=0.9, weight_decay=1e-4)
         scheduler = StepLR(optimizer, step_size=5, gamma=0.1)
-        pruned_model_g = torch.nn.DataParallel(pruned_model_g).cuda()
+        model = torch.nn.DataParallel(model).cuda()
         state = {
             "epoch": 0,
             "arch": "resnet50",
@@ -131,7 +131,8 @@ def prune_structured_resnet50(
         }
         store_model_path = f"{model_file}_{i}iter"
         torch.save(state, f"{store_model_path}.pth.tar")
-        torch.save(pruned_model_g, f"{store_model_path}.pth")
+        torch.save(model, f"{store_model_path}.pth")
+
         last_model_path = f"{model_file}_{i}iter{prune_iter_epochs}"
         print("Handing over to train_resnet50()")
         after_retrain_acc = train_resnet50(
@@ -340,7 +341,6 @@ after_retrain_acc = train_resnet50(
     result_model_path_=final_model_path,
 )
 print(f"The final pruned and retrained model is stored in: {final_model_path}_best_model.pth")
-# after_retrain_acc = evaluate_performance_imagenet(final_model, loaders["test"], gpu_id)
 
 model_accuracy_development["retraining"] = after_retrain_acc
 with open(f"./results_of_pruning_experiment/all_accuracies_{model_file}.json", "w") as outfile:
