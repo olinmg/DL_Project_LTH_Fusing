@@ -546,9 +546,9 @@ def save_checkpoint(model, state, is_best, filename="some_model"):
     torch.save(state, f"{filename}.pth.tar")
     if True:  # is_best:
         print("Carefull! Always storing last model as best: go to train_resnet50.py - 548")
-        shutil.copyfile(filename, f"{filename}_best_model.pth.tar")
-
+        # shutil.copyfile(filename, f"{filename}_best_model.pth.tar")
         torch.save(model, f"{filename}_best_model.pth")
+        print(f"Stored to {filename}_best_model.pth")
 
 
 class Summary(Enum):
