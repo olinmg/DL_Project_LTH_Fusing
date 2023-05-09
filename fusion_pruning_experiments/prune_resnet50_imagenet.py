@@ -113,10 +113,15 @@ def prune_structured_resnet50(
     accuarcies_between_prunesteps = []
     for i in range(prune_iter_steps):  # iterative pruning
         print(f"\n{i}")
+
+        model = model.module.to("cpu")
         for name, module in model.named_modules():
             print(name, type(module))
 
         pruner.model = model
+        pruner.module2node = pruner._trace(
+            model, example_inputs, output_transform=pruner.output_transform
+        )
         pruner.step()
         print("  Params: %.2f M => %.2f M" % (ori_size / 1e6, tp.utils.count_params(model) / 1e6))
         model.cuda()
