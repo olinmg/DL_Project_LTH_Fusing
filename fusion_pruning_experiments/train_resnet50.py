@@ -300,6 +300,8 @@ def main_worker(gpu, ngpus_per_node, args):
                 best_acc1 = best_acc1.to(args.gpu)
             # model.load_state_dict(checkpoint["state_dict"])
             model = torch.load(f"{args.resume}.pth")
+            if torch.cuda.is_available():
+                model.cuda()
             optimizer.load_state_dict(checkpoint["optimizer"])
             scheduler.load_state_dict(checkpoint["scheduler"])
             print("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint["epoch"]))

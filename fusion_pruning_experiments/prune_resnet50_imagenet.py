@@ -333,17 +333,13 @@ print(f"Model pruning is done. Final accuracy: {val_perf}")
 # 2. additional retraining of the model
 final_model_path = f"{model_file}_{prune_params.get('prune_iter_steps')}iter{prune_params.get('prune_iter_epochs')}_T{retrain_epochs}"
 print(f"Starting additional training for {retrain_epochs} epochs ...")
-train_resnet50(
+after_retrain_acc = train_resnet50(
     num_epochs_to_train=retrain_epochs,
     dataset_path="/local/home/stuff/imagenet",
     checkpoint_path=last_model_path,
     result_model_path_=final_model_path,
 )
-final_model = model_archs.__dict__["resnet50"]()
-final_model = torch.nn.DataParallel(final_model)
-checkpoint = torch.load(final_model_path)
-final_model.load_state_dict(checkpoint["state_dict"])
-after_retrain_acc = validate(loaders["test"], final_model, gpu_id)
+print(f"The final pruned and retrained model is stored in: {final_model_path}_best_model.pth")
 # after_retrain_acc = evaluate_performance_imagenet(final_model, loaders["test"], gpu_id)
 
 model_accuracy_development["retraining"] = after_retrain_acc
