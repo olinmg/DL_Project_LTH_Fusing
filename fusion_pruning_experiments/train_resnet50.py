@@ -309,6 +309,7 @@ def main_worker(gpu, ngpus_per_node, args):
             print("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint["epoch"]))
         else:
             print("=> no checkpoint found at '{}'".format(args.resume))
+        model.to(device)
 
     # Data loading code
     if args.dummy:
@@ -541,7 +542,6 @@ def validate(val_loader, model, gpu_id, criterion=None):
 
 
 def save_checkpoint(model, state, is_best, filename="some_model"):
-    model = model.module.to("cpu")
     torch.save(model, f"{filename}_checkpoint.pth")
     torch.save(model, f"{filename}.pth")
     torch.save(state, f"{filename}_checkpoint.pth.tar")
