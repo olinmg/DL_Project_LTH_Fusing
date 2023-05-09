@@ -158,7 +158,7 @@ def train_resnet50(
     args = parser.parse_args()
     args.epochs = num_epochs_to_train
     args.data = dataset_path
-    if checkpoint_path is not None:
+    if not (checkpoint_path is None):
         args.resume = checkpoint_path
 
     if args.seed is not None:
