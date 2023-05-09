@@ -148,10 +148,11 @@ best_acc1 = 0
 
 
 def train_resnet50(
-    num_epochs_to_train, dataset_path, checkpoint_path=None, result_model_path_=None
+    num_epochs_to_train, dataset_path, checkpoint_path=None, result_model_path_=None, ext_gpu=0
 ):
+    global ext_gpu_id
     global result_model_path
-
+    ext_gpu_id = ext_gpu
     result_model_path = result_model_path_
     # python main.py -a resnet50 --nr_datasplits 2 --touse_datasplit 1 --resume checkpoint.pth.tar /local/home/stuff/imagenet
     args = parser.parse_args()
@@ -381,7 +382,7 @@ def main_worker(gpu, ngpus_per_node, args):
     )
 
     if args.evaluate:
-        validate(val_loader, model, criterion, args)
+        validate(val_loader, model, ext_gpu_id, criterion)
         return
 
     for epoch in range(args.start_epoch, args.epochs):
@@ -392,7 +393,7 @@ def main_worker(gpu, ngpus_per_node, args):
         train(train_loader, model, criterion, optimizer, epoch, device, args)
 
         # evaluate on validation set
-        acc1 = validate(val_loader, model, criterion, args)
+        acc1 = validate(val_loader, model, ext_gpu_id, criterion)
 
         scheduler.step()
 
