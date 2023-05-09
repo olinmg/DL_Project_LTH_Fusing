@@ -75,7 +75,7 @@ parser.add_argument(
 parser.add_argument(
     "-b",
     "--batch-size",
-    default=256,
+    default=128,
     type=int,
     metavar="N",
     help="mini-batch size (default: 256), this is the total "
