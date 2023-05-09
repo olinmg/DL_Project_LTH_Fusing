@@ -130,8 +130,9 @@ def get_cifar100_data_loader():
 
 
 def get_imagenet_data_loader():
-    traindir = os.path.join("/local/home/stuff/imagenet", "train")
-    valdir = os.path.join("/local/home/stuff/imagenet", "val")
+    folder = "/local/home/gaf/coolvenv/testarea_imagenetIntegration/fake_imagenet"  # "/local/home/stuff/imagenet"
+    traindir = os.path.join(folder, "train")
+    valdir = os.path.join(folder, "val")
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
     train_dataset = datasets.ImageFolder(
@@ -813,7 +814,9 @@ def wrapper_intra_fusion(
         return fused_model_g, iterative_retrain_accuracies
 
 
-'''
+from pruning_modified import prune_structured
+
+
 def wrapper_structured_pruning_old(input_model, prune_params):
     """
     A function that makes the structured pruning function available.
@@ -886,7 +889,6 @@ def wrapper_structured_pruning_old(input_model, prune_params):
     }
 
     return pruned_model, description
-'''
 
 
 ###################### Helpers used along the way ##################################################
