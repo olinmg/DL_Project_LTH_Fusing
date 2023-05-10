@@ -110,7 +110,7 @@ def prune_structured_resnet50(
             prune_steps.append(1 - goal_sparsities[i])
         else:
             prune_steps.append(1 - (goal_sparsities[i] / goal_sparsities[i - 1]))
-
+    print(prune_steps)
     for i in range(prune_iter_steps):  # iterative pruning
         print(f"\n{i}: goal sparsity {prune_steps[i]}")
         ori_size = tp.utils.count_params(model)
@@ -140,11 +140,11 @@ def prune_structured_resnet50(
             "optimizer": optimizer.state_dict(),
             "scheduler": scheduler.state_dict(),
         }
-        store_model_path = f"{model_file}_s{int(goal_sparsities[i]*100)}.pth.tar"
+        store_model_path = f"{model_file}_s{int(1-goal_sparsities[i]*100)}.pth.tar"
         torch.save(state, f"{store_model_path.split('.')[0]}.pth.tar")
         torch.save(model, f"{store_model_path.split('.')[0]}.pth")
 
-        last_model_path = f"{model_file}_s{int(goal_sparsities[i]*100)}iter{prune_iter_epochs}"
+        last_model_path = f"{model_file}_s{int(1-goal_sparsities[i]*100)}iter{prune_iter_epochs}"
         print("\nHanding over to train_resnet50()")
         after_retrain_acc = train_resnet50(
             num_epochs_to_train=prune_iter_epochs,
@@ -262,8 +262,8 @@ def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, spar
 
 gpu_id = 0
 sparsity_in = 0.9
-retrain_epochs = 20
-prune_iter_epochs_in = 10
+retrain_epochs = 2
+prune_iter_epochs_in = 1
 prune_iter_steps_in = 4
 dataset_path = "/local/home/gaf/coolvenv/testarea_imagenetIntegration/fake_imagenet"  # "/local/home/stuff/imagenet"
 model_name = "resnet50"
