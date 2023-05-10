@@ -120,7 +120,7 @@ def prune_structured_resnet50(
             example_inputs,
             importance=imp,
             total_steps=1,  # number of iterations
-            ch_sparsity=prune_steps[i],  # channel sparsity
+            sparsity=prune_steps[i],
             ignored_layers=ignored_layers,  # ignored_layers will not be pruned
         )
         pruner.step()
