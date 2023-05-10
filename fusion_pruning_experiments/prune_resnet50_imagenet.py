@@ -114,6 +114,7 @@ def prune_structured_resnet50(
 
     for i in range(prune_iter_steps):  # iterative pruning
         print(f"\n{i}: goal sparsity {prune_steps[i]}")
+        ori_size = tp.utils.count_params(model)
         pruner = tp.pruner.LocalMagnitudePruner(
             model,
             example_inputs,
@@ -122,7 +123,6 @@ def prune_structured_resnet50(
             ch_sparsity=prune_steps[i],  # channel sparsity
             ignored_layers=ignored_layers,  # ignored_layers will not be pruned
         )
-        ori_size = tp.utils.count_params(model)
         pruner.step()
         print("  Params: %.2f M => %.2f M" % (ori_size / 1e6, tp.utils.count_params(model) / 1e6))
         model.cuda()
