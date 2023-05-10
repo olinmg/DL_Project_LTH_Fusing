@@ -56,8 +56,8 @@ from train_resnet50 import train_resnet50, validate
 
 gpu_id = 0
 sparsity_in = 0.6
-retrain_epochs = 2
-prune_iter_epochs_in = 3
+retrain_epochs = 20
+prune_iter_epochs_in = 10
 prune_iter_steps_in = 4
 dataset_path = "/local/home/stuff/imagenet"  # "/local/home/gaf/coolvenv/testarea_imagenetIntegration/fake_imagenet"  # "/local/home/stuff/imagenet"
 model_name = "resnet50"
