@@ -144,7 +144,7 @@ def prune_structured_resnet50(
         torch.save(state, f"{store_model_path.split('.')[0]}.pth.tar")
         torch.save(model, f"{store_model_path.split('.')[0]}.pth")
 
-        last_model_path = f"{model_file}_s{int(goal_sparsities[i]*100)}_T{prune_iter_epochs}"
+        last_model_path = f"{model_file}_s{int(goal_sparsities[i]*100)}iter{prune_iter_epochs}"
         print("\nHanding over to train_resnet50()")
         after_retrain_acc = train_resnet50(
             num_epochs_to_train=prune_iter_epochs,
@@ -349,7 +349,8 @@ print(f"Model pruning is done. Final accuracy: {val_perf}")
 
 
 # 2. additional retraining of the model
-final_model_path = f"{model_file}_{prune_params.get('prune_iter_steps')}iter{prune_params.get('prune_iter_epochs')}_T{retrain_epochs}"
+# final_model_path = f"{model_file}_{prune_params.get('prune_iter_steps')}iter{prune_params.get('prune_iter_epochs')}_T{retrain_epochs}"
+final_model_path = f"{model_file}_s{int(prune_params.get('sparsity')*100)}iter{prune_params.get('prune_iter_epochs')}_T{retrain_epochs}"
 print(f"Starting additional training for {retrain_epochs} epochs ...")
 after_retrain_acc = train_resnet50(
     num_epochs_to_train=retrain_epochs,
