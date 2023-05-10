@@ -153,13 +153,15 @@ def prune_structured_resnet50(
             result_model_path_=last_model_path,
             ext_gpu=gpu_id,
         )
-        print(f"Loding result of retraining into pruner with path: {last_model_path}.pth")
-        model = torch.load(f"{last_model_path}.pth")
+        print(
+            f"Loding result of retraining into pruner with path: {last_model_path}_best_model.pth"
+        )
+        model = torch.load(f"{last_model_path}_best_model.pth")
         after_retrain_acc = validate(model=model, val_loader=loaders["test"], gpu_id=gpu_id)
         accuarcies_between_prunesteps.append(after_retrain_acc)
         model = model.module.to("cpu")
         print("\n ---------------------------------------------")
-    return model, accuarcies_between_prunesteps, last_model_path
+    return model, accuarcies_between_prunesteps, f"{last_model_path}_best_model"
 
 
 def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, sparsity):
@@ -347,7 +349,7 @@ print(f"Model pruning is done. Final accuracy: {val_perf}")
 
 # 2. additional retraining of the model
 # final_model_path = f"{model_file}_{prune_params.get('prune_iter_steps')}iter{prune_params.get('prune_iter_epochs')}_T{retrain_epochs}"
-final_model_path = f"{model_file}_s{int(prune_params.get('sparsity')*100)}iter{prune_params.get('prune_iter_epochs')}_T{retrain_epochs}"
+final_model_path = f"{last_model_path.split('.')[0]}_T{retrain_epochs}"
 print(f"Starting additional training for {retrain_epochs} epochs ...")
 after_retrain_acc = train_resnet50(
     num_epochs_to_train=retrain_epochs,
@@ -356,7 +358,7 @@ after_retrain_acc = train_resnet50(
     result_model_path_=final_model_path,
     ext_gpu=gpu_id,
 )
-print(f"The final pruned and retrained model is stored in: {last_model_path}.pth")
+print(f"The final pruned and retrained model is stored in: {final_model_path}_best_model.pth")
 
 model_accuracy_development["retraining"] = after_retrain_acc
 with open(f"./results_of_pruning_experiment/all_accuracies_{model_file}.json", "w") as outfile:
