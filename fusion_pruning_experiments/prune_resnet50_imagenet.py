@@ -153,14 +153,14 @@ def prune_structured_resnet50(
             result_model_path_=last_model_path,
             ext_gpu=gpu_id,
         )
-        print("Loding result of retraining into pruner....")
+        print(
+            f"Loding result of retraining into pruner with path: {last_model_path}_best_model.pth"
+        )
         model = torch.load(f"{last_model_path}_best_model.pth")
         # model = torch.nn.DataParallel(model)
         after_retrain_acc = validate(model=model, val_loader=loaders["test"], gpu_id=gpu_id)
         accuarcies_between_prunesteps.append(after_retrain_acc)
         model = model.module.to("cpu")
-        print(type(accuarcies_between_prunesteps))
-        print(accuarcies_between_prunesteps)
         print("\n ---------------------------------------------")
     return model, accuarcies_between_prunesteps, last_model_path
 
@@ -313,7 +313,7 @@ model_accuracy_development = {}
 
 # 0. original model accuracy
 print("Starting to evaluate the original model performance ...")
-original_acc = 0.7007  # validate(loaders["test"], loaded_model, gpu_id)
+original_acc = validate(loaders["test"], loaded_model, gpu_id)
 model_accuracy_development["original_accuracy"] = original_acc
 
 # 1. prune the model - possibly iteratively
