@@ -286,7 +286,7 @@ example_input = torch.randn(1, 3, 224, 224)
 
 prune_params = {
     "prune_type": "l1",
-    "sparsity": 0.5,
+    "sparsity": 0.4,
     "example_input": example_input,
     "out_features": out_features,
     "use_iter_prune": True,
