@@ -340,7 +340,6 @@ pruned_model, accuarcies_between_prunesteps, last_model_path = prune_structured_
 val_perf = accuarcies_between_prunesteps[-1]
 model_accuracy_development["iterative_pruning"] = accuarcies_between_prunesteps
 print(model_accuracy_development)
-print([type(a) for a in model_accuracy_development])
 with open(
     f"./results_of_pruning_experiment/retraining_accuracies_{model_file}.json", "w"
 ) as outfile:
