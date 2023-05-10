@@ -277,11 +277,8 @@ loaded_model = model_archs.__dict__["resnet50"]()
 loaded_model = torch.nn.DataParallel(loaded_model)
 checkpoint = torch.load(f"{model_path}.pth.tar")
 loaded_model.load_state_dict(checkpoint["state_dict"])
-# loaded_model = loaded_model.module.to("cpu")
-# loaded_model = loaded_model.cuda(gpu_id)
-
-loaded_model = nn.DataParallel(loaded_model)
-loaded_model.to(device)
+loaded_model = loaded_model.module.to("cpu")
+loaded_model = loaded_model.cuda(gpu_id)
 
 print("Loading imagenet dataset ...")
 loaders = get_imagenet_data_loader()
