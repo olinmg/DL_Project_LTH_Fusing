@@ -103,7 +103,7 @@ def prune_structured_resnet50(
 
     accuarcies_between_prunesteps = []
     step_size = (1 - sparsity) / prune_iter_steps
-    goal_sparsities = [1 - step_size * (step + 1) for step in range(prune_iter_steps)]
+    goal_sparsities = [step_size * (step + 1) for step in range(prune_iter_steps)]
     prune_steps = []
     for i in range(len(goal_sparsities)):
         if i == 0:
@@ -120,7 +120,7 @@ def prune_structured_resnet50(
             example_inputs,
             importance=imp,
             total_steps=1,  # number of iterations
-            sparsity=prune_steps[i],
+            ch_sparsity=prune_steps[i],  # channel sparsity
             ignored_layers=ignored_layers,  # ignored_layers will not be pruned
         )
         pruner.step()
