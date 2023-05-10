@@ -125,9 +125,8 @@ def prune_structured_resnet50(
         pruner.step()
         print("  Params: %.2f M => %.2f M" % (ori_size / 1e6, tp.utils.count_params(model) / 1e6))
         model.cuda()
-        if i == 0:
-            after_retrain_acc = 0
-        else:
+        after_retrain_acc = 0
+        if i > 0:
             after_prune_acc = validate(model=model, val_loader=loaders["test"], gpu_id=gpu_id)
         accuarcies_between_prunesteps.append(after_prune_acc)
 
