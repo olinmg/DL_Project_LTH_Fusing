@@ -130,7 +130,7 @@ def get_cifar100_data_loader():
 
 
 def get_imagenet_data_loader():
-    folder = "/local/home/gaf/coolvenv/testarea_imagenetIntegration/fake_imagenet" # "/local/home/stuff/imagenet"
+    folder = "/local/home/stuff/imagenet"  # "/local/home/gaf/coolvenv/testarea_imagenetIntegration/fake_imagenet" # "/local/home/stuff/imagenet"
     traindir = os.path.join(folder, "train")
     valdir = os.path.join(folder, "val")
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
