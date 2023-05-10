@@ -64,7 +64,7 @@ def prune_structured_resnet50(
     prune_type,
     gpu_id,
     sparsity=0.5,
-    prune_iter_steps=3,
+    prune_iter_steps=4,
 ):
     print(f"Structured pruning with type {prune_type} and channel sparsity {sparsity}")
     ori_size = tp.utils.count_params(net)
@@ -102,17 +102,27 @@ def prune_structured_resnet50(
     if next(model.parameters()).is_cuda:
         model.to("cpu")
 
-    pruner = tp.pruner.LocalMagnitudePruner(
-        model,
-        example_inputs,
-        importance=imp,
-        total_steps=prune_iter_steps,  # number of iterations
-        ch_sparsity=sparsity,  # channel sparsity
-        ignored_layers=ignored_layers,  # ignored_layers will not be pruned
-    )
     accuarcies_between_prunesteps = []
+    step_size = (1 - sparsity) / prune_iter_steps
+    goal_sparsities = [1 - step_size * (step + 1) for step in range(prune_iter_steps)]
+    prune_steps = []
+    for i in range(len(goal_sparsities)):
+        if i == 0:
+            prune_steps.append(goal_sparsities[i])
+        else:
+            prune_steps.append(goal_sparsities[i] / goal_sparsities[i - 1])
+    print(prune_steps)
+
     for i in range(prune_iter_steps):  # iterative pruning
         print(f"\n{i}")
+        pruner = tp.pruner.LocalMagnitudePruner(
+            model,
+            example_inputs,
+            importance=imp,
+            total_steps=1,  # number of iterations
+            ch_sparsity=prune_steps[i],  # channel sparsity
+            ignored_layers=ignored_layers,  # ignored_layers will not be pruned
+        )
 
         # pruner.model = model
         pruner.step()
