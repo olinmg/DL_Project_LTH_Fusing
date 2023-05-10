@@ -66,7 +66,7 @@ def prune_structured_resnet50(
     sparsity=0.5,
     prune_iter_steps=4,
 ):
-    print(f"Structured pruning with type {prune_type} and channel sparsity {sparsity}")
+    print(f"Structured pruning with type {prune_type} and channel sparsity {abs(1-sparsity)}")
     imp = None
 
     if prune_type == "random":
@@ -102,7 +102,7 @@ def prune_structured_resnet50(
         model.to("cpu")
 
     accuarcies_between_prunesteps = []
-    step_size = (1 - sparsity) / prune_iter_steps
+    step_size = sparsity / prune_iter_steps
     goal_sparsities = [(1 - step_size * (step + 1)) for step in range(prune_iter_steps)]
     prune_steps = []
     for i in range(len(goal_sparsities)):
@@ -261,7 +261,10 @@ def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, spar
 
 
 gpu_id = 0
-retrain_epochs = 4
+sparsity_in = 0.9
+retrain_epochs = 20
+prune_iter_epochs_in = 10
+prune_iter_steps_in = 4
 dataset_path = "/local/home/gaf/coolvenv/testarea_imagenetIntegration/fake_imagenet"  # "/local/home/stuff/imagenet"
 model_name = "resnet50"
 model_file = "resnet50_imagenet_eps90_datasplit_0"
@@ -284,12 +287,12 @@ example_input = torch.randn(1, 3, 224, 224)
 
 prune_params = {
     "prune_type": "l1",
-    "sparsity": 0.4,
+    "sparsity": sparsity_in,
     "example_input": example_input,
     "out_features": out_features,
     "use_iter_prune": True,
-    "prune_iter_steps": 4,
-    "prune_iter_epochs": 2,
+    "prune_iter_steps": prune_iter_steps_in,
+    "prune_iter_epochs": prune_iter_epochs_in,
     "loaders": loaders,
     "gpu_id": gpu_id,
     "model_name": model_name,
@@ -352,7 +355,7 @@ print(f"Model pruning is done. Final accuracy: {val_perf}")
 final_model_path = f"{last_model_path.split('.')[0]}_T{retrain_epochs}"
 print(f"Starting additional training for {retrain_epochs} epochs ...")
 after_retrain_acc = train_resnet50(
-    num_epochs_to_train=retrain_epochs + prune_params.get("prune_iter_epochs"),
+    num_epochs_to_train=retrain_epochs + prune_params.get("prune_iter_epochs") - 1,
     dataset_path=dataset_path,
     checkpoint_path=last_model_path,
     result_model_path_=final_model_path,
