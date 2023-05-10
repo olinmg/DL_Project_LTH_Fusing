@@ -143,7 +143,7 @@ def prune_structured_resnet50(
             "optimizer": optimizer.state_dict(),
             "scheduler": scheduler.state_dict(),
         }
-        store_model_path = f"{model_file}_{i}iter.pth.tar"
+        store_model_path = f"{model_file}_{int(prune_steps[i]*100)}iter.pth.tar"
         torch.save(state, f"{store_model_path.split('.')[0]}.pth.tar")
         torch.save(model, f"{store_model_path.split('.')[0]}.pth")
 
