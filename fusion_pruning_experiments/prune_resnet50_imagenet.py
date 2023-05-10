@@ -54,6 +54,17 @@ from fusion_utils_IF import MetaPruneType, PruneType
 from pruning_modified import prune_structured, prune_structured_intra
 from train_resnet50 import train_resnet50, validate
 
+gpu_id = 0
+sparsity_in = 0.6
+retrain_epochs = 2
+prune_iter_epochs_in = 3
+prune_iter_steps_in = 4
+dataset_path = "/local/home/stuff/imagenet"  # "/local/home/gaf/coolvenv/testarea_imagenetIntegration/fake_imagenet"  # "/local/home/stuff/imagenet"
+model_name = "resnet50"
+model_file = "resnet50_imagenet_eps90_datasplit_0"
+model_path = f"./models/models_resnet50/{model_file}"
+dataset_name = "imagenet"
+
 
 def prune_structured_resnet50(
     net,
@@ -260,17 +271,6 @@ def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, spar
 
     return model, accuarcies_between_prunesteps, last_model_path
 
-
-gpu_id = 0
-sparsity_in = 0.6
-retrain_epochs = 2
-prune_iter_epochs_in = 3
-prune_iter_steps_in = 4
-dataset_path = "/local/home/stuff/imagenet"  # "/local/home/gaf/coolvenv/testarea_imagenetIntegration/fake_imagenet"  # "/local/home/stuff/imagenet"
-model_name = "resnet50"
-model_file = "resnet50_imagenet_eps90_datasplit_0"
-model_path = f"./models/models_resnet50/{model_file}"
-dataset_name = "imagenet"
 
 print(f"Loading resnet50 model: {model_path}")
 
