@@ -316,7 +316,7 @@ model_accuracy_development = {}
 
 # 0. original model accuracy
 print("Starting to evaluate the original model performance ...")
-original_acc = 0  # validate(loaders["test"], loaded_model, gpu_id)
+original_acc = validate(loaders["test"], loaded_model, gpu_id)
 model_accuracy_development["original_accuracy"] = original_acc
 
 # 1. prune the model - possibly iteratively
