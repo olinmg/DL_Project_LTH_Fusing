@@ -113,7 +113,7 @@ def prune_structured_resnet50(
     print(prune_steps)
 
     for i in range(prune_iter_steps):  # iterative pruning
-        print(f"\n{i}")
+        print(f"\n{i}: goal sparsity {prune_steps[i]}")
         pruner = tp.pruner.LocalMagnitudePruner(
             model,
             example_inputs,
