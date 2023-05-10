@@ -303,6 +303,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 # best_acc1 may be from a checkpoint from a different GPU
                 best_acc1 = best_acc1.to(args.gpu)
             # model.load_state_dict(checkpoint["state_dict"])
+            model = torch.nn.DataParallel(model)
             model = torch.load(f"{args.resume.split('.')[0]}.pth")
             # if torch.cuda.is_available():
             optimizer.load_state_dict(checkpoint["optimizer"])
@@ -310,7 +311,6 @@ def main_worker(gpu, ngpus_per_node, args):
             print("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint["epoch"]))
         else:
             print("=> no checkpoint found at '{}'".format(args.resume))
-        # model = torch.nn.DataParallel(model)
         # model = model.to(args.gpu)
 
     # Data loading code
