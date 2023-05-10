@@ -140,11 +140,11 @@ def prune_structured_resnet50(
             "optimizer": optimizer.state_dict(),
             "scheduler": scheduler.state_dict(),
         }
-        store_model_path = f"{model_file}_{int(goal_sparsities[i]*100)}iter.pth.tar"
+        store_model_path = f"{model_file}_s{int(goal_sparsities[i]*100)}.pth.tar"
         torch.save(state, f"{store_model_path.split('.')[0]}.pth.tar")
         torch.save(model, f"{store_model_path.split('.')[0]}.pth")
 
-        last_model_path = f"{model_file}_{i}iter{prune_iter_epochs}"
+        last_model_path = f"{model_file}_s{int(goal_sparsities[i]*100)}_T{prune_iter_epochs}"
         print("\nHanding over to train_resnet50()")
         after_retrain_acc = train_resnet50(
             num_epochs_to_train=prune_iter_epochs,
