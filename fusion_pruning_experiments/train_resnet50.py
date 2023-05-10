@@ -296,7 +296,6 @@ def main_worker(gpu, ngpus_per_node, args):
             elif torch.cuda.is_available():
                 # Map model to be loaded to specified single gpu.
                 loc = "cuda:{}".format(args.gpu)
-                print(loc)
                 checkpoint = torch.load(args.resume, map_location=loc)
             args.start_epoch = 0  # checkpoint["epoch"]
             best_acc1 = -1  # checkpoint["best_acc1"]
@@ -311,8 +310,8 @@ def main_worker(gpu, ngpus_per_node, args):
             print("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint["epoch"]))
         else:
             print("=> no checkpoint found at '{}'".format(args.resume))
-        model = torch.nn.DataParallel(model)
-        model = model.to(args.gpu)
+        # model = torch.nn.DataParallel(model)
+        # model = model.to(args.gpu)
 
     # Data loading code
     if args.dummy:
