@@ -261,7 +261,7 @@ def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, spar
 
 
 gpu_id = 0
-retrain_epochs = 1
+retrain_epochs = 4
 dataset_path = "/local/home/gaf/coolvenv/testarea_imagenetIntegration/fake_imagenet"  # "/local/home/stuff/imagenet"
 model_name = "resnet50"
 model_file = "resnet50_imagenet_eps90_datasplit_0"
@@ -352,7 +352,7 @@ print(f"Model pruning is done. Final accuracy: {val_perf}")
 final_model_path = f"{last_model_path.split('.')[0]}_T{retrain_epochs}"
 print(f"Starting additional training for {retrain_epochs} epochs ...")
 after_retrain_acc = train_resnet50(
-    num_epochs_to_train=retrain_epochs,
+    num_epochs_to_train=retrain_epochs + prune_params.get("prune_iter_epochs"),
     dataset_path=dataset_path,
     checkpoint_path=last_model_path,
     result_model_path_=final_model_path,
