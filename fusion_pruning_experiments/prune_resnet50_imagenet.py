@@ -162,7 +162,7 @@ def prune_structured_resnet50(
         accuarcies_between_prunesteps.append(after_retrain_acc)
         model = model.module.to("cpu")
         print("\n ---------------------------------------------")
-    return model, accuarcies_between_prunesteps, last_model_path
+    return model, accuarcies_between_prunesteps, f"{last_model_path}_best_model"
 
 
 def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, sparsity):
@@ -359,7 +359,7 @@ after_retrain_acc = train_resnet50(
     result_model_path_=final_model_path,
     ext_gpu=gpu_id,
 )
-print(f"The final pruned and retrained model is stored in: {final_model_path}_best_model.pth")
+print(f"The final pruned and retrained model is stored in: {last_model_path}_best_model.pth")
 
 model_accuracy_development["retraining"] = after_retrain_acc
 with open(f"./results_of_pruning_experiment/all_accuracies_{model_file}.json", "w") as outfile:
