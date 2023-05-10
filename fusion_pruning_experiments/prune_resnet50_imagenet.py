@@ -144,7 +144,9 @@ def prune_structured_resnet50(
         torch.save(state, f"{store_model_path.split('.')[0]}.pth.tar")
         torch.save(model, f"{store_model_path.split('.')[0]}.pth")
 
-        last_model_path = f"{model_file}_s{int(goal_sparsities[i]*100)}iter{prune_iter_epochs}"
+        last_model_path = (
+            f"{model_file}_s{int(goal_sparsities[i]*100)}iter{prune_iter_epochs}_best_model"
+        )
         print("\nHanding over to train_resnet50()")
         after_retrain_acc = train_resnet50(
             num_epochs_to_train=prune_iter_epochs,
@@ -153,16 +155,13 @@ def prune_structured_resnet50(
             result_model_path_=last_model_path,
             ext_gpu=gpu_id,
         )
-        print(
-            f"Loding result of retraining into pruner with path: {last_model_path}_best_model.pth"
-        )
+        print(f"Loding result of retraining into pruner with path: {last_model_path}.pth")
         model = torch.load(f"{last_model_path}_best_model.pth")
-        # model = torch.nn.DataParallel(model)
         after_retrain_acc = validate(model=model, val_loader=loaders["test"], gpu_id=gpu_id)
         accuarcies_between_prunesteps.append(after_retrain_acc)
         model = model.module.to("cpu")
         print("\n ---------------------------------------------")
-    return model, accuarcies_between_prunesteps, f"{last_model_path}_best_model"
+    return model, accuarcies_between_prunesteps, last_model_path
 
 
 def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, sparsity):
