@@ -125,7 +125,10 @@ def prune_structured_resnet50(
         pruner.step()
         print("  Params: %.2f M => %.2f M" % (ori_size / 1e6, tp.utils.count_params(model) / 1e6))
         model.cuda()
-        after_prune_acc = validate(model=model, val_loader=loaders["test"], gpu_id=gpu_id)
+        if i == 0:
+            after_retrain_acc = 0
+        else:
+            after_prune_acc = validate(model=model, val_loader=loaders["test"], gpu_id=gpu_id)
         accuarcies_between_prunesteps.append(after_prune_acc)
 
         print(f"Doing iterative retraining for {prune_iter_epochs} epochs")
@@ -315,7 +318,7 @@ model_accuracy_development = {}
 
 # 0. original model accuracy
 print("Starting to evaluate the original model performance ...")
-original_acc = [0]  # validate(loaders["test"], loaded_model, gpu_id)
+original_acc = 0  # validate(loaders["test"], loaded_model, gpu_id)
 model_accuracy_development["original_accuracy"] = original_acc
 
 # 1. prune the model - possibly iteratively
