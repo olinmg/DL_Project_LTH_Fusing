@@ -436,7 +436,6 @@ def train(train_loader, model, criterion, optimizer, epoch, device, args):
     )
 
     # switch to train mode
-    model = model.to(device)
     model.train()
 
     end = time.time()
