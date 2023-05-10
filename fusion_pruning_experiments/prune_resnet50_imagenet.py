@@ -144,9 +144,7 @@ def prune_structured_resnet50(
         torch.save(state, f"{store_model_path.split('.')[0]}.pth.tar")
         torch.save(model, f"{store_model_path.split('.')[0]}.pth")
 
-        last_model_path = (
-            f"{model_file}_s{int(goal_sparsities[i]*100)}iter{prune_iter_epochs}_best_model"
-        )
+        last_model_path = f"{model_file}_s{int(goal_sparsities[i]*100)}iter{prune_iter_epochs}"
         print("\nHanding over to train_resnet50()")
         after_retrain_acc = train_resnet50(
             num_epochs_to_train=prune_iter_epochs,
@@ -156,7 +154,7 @@ def prune_structured_resnet50(
             ext_gpu=gpu_id,
         )
         print(f"Loding result of retraining into pruner with path: {last_model_path}.pth")
-        model = torch.load(f"{last_model_path}_best_model.pth")
+        model = torch.load(f"{last_model_path}.pth")
         after_retrain_acc = validate(model=model, val_loader=loaders["test"], gpu_id=gpu_id)
         accuarcies_between_prunesteps.append(after_retrain_acc)
         model = model.module.to("cpu")
@@ -358,7 +356,7 @@ after_retrain_acc = train_resnet50(
     result_model_path_=final_model_path,
     ext_gpu=gpu_id,
 )
-print(f"The final pruned and retrained model is stored in: {last_model_path}_best_model.pth")
+print(f"The final pruned and retrained model is stored in: {last_model_path}.pth")
 
 model_accuracy_development["retraining"] = after_retrain_acc
 with open(f"./results_of_pruning_experiment/all_accuracies_{model_file}.json", "w") as outfile:
