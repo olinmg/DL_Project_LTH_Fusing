@@ -67,7 +67,6 @@ def prune_structured_resnet50(
     prune_iter_steps=4,
 ):
     print(f"Structured pruning with type {prune_type} and channel sparsity {sparsity}")
-    ori_size = tp.utils.count_params(net)
     imp = None
 
     if prune_type == "random":
@@ -123,8 +122,7 @@ def prune_structured_resnet50(
             ch_sparsity=prune_steps[i],  # channel sparsity
             ignored_layers=ignored_layers,  # ignored_layers will not be pruned
         )
-
-        # pruner.model = model
+        ori_size = tp.utils.count_params(model)
         pruner.step()
         print("  Params: %.2f M => %.2f M" % (ori_size / 1e6, tp.utils.count_params(model) / 1e6))
         model.cuda()
@@ -292,7 +290,7 @@ prune_params = {
     "example_input": example_input,
     "out_features": out_features,
     "use_iter_prune": True,
-    "prune_iter_steps": 2,
+    "prune_iter_steps": 4,
     "prune_iter_epochs": 2,
     "loaders": loaders,
     "gpu_id": gpu_id,
