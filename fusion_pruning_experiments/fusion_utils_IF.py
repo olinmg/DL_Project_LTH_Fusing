@@ -18,6 +18,14 @@ class FusionType(str,BaseEnum):
     ACTIVATION = "activation"
     GRADIENT = "gradient"
 
+class MetaPruneType(str):
+    IF = "intra-fusion"
+    DEFAULT = "default"
+
+class PruneType(str):
+    L1 = "l1"
+    L2 = "l2"
+
 class Fusion_Layer():
     def __init__(self, super_type, weight, name, fusion_type, intrafusion=False, bias=None, bn=False, bn_mean=None, bn_var=None, bn_gamma=None, bn_beta=None):
         self.super_type = super_type
@@ -171,12 +179,12 @@ class Fusion_Layer():
             result.extend(self.skip_ot_2.create_comparison_vec())
         return result
     
-    def get_norm(self, metric):
+    def get_norm(self, prune_type):
         comp_vecs = self.create_comparison_vec()
         norm_layer = []
 
         for idx, comp_vec in enumerate(comp_vecs):
-            norm_layer.append(torch.norm(comp_vec, p=1, dim=1))
+            norm_layer.append(torch.norm(comp_vec, p=1 if prune_type == "l1" else 2, dim=1))
         
         norm_layer = torch.stack(norm_layer, dim=0)
         norm_layer = norm_layer.mean(dim=0)
@@ -460,22 +468,38 @@ def preprocess_parameters(models, fusion_type, intrafusion=False, resnet=False, 
             fusion_layer = None
             if isinstance(module, nn.Linear):
                 fusion_layer = Fusion_Layer("Linear", module.weight, intrafusion=intrafusion, name=name, bias=module.bias, fusion_type=fusion_type)
-                if resnet and len(fusion_layers) > 1 and fusion_layers[-2].weight.shape[0] == fusion_layers[-2].weight.shape[1]:
-                    fusion_layers[-3].skip_ot_2 = fusion_layers[-1]
+                if resnet and len(fusion_layers) > 1:
+                    if model_name != "resnet50" and model_name != "resnet101" and model_name != "resnet152":
+                        if fusion_layers[-2].weight.shape[0] == fusion_layers[-2].weight.shape[1]:
+                            fusion_layers[-3].skip_ot_2 = fusion_layers[-1]
+                    else:
+                        if fusion_layers[-1].skip_ot == None:
+                            fusion_layers[-4].skip_ot_2 = fusion_layers[-1]
+                    
 
             elif isinstance(module, nn.Conv2d):
                 fusion_layer = Fusion_Layer("Conv2d", module.weight, name=name, intrafusion=intrafusion, bias=module.bias, fusion_type=fusion_type)
                 if resnet and len(fusion_layers) > 0:
-                    if module.weight.shape[2] == 1 and module.weight.shape[3] == 1:
-                        fusion_layers[-1].skip_ot = fusion_layer
-                        assert fusion_layers[-2].weight.shape[:2] == fusion_layer.weight.shape[:2]
-                        fusion_layers[-2].skip_align = fusion_layer
-                        fusion_layers[-3].skip_next = fusion_layer
+                    if model_name != "resnet50" and model_name != "resnet101" and model_name != "resnet152":
+                        if module.weight.shape[2] == 1 and module.weight.shape[3] == 1:
+                            fusion_layers[-1].skip_ot = fusion_layer
+                            assert fusion_layers[-2].weight.shape[:2] == fusion_layer.weight.shape[:2]
+                            fusion_layers[-2].skip_align = fusion_layer
+                            fusion_layers[-3].skip_next = fusion_layer
 
-                        continue
-                    if len(fusion_layers) > 1 and "conv1" in name and fusion_layers[-2].weight.shape[0] == fusion_layers[-2].weight.shape[1]:
-                        fusion_layers[-3].skip_ot_2 = fusion_layers[-1]
+                            continue
+                        if len(fusion_layers) > 1 and "conv1" in name and fusion_layers[-2].weight.shape[0] == fusion_layers[-2].weight.shape[1]:
+                            fusion_layers[-3].skip_ot_2 = fusion_layers[-1]
+                    else:
+                        if "shortcut" in name:
+                            fusion_layers[-1].skip_ot = fusion_layer
+                            assert fusion_layers[-3].weight.shape[1] == fusion_layer.weight.shape[1]
+                            fusion_layers[-3].skip_align = fusion_layer
+                            fusion_layers[-4].skip_next = fusion_layer
 
+                            continue
+                        elif len(fusion_layers) > 1 and "conv1" in name and fusion_layers[-1].skip_ot == None:
+                            fusion_layers[-4].skip_ot_2 = fusion_layers[-1]
 
                         
             elif isinstance(module, nn.BatchNorm2d):

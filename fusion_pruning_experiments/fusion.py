@@ -39,22 +39,43 @@ def compute_euclidian_distance_matrix(x, y, p=1, squared=True): # For some reaso
         c = c ** (1/2)
     return c
 
+def pairwise_distances(x, y, squared=True):
+        '''
+        Source: https://discuss.pytorch.org/t/efficient-distance-matrix-computation/9065/2
+        Input: x is a Nxd matrix
+               y is an optional Mxd matirx
+        Output: dist is a NxM matrix where dist[i,j] is the square norm between x[i,:] and y[j,:]
+                if y is not given then use 'y=x'.
+        i.e. dist[i,j] = ||x[i,:]-y[j,:]||^2
+        '''
+        x_norm = torch.abs(x).sum(1).view(-1, 1)
+        if y is not None:
+            y_t = torch.transpose(y, 0, 1)
+            y_norm = torch.abs(y).sum(1).view(1, -1)
+        else:
+            y_t = torch.transpose(x, 0, 1)
+            y_norm = x_norm.view(1, -1)
+
+        dist = x_norm + y_norm - 2.0 * torch.mm(x, y_t)
+        # Ensure diagonal is zero if x=y
+        dist = torch.clamp(dist, min=0.0)
+
+
+        if not squared:
+            print("dont leave off the squaring of the ground metric")
+            dist = dist ** (1/2)
+
+        return dist
+
 def normalize_ground_metric(t):
     mean, std, var = torch.mean(t), torch.std(t), torch.var(t)
     t  = (t-mean)/std
     return t
 
-# get_ground_metric computes the cost matrix
-# if bias is present, the bias will be appended to the weight matrix and subsequently used to calculate the cost
-# cost matrix is based on the weights, not the activations
-def get_ground_metric(coordinates1, coordinates2, bias1, bias2):
-    if bias1 != None: # and bias2 != None
-        assert bias2 != None
-        coordinates1 = torch.cat((coordinates1, bias1.view(bias1.shape[0], -1)), 1)
-        coordinates2 = torch.cat((coordinates2, bias2.view(bias2.shape[0], -1)), 1)
-    coordinates1 = normalize_vector(coordinates1)
-    coordinates2 = normalize_vector(coordinates2)
-    return compute_euclidian_distance_matrix(coordinates1, coordinates2)
+
+
+def get_ground_metric(coordinates1, coordiantes2, bias1, bias2):
+    return torch.cdist(coordinates1, coordiantes2, p=1)
 
 # create_network_from_params creates a network given the list of weights
 def create_network_from_params(reference_model, param_list, gpu_id = -1,sparsity=1.0):
@@ -114,29 +135,7 @@ def create_network_from_parameters(reference_model, param_list, gpu_id = -1):
         if layer.skip_ot:
             idx += 1
             idx = process_layer(layer.skip_ot, idx)
-        """model_state_dict[keys[idx]] = layer.weight.view(model_state_dict[keys[idx]].shape)
-        if layer.bias != None:
-            idx += 1
-            model_state_dict[keys[idx]] = layer.bias
-            print("Went in here")
-        if layer.bn:
-            if layer.bn_gamma != None:
-                idx += 1
-                print("key for bn gamma: ", keys[idx])
-                model_state_dict[keys[idx]] = layer.bn_gamma
-                idx += 1
-                print("key for beta: ", keys[idx])
-                model_state_dict[keys[idx]] = layer.bn_beta
-            idx += 1
-            print("key for mean: ", keys[idx])
-            model_state_dict[keys[idx]] = layer.bn_mean
-            idx += 1
-            print("key for var: ", keys[idx])
-            model_state_dict[keys[idx]] = layer.bn_var
 
-            idx += 1
-            print("key for batches tracked: ", keys[idx])
-            model_state_dict[keys[idx]] = torch.Tensor([10000])"""
     
     model.load_state_dict(model_state_dict)
 
@@ -728,7 +727,6 @@ def fusion_bn(networks, fusion_type, gpu_id = -1, accuracies=None, importance=No
     num_layers = len(fusion_layers)
 
     for idx in range(num_layers):
-
         fusion_layers[idx] = list(fusion_layers[idx])
 
         #fusion_layers[idx][0].to(gpu_id)
@@ -776,14 +774,15 @@ def fusion_bn(networks, fusion_type, gpu_id = -1, accuracies=None, importance=No
             comp_vec_ours = fusion_layer.create_comparison_vec()
             comp_vec_avg = avg_layer.create_comparison_vec()
             
-            M = []
-            for i in range(0, len(comp_vec_ours)):
-                M.append(get_ground_metric(comp_vec_ours[i], comp_vec_avg[i].view(comp_vec_avg[i].shape[0], -1), None, None))
-            if len(M) > 1:
-                M = torch.stack(M)
-                M = torch.mean(M, dim=0)
-            else:
-                M = M[0]
+            with torch.no_grad():
+                M = []
+                for i in range(0, len(comp_vec_ours)):
+                    M.append(get_ground_metric(comp_vec_ours[i], comp_vec_avg[i].view(comp_vec_avg[i].shape[0], -1), None, None))
+                if len(M) > 1:
+                    M = torch.stack(M)
+                    M = torch.mean(M, dim=0)
+                else:
+                    M = M[0]
             
 
             #M = get_ground_metric(fusion_layer.create_comparison_vec(), avg_layer.create_comparison_vec(), None, None)

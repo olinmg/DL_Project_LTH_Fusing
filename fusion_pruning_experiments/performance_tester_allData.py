@@ -59,7 +59,7 @@ if __name__ == "__main__":
     prune_iter_epochs = experiment_params["prune_iter_epochs"]
     use_iter_prune = experiment_params["use_iter_prune"]
     name = experiment_params["models"][0]["name"]
-    use_iterative_pruning = True if (prune_iter_epochs > 0 and prune_iter_steps > 1) else False
+    use_iterative_pruning = True if (prune_iter_epochs > 0 and prune_iter_steps > 1 and use_iter_prune) else False
     if use_iter_prune and prune_iter_epochs > 0:
         logging.info(
             f"Working with iterative pruning: {prune_iter_steps} steps with each {prune_iter_epochs} epochs retraining."
@@ -101,7 +101,7 @@ if __name__ == "__main__":
     }
 
     # Load the model that should be pruned and retraiend
-    model_path = f"./models/{experiment_params['models'][0]['basis_name']}_fullData"
+    model_path = f"./models/{experiment_params['models'][0]['basis_name']}_wholeData"
     logging.info(f"Loading model: {model_path}.")
     print(f"Loading model: {model_path}.")
     models_original = [get_pretrained_model_by_name(model_path, gpu_id=experiment_params["gpu_id"])]

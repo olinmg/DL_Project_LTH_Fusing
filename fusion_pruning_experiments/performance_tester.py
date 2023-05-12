@@ -119,51 +119,6 @@ def get_cifar100_data_loader():
     return {"train": train_loader, "test": val_loader}
 
 
-def get_imagenet_data_loader():
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-
-    # Initialize transformations for data augmentation
-    transforming = transforms.Compose(
-        [
-            transforms.Resize(256),
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomVerticalFlip(),
-            transforms.RandomRotation(degrees=45),
-            transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-        ]
-    )
-
-    train_loader = torch.utils.data.DataLoader(
-        datasets.ImageNet(root="./data", train=True, transform=transforming, download=True),
-        batch_size=128,
-        shuffle=True,
-        num_workers=4,
-        pin_memory=True,
-    )
-
-    val_loader = torch.utils.data.DataLoader(
-        datasets.ImageNet(
-            root="./data",
-            train=False,
-            transform=transforms.Compose(
-                [
-                    transforms.ToTensor(),
-                    normalize,
-                ]
-            ),
-        ),
-        batch_size=128,
-        shuffle=False,
-        num_workers=4,
-        pin_memory=True,
-    )
-
-    return {"train": train_loader, "test": val_loader}
-
-
 def evaluate_performance_simple(input_model, loaders, gpu_id, prune=True):
     """
     Computes the accuracy of a given model (input_model) on a given dataset (loaders["test"]).

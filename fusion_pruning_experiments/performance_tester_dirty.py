@@ -5,6 +5,9 @@ import os
 
 import torch
 import torchvision.transforms as transforms
+from torchvision import datasets
+from torchvision.transforms import ToTensor
+
 from fusion_utils import FusionType
 from model_caching import (
     ensure_folder_existence,
@@ -34,8 +37,6 @@ from performance_tester import (
     wrapper_first_fusion,
     wrapper_structured_pruning,
 )
-from torchvision import datasets
-from torchvision.transforms import ToTensor
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -67,12 +68,14 @@ if __name__ == "__main__":
     use_iterative_pruning = (
         True
         if (
-            experiment_params["prune_iter_epochs"] > 0 and experiment_params["prune_iter_steps"] > 1
+            experiment_params["prune_iter_epochs"] > 0
+            and experiment_params["prune_iter_steps"] > 1
+            and use_iter_prune
         )
         else False
     )
     prune_iter_epochs = experiment_params["prune_iter_epochs"]
-    if use_iter_prune and prune_iter_epochs > 0:
+    if use_iterative_pruning:
         logging.info(
             f"Working with iterative pruning: {prune_iter_steps} steps with each {prune_iter_epochs} epochs retraining."
         )
@@ -97,8 +100,6 @@ if __name__ == "__main__":
     elif dataset_name == "cifar100":
         loaders = get_cifar100_data_loader()
         output_dim = 100
-    elif dataset_name == "imagenet":
-        pass
     else:
         raise Exception("Provided dataset does not exist.")
 
