@@ -209,13 +209,16 @@ if __name__ == "__main__":
     loaders = None
     if args.dataset == "cifar10":
         loaders = get_cifar_data_loader(num_models, args)
+        output_dim = 10
     elif args.dataset == "cifar100":
         print("went in here!!")
         loaders = get_cifar100_data_loader(num_models, args)
+        output_dim = 100
     else:
         loaders = get_mnist_data_loader(num_models, args)
+        output_dim = 10
 
-    model_parent = get_model(args.model_name, output_dim=100 if args.dataset == "cifar100" else 10)
+    model_parent = get_model(args.model_name, output_dim=output_dim)
     for idx, ((layer0_name, fc_layer0_weight), (layer1_name, fc_layer1_weight)) in enumerate(
         zip(model_parent.named_parameters(), model_parent.named_parameters())
     ):
@@ -225,7 +228,7 @@ if __name__ == "__main__":
         model = (
             copy.deepcopy(model_parent)
             if not args.diff_weight_init
-            else get_model(args.model_name, output_dim=100 if args.dataset == "cifar100" else 10)
+            else get_model(args.model_name, output_dim=output_dim)
         )
         if args.gpu_id != -1:
             model = model.cuda(args.gpu_id)
