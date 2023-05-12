@@ -2,7 +2,6 @@ from collections import OrderedDict
 
 import torch
 import torch.nn as nn
-
 from mobilenetv1 import MobileNetV1
 from resnet import BasicBlock, Bottleneck, ResNet
 from vgg import VGG, make_layers
@@ -25,7 +24,6 @@ class MLP(nn.Module):
         self.out = nn.Linear(int(512 * self.sparsity), 10, bias=bias)
 
     def forward(self, x):
-
         x = self.lin1(x.view(-1, 28 * 28))
         x = self.lin2(x)
         output = self.out(x)
@@ -208,9 +206,7 @@ def vgg11(bias=False, sparsity=1.0, output_dim=10):
     """VGG 11-layer model (configuration "A")"""
     params = cfg["A"]
     params = [
-        (round(i * sparsity) if round(i * sparsity) > 1 else 1)
-        if isinstance(i, int)
-        else i
+        (round(i * sparsity) if round(i * sparsity) > 1 else 1) if isinstance(i, int) else i
         for i in params
     ]
     print(params)
@@ -266,7 +262,7 @@ def get_model(model_name, sparsity=1.0, output_dim=10):
     elif model_name == "resnet18":
         return ResNet18(linear_bias=False)
     elif model_name == "resnet34":
-        return ResNet34()
+        return ResNet34(output_dim=output_dim)
     elif model_name == "resnet50":
         return ResNet50()
     elif model_name == "resnet101":
@@ -294,9 +290,7 @@ def get_pretrained_models(model_name, basis_name, gpu_id, num_models, output_dim
         try:
             model = torch.load(f"models/{basis_name}_{idx}.pth")
         except:
-            model = torch.load(
-                f"models/{basis_name}_{idx}.pth", map_location=torch.device("cpu")
-            )
+            model = torch.load(f"models/{basis_name}_{idx}.pth", map_location=torch.device("cpu"))
 
         if gpu_id != -1:
             model = model.cuda(gpu_id)
@@ -318,9 +312,7 @@ def get_pretrained_models_by_name(
         try:
             state = torch.load(f"./{model_file_names[idx]}.pth")
         except:
-            state = torch.load(
-                f"./{model_file_names[idx]}.pth", map_location=torch.device("cpu")
-            )
+            state = torch.load(f"./{model_file_names[idx]}.pth", map_location=torch.device("cpu"))
 
         print(f"Getting state from: ./{model_file_names[idx]}.pth")
 
