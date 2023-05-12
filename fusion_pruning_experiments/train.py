@@ -157,9 +157,7 @@ def train(model, loaders, num_epochs, gpu_id):
             # gives batch data, normalize x when iterate train_loader
 
             predictions = model(images)
-            print("Predictions: ", predictions.shape)
             loss = loss_func(predictions, labels)
-            print("Loss: ", loss.shape)
 
             # clear gradients for this training step
             optimizer.zero_grad()
