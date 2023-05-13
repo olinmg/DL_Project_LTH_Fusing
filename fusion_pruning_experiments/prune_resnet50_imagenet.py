@@ -275,7 +275,7 @@ def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, spar
 print(f"Loading resnet50 model: {model_path}")
 
 loaded_model = model_archs.__dict__["resnet50"](num_classes=output_dim)
-loaded_model = torch.nn.DataParallel(loaded_model)
+loaded_model = torch.nn.DataParallel(loaded_model).cuda()
 checkpoint = torch.load(f"{model_path}.pth.tar")
 loaded_model.load_state_dict(checkpoint["state_dict"])
 loaded_model = loaded_model.module.to("cpu")
@@ -283,7 +283,7 @@ loaded_model = loaded_model.cuda(gpu_id)
 
 print("Loading imagenet dataset ...")
 loaders = get_imagenet_data_loader()
-out_features = 1000
+out_features = output_dim
 example_input = torch.randn(1, 3, 224, 224)
 
 prune_params = {
