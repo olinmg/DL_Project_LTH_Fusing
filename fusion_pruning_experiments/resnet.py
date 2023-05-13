@@ -112,6 +112,7 @@ class ResNet(nn.Module):
         layers = []
         for stride in strides:
             if isinstance(block, Bottleneck):
+                print("This is a bottleneck layer.")
                 layers.append(block(self.in_planes, planes, stride, self.use_batchnorm))
             else:
                 layers.append(
