@@ -138,8 +138,8 @@ def train(model, loaders, num_epochs, gpu_id):
     """
 
     loss_func = nn.CrossEntropyLoss()
-    # optimizer = optim.Adam(model.parameters(), lr = 0.05)
-    optimizer = optim.SGD(model.parameters(), lr=0.05, momentum=0.9)
+    optimizer = optim.Adam(model.parameters(), lr=0.05)
+    # optimizer = optim.SGD(model.parameters(), lr=0.05, momentum=0.9)
     model.train()
 
     # Train the model
