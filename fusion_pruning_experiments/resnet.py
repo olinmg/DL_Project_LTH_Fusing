@@ -111,19 +111,15 @@ class ResNet(nn.Module):
         strides = [stride] + [1] * (num_blocks - 1)
         layers = []
         for stride in strides:
-            if isinstance(block, Bottleneck):
-                print("This is a bottleneck layer.")
-                layers.append(block(self.in_planes, planes, stride, self.use_batchnorm))
-            else:
-                layers.append(
-                    block(
-                        self.in_planes,
-                        planes,
-                        stride,
-                        self.use_batchnorm,
-                        linear_bias=self.linear_bias,
-                    )
+            layers.append(
+                block(
+                    self.in_planes,
+                    planes,
+                    stride,
+                    self.use_batchnorm,
+                    linear_bias=self.linear_bias,
                 )
+            )
             self.in_planes = planes * block.expansion
         return nn.Sequential(*layers)
 
