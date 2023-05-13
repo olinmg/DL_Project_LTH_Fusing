@@ -264,7 +264,7 @@ def get_model(model_name, sparsity=1.0, output_dim=10):
     elif model_name == "resnet34":
         return ResNet34(num_classes=output_dim, use_batchnorm=True)
     elif model_name == "resnet50":
-        return ResNet50()
+        return ResNet50(num_classes=output_dim, use_batchnorm=True)
     elif model_name == "resnet101":
         return ResNet101()
     elif model_name == "resnet152":
