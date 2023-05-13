@@ -4,11 +4,9 @@ import math
 import os
 import shutil
 
+import numpy as np
 import torch
 import torchvision.transforms as transforms
-from torchvision import datasets
-from torchvision.transforms import ToTensor
-
 from fusion_utils import FusionType
 from model_caching import (
     ensure_folder_existence,
@@ -41,17 +39,18 @@ from performance_tester_utils import (
     wrapper_first_fusion,
     wrapper_structured_pruning,
 )
+from torchvision import datasets
+from torchvision.transforms import ToTensor
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 import torch.nn as nn
-import torchvision.models as model_archs
-from torch.optim.lr_scheduler import StepLR
-
 import torch_pruning as tp
+import torchvision.models as model_archs
 from fusion import fusion_bn
 from fusion_IF import intrafusion_bn
 from fusion_utils_IF import MetaPruneType, PruneType
 from pruning_modified import prune_structured, prune_structured_intra
+from torch.optim.lr_scheduler import StepLR
 from train_resnet50 import train_resnet50, validate
 
 gpu_id = 0
@@ -59,6 +58,7 @@ sparsity_in = 0.6
 retrain_epochs = 20
 prune_iter_epochs_in = 10
 prune_iter_steps_in = 4
+output_dim = 1000
 dataset_path = "/local/home/stuff/imagenet"  # "/local/home/gaf/coolvenv/testarea_imagenetIntegration/fake_imagenet"  # "/local/home/stuff/imagenet"
 model_name = "resnet50"
 model_file = "resnet50_imagenet_eps90_datasplit_0"
@@ -274,7 +274,7 @@ def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, spar
 
 print(f"Loading resnet50 model: {model_path}")
 
-loaded_model = model_archs.__dict__["resnet50"]()
+loaded_model = model_archs.__dict__["resnet50"](out_features=output_dim)
 loaded_model = torch.nn.DataParallel(loaded_model)
 checkpoint = torch.load(f"{model_path}.pth.tar")
 loaded_model.load_state_dict(checkpoint["state_dict"])
