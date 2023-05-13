@@ -274,7 +274,7 @@ def iterative_pruning(model, iter_num_epochs, prune_iter_steps, prune_type, spar
 
 print(f"Loading resnet50 model: {model_path}")
 
-loaded_model = model_archs.__dict__["resnet50"](out_features=output_dim)
+loaded_model = model_archs.__dict__["resnet50"](num_classes=output_dim)
 loaded_model = torch.nn.DataParallel(loaded_model)
 checkpoint = torch.load(f"{model_path}.pth.tar")
 loaded_model.load_state_dict(checkpoint["state_dict"])
