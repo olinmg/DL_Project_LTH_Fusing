@@ -3,7 +3,6 @@ from collections import OrderedDict
 import torch
 import torch.nn as nn
 import torchvision.models as model_archs
-
 from mobilenetv1 import MobileNetV1
 from resnet import BasicBlock, Bottleneck, ResNet
 from vgg import VGG, make_layers
@@ -260,7 +259,7 @@ def get_model(model_name, sparsity=1.0, output_dim=10):
     elif model_name == "vgg16":
         return vgg16()
     elif model_name == "vgg19":
-        return vgg19()
+        return vgg19(output_dim=output_dim)
     elif model_name == "resnet18":
         return ResNet18(linear_bias=False)
     elif model_name == "resnet34":
