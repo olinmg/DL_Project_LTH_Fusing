@@ -233,9 +233,9 @@ def vgg16(bias=True):
     return VGG(make_layers(cfg["D"], bias=bias), bias=bias)
 
 
-def vgg19(bias=False):
+def vgg19(bias=False, output_dim=10):
     """VGG 19-layer model (configuration "E")"""
-    return VGG(make_layers(cfg["E"], bias=bias), bias=bias)
+    return VGG(make_layers(cfg["E"], bias=bias), bias=bias, output_dim=output_dim)
 
 
 def get_model(model_name, sparsity=1.0, output_dim=10):
