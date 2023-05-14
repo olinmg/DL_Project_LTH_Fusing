@@ -5,9 +5,6 @@ import os
 
 import torch
 import torchvision.transforms as transforms
-from torchvision import datasets
-from torchvision.transforms import ToTensor
-
 from fusion_utils import FusionType
 from model_caching import (
     ensure_folder_existence,
@@ -40,6 +37,8 @@ from performance_tester_utils import (
     wrapper_first_fusion,
     wrapper_structured_pruning,
 )
+from torchvision import datasets
+from torchvision.transforms import ToTensor
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -400,8 +399,9 @@ if __name__ == "__main__":
                         model_name=name,
                     )
 
-                    fap_model_accuracies = fap_model_accuracies[0]
-                    fap_model_accuracies.extend(epoch_accuracy)
+                    # fap_model_accuracies = fap_model_accuracies[0]
+                    # fap_model_accuracies.extend(epoch_accuracy)
+                    fap_model_accuracies = epoch_accuracy
                     if use_caching:
                         save_model(fap_model_path, fap_model)
                         save_model_trainHistory(fap_model_path, fap_model_accuracies)
