@@ -241,8 +241,9 @@ if __name__ == "__main__":
                         prune=False,
                         model_name=name,
                     )
-                    this_pruned_model_accuracies = this_pruned_model_accuracies
-                    this_pruned_model_accuracies.extend(epoch_accuracy)
+                    # this_pruned_model_accuracies = this_pruned_model_accuracies
+                    # this_pruned_model_accuracies.extend(epoch_accuracy)
+                    this_pruned_model_accuracies = epoch_accuracy
                     this_pruned_model = this_pruned_model_lis[0]
                     if use_caching:
                         save_model(this_model_path, this_pruned_model)
