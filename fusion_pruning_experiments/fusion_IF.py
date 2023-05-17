@@ -97,6 +97,8 @@ def create_network_from_parameters(reference_model, param_list, gpu_id = -1):
     processed_keys = []
 
     def process_layer(layer, idx):
+        print(layer.weight.shape)
+        print(model_state_dict[keys[idx]].shape)
         if layer.is_conv:
             model_state_dict[keys[idx]] = layer.weight.view(layer.weight.shape[0], layer.weight.shape[1], model_state_dict[keys[idx]].shape[2], model_state_dict[keys[idx]].shape[3])
         else:

@@ -189,6 +189,79 @@ def prune_structured_intra(net, loaders, num_epochs, example_inputs, out_feature
     #The model is returned, but the pruning is done in situ...
     return models
 
+def prune_structured_layer(
+    net,
+    loaders,
+    prune_iter_epochs,
+    example_inputs,
+    out_features,
+    prune_type,
+    gpu_id,
+    layer,
+    sparsity=0.5,
+    prune_iter_steps=3,
+    train_fct=None,
+):
+    print(f"Structured pruning with type {prune_type} and channel sparsity {sparsity}")
+    ori_size = tp.utils.count_params(net)
+    imp = None
+
+    if prune_type == "random":
+        imp = tp.importance.RandomImportance()
+    elif prune_type == "sensitivity":
+        imp = tp.importance.SensitivityImportance()
+    elif prune_type == "l1":
+        imp = tp.importance.MagnitudeImportance(1)
+    elif prune_type == "l2":
+        imp = tp.importance.MagnitudeImportance(2)
+    elif prune_type == "l_inf":
+        imp = tp.importance.MagnitudeImportance(np.inf)
+    elif prune_type == "hessian":
+        imp = tp.importance.HessianImportance()
+    elif prune_type == "bnscale":
+        imp = tp.importance.BNScaleImportance()
+    elif prune_type == "structural":
+        imp = tp.importance.StrcuturalImportance
+    elif prune_type == "lamp":
+        imp = tp.importance.LAMPImportance()
+    else:
+        raise ValueError("Prune type not supported")
+
+    ignored_layers = []
+    model = net  # Correct????
+    for m in model.modules():
+        if isinstance(m, torch.nn.Linear) and m.out_features == out_features:
+            ignored_layers.append(m)
+
+    prune_iter_steps = int(prune_iter_steps)
+
+    if next(model.parameters()).is_cuda:
+        model.to("cpu")
+
+    pruner = tp.pruner.LocalMagnitudePruner(
+        model,
+        example_inputs,
+        importance=imp,
+        total_steps=prune_iter_steps,  # number of iterations
+        ch_sparsity=sparsity,  # channel sparsity
+        ignored_layers=ignored_layers,  # ignored_layers will not be pruned
+    )
+    for i in range(prune_iter_steps):  # iterative pruning
+        print(i)
+        pruner.step(only_layer=layer)
+        print("  Params: %.2f M => %.2f M" % (ori_size / 1e6, tp.utils.count_params(model) / 1e6))
+
+        # Potentially retrain the model
+        # The train function is a function that takes the model and does the training on it.
+        # It probably calls other training functions
+
+        if train_fct is not None and prune_iter_epochs > 0:
+            print(f"Doing iterative retraining for {prune_iter_epochs} epochs")
+            model, val_acc_per_epoch = train_fct(model, loaders, prune_iter_epochs, gpu_id)
+
+    # The model is returned, but the pruning is done in situ...
+    return model
+
 from torch.autograd import Variable
 from torch import optim
 from torch.autograd import Variable

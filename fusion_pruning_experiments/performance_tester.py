@@ -355,6 +355,87 @@ def train_during_pruning(model, loaders, num_epochs, gpu_id, prune=True, perform
     val_acc_per_epoch.append(best_accuracy)
     return best_model, val_acc_per_epoch
 
+def train_during_pruning_cifar100(model, loaders, num_epochs, gpu_id, prune=True, performed_epochs=0):
+    # return model, [0 for i in range(num_epochs)]
+    """
+    Has to be a function that loads a dataset.
+
+    A given model and an amount of epochs of training will be given.
+    """
+
+    if gpu_id != -1:
+        model = model.cuda(gpu_id)
+
+    loss_func = nn.CrossEntropyLoss()
+    # optimizer = optim.Adam(model.parameters(), lr = 0.01)
+    lr = 0.002
+    model.train()
+
+    # Train the model
+    total_step = len(loaders["train"])
+    best_model = model
+    best_accuracy = -1
+
+    val_acc_per_epoch = []
+    this_epoch_acc = evaluate_performance_simple(
+        input_model=model, loaders=loaders, gpu_id=gpu_id, prune=False
+    )
+    val_acc_per_epoch.append(this_epoch_acc)
+    is_nan = False
+    for epoch in range(num_epochs):
+        if epoch == 59:
+            lr = 0.004
+        if epoch == 99:
+            lr = 0.0008
+        optimizer = optim.SGD(
+            model.parameters(), lr=lr, momentum=0.9
+        )
+        for i, (images, labels) in enumerate(loaders["train"]):
+            if gpu_id != -1 and not next(model.parameters()).is_cuda:
+                model = model.cuda(gpu_id)
+            if gpu_id != -1:
+                images, labels = images.cuda(gpu_id), labels.cuda(gpu_id)
+            # gives batch data, normalize x when iterate train_loader
+
+            predictions = model(images)
+            loss = loss_func(predictions, labels)
+
+            # clear gradients for this training step
+            optimizer.zero_grad()
+
+            # backpropagation, compute gradients
+            loss.backward()
+            # apply gradients
+            optimizer.step()
+
+            if (i + 1) % 100 == 0:
+                print(
+                    "Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}".format(
+                        epoch + 1, num_epochs, i + 1, total_step, loss.item()
+                    )
+                )
+
+            if math.isnan(loss.item()):
+                is_nan = True
+                break
+
+        if is_nan:
+            print("Is NAN")
+            break
+        this_epoch_acc = evaluate_performance_simple(
+            input_model=model, loaders=loaders, gpu_id=gpu_id, prune=False
+        )
+        print(this_epoch_acc)
+        if this_epoch_acc > best_accuracy:
+            best_model = copy.deepcopy(model)
+            best_accuracy = this_epoch_acc
+        val_acc_per_epoch.append(this_epoch_acc)
+
+    model.cpu()
+    best_model.cpu()
+    val_acc_per_epoch.append(best_accuracy)
+    return best_model, val_acc_per_epoch
+
 
 from pruning_modified import prune_structured
 

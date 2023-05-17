@@ -99,7 +99,7 @@ def vgg16():
 
 def vgg16_bn():
     """VGG 16-layer model (configuration "D") with batch normalization"""
-    return VGG(make_layers(cfg['D'], batch_norm=True))
+    return VGG(make_layers(cfg['D']))
 
 
 def vgg19():

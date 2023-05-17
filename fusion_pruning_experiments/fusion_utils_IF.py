@@ -464,6 +464,7 @@ def preprocess_parameters(models, fusion_type, intrafusion=False, resnet=False, 
         prev_name = ""
         for name, module in model.named_modules():
             fusion_layer = None
+
             if isinstance(module, nn.Linear):
                 fusion_layer = Fusion_Layer("Linear", module.weight, intrafusion=intrafusion, name=name, bias=module.bias, fusion_type=fusion_type)
                 if resnet and len(fusion_layers) > 1:
@@ -474,14 +475,13 @@ def preprocess_parameters(models, fusion_type, intrafusion=False, resnet=False, 
                         if fusion_layers[-1].skip_ot == None:
                             fusion_layers[-4].skip_ot_2 = fusion_layers[-1]
                     
-
             elif isinstance(module, nn.Conv2d):
                 fusion_layer = Fusion_Layer("Conv2d", module.weight, name=name, intrafusion=intrafusion, bias=module.bias, fusion_type=fusion_type)
                 if resnet and len(fusion_layers) > 0:
                     if model_name != "resnet50" and model_name != "resnet101" and model_name != "resnet152":
                         if module.weight.shape[2] == 1 and module.weight.shape[3] == 1:
                             fusion_layers[-1].skip_ot = fusion_layer
-                            assert fusion_layers[-2].weight.shape[:2] == fusion_layer.weight.shape[:2]
+                            #assert fusion_layers[-2].weight.shape[:2] == fusion_layer.weight.shape[:2]
                             fusion_layers[-2].skip_align = fusion_layer
                             fusion_layers[-3].skip_next = fusion_layer
 

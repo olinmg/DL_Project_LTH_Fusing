@@ -1,11 +1,12 @@
 from collections import OrderedDict
+from vit import ViT
 
 import torch
 import torch.nn as nn
 
 from mobilenetv1 import MobileNetV1
 from resnet import BasicBlock, Bottleneck, ResNet
-from vgg import VGG, make_layers
+from vgg import VGG, make_layers, vgg19_bn
 
 
 class MLP(nn.Module):
@@ -239,7 +240,7 @@ def vgg16(bias=True):
 
 def vgg19(bias=False):
     """VGG 19-layer model (configuration "E")"""
-    return VGG(make_layers(cfg["E"], bias=bias), bias=bias)
+    return VGG(make_layers(cfg["E"], bias=bias), bias=bias, batch_norm=True)
 
 
 def get_model(model_name, sparsity=1.0, output_dim=10):
@@ -253,6 +254,18 @@ def get_model(model_name, sparsity=1.0, output_dim=10):
         return MLP(sparsity)
     elif model_name == "mobilenetv1":
         return MobileNetV1(ch_in=3, n_classes=output_dim)
+    elif model_name == "vit":
+        return ViT(
+            image_size = 32,
+            patch_size = 4,
+            num_classes = 10,
+            dim = 512,
+            depth = 6,
+            heads = 8,
+            mlp_dim = 512,
+            dropout = 0.1,
+            emb_dropout = 0.1
+        )
     elif model_name == "vgg11":
         return vgg11(bias=False, sparsity=sparsity, output_dim=output_dim)
     elif model_name == "vgg11_bn":
@@ -263,12 +276,14 @@ def get_model(model_name, sparsity=1.0, output_dim=10):
         return vgg16()
     elif model_name == "vgg19":
         return vgg19()
+    elif model_name == "vgg19_bn":
+        return vgg19_bn()
     elif model_name == "resnet18":
         return ResNet18(linear_bias=False)
     elif model_name == "resnet34":
-        return ResNet34()
+        return ResNet34(linear_bias=False, num_classes=output_dim)
     elif model_name == "resnet50":
-        return ResNet50()
+        return ResNet50(num_classes=output_dim, use_batchnorm=False, linear_bias=False)
     elif model_name == "resnet101":
         return ResNet101()
     elif model_name == "resnet152":
@@ -304,6 +319,21 @@ def get_pretrained_models(model_name, basis_name, gpu_id, num_models, output_dim
             modle = model.to("cpu")
         models.append(model)
     return models
+
+"""def get_pretrained_model_by_name(model_file_path, gpu_id):
+if "resnet50" in model_file_path:
+model = model_archs.__dict__["resnet50"]()
+model = torch.nn.DataParallel(model)
+checkpoint = torch.load(f"models/{model_file_path}.pth.tar")
+model.load_state_dict(checkpoint["state_dict"])
+model = model.module.to("cpu")
+else:
+try:
+model = torch.load(f"{model_file_path}.pth")
+except:
+model = torch.load(f"{model_file_path}.pth", map_location=torch.device("cpu"))
+model = model.cuda(gpu_id) if gpu_id != -1 else model.to("cpu")
+return model"""
 
 
 def get_pretrained_models_by_name(

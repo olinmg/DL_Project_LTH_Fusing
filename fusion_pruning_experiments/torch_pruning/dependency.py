@@ -485,6 +485,7 @@ class DependencyGraph(object):
 
         visited = set()
 
+
         def _fix_dependency_graph_non_recursive(node, fn, indices):
             processing_stack = [(node, fn, indices)]
             while len(processing_stack) > 0:
@@ -516,8 +517,11 @@ class DependencyGraph(object):
         # merge pruning ops
         merged_plan = PruningPlan()
 
+
         for dep, idxs in plan.plan:
             merged_plan.add_plan_and_merge(dep, idxs)
+
+
         return merged_plan
 
     def _build_dependency(self, module2node):

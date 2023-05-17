@@ -1,13 +1,15 @@
 from collections import OrderedDict
 import copy
+from fusion_utils import FusionType
+from fusion import fusion_bn
 from intrafusion_test import wrapper_intra_fusion
 from fusion_utils_IF import MetaPruneType, PruneType
-from pruning_modified import prune_structured, prune_structured_intra
+from pruning_modified import prune_structured, prune_structured_intra, prune_structured_layer
 from performance_tester import train_during_pruning, update_running_statistics
 from parameters import get_parameters
 from train import get_model
 import torch
-from fusion import MSF, IntraFusion_Clustering, fusion, fusion_bn, fusion_old, fusion_sidak_multimodel, fusion_bn_alt, intrafusion_bn
+from fusion_IF import MSF, IntraFusion_Clustering, fusion, fusion_old, fusion_sidak_multimodel, fusion_bn_alt, intrafusion_bn
 from sklearn.model_selection import train_test_split
 from torchvision.transforms import ToTensor
 from torch.utils.data import DataLoader
@@ -20,6 +22,7 @@ from models import get_pretrained_models
 import json
 import re
 import pprint
+import torchvision.models as model_archs
 
 
 def get_cifar_data_loader(shuffle=True):
@@ -33,7 +36,7 @@ def get_cifar_data_loader(shuffle=True):
             transforms.ToTensor(),
             normalize,
         ]), download=True),
-        batch_size=128, shuffle=true,
+        batch_size=128, shuffle=True,
         num_workers=4, pin_memory=True)
 
     val_loader = torch.utils.data.DataLoader(
@@ -167,6 +170,41 @@ if __name__ == '__main__':
         print(f"{layer0_name} : {fc_layer0_weight.shape}")
 
 
+    """t = prune_structured_layer(net=copy.deepcopy(models[0]), loaders=None, gpu_id=args.gpu_id, example_inputs=torch.randn(1, 3, 32, 32),
+                                    out_features=10, prune_type=PruneType.L1, sparsity=0.7, train_fct=None, prune_iter_epochs=0, prune_iter_steps=1, layer=3)
+                    
+    for idx, ((layer0_name, fc_layer0_weight), (layer1_name, fc_layer1_weight)) in \
+            enumerate(zip(t.named_parameters(), t.named_parameters())):
+        print(f"{layer0_name} : {fc_layer0_weight.shape}")
+    fused_model_g = intrafusion_bn(models[0], model_name = args.model_name, meta_prune_type = MetaPruneType.DEFAULT, prune_type = PruneType.L1, sparsity=0.5, fusion_type="weight", full_model = models[0], small_model=t, gpu_id = args.gpu_id, resnet = True, train_loader=None)
+    print(evaluate_performance_simple(fused_model_g, loaders, 0, eval=True))
+    exit()"""
+    sparsities = [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]
+    layer_idxs = [i for i in range(10)]
+    meta_prune_types = ["SSF"]
+    prune_types = [PruneType.L1, PruneType.L2]
+    results = {}
+    for layer_idx in layer_idxs:
+        results[layer_idx] = {}
+        for sparsity in sparsities:
+            results[layer_idx][sparsity] = {}
+            for meta_prune_type in meta_prune_types:
+                results[layer_idx][sparsity][meta_prune_type] = {}
+                for prune_type in prune_types:
+                    print(f"{layer_idx} : {sparsity} : {meta_prune_type} : {prune_type}")
+                    t = prune_structured_layer(net=copy.deepcopy(models[0]), loaders=None, gpu_id=args.gpu_id, example_inputs=torch.randn(1, 3, 32, 32),
+                                    out_features=10, prune_type=prune_type, sparsity=sparsity, train_fct=None, prune_iter_epochs=0, prune_iter_steps=1, layer=layer_idx)
+                    
+                    """for idx, ((layer0_name, fc_layer0_weight), (layer1_name, fc_layer1_weight)) in \
+                            enumerate(zip(t.named_parameters(), t.named_parameters())):
+                        print(f"{layer0_name} : {fc_layer0_weight.shape}")"""
+                    fused_model_g = fusion_bn([t, models[0]], fusion_type=FusionType.WEIGHT, gpu_id=0, resnet=False, model_name = args.model_name)
+                    #fused_model_g = intrafusion_bn(models[0], model_name = args.model_name, meta_prune_type = meta_prune_type, prune_type = prune_type, sparsity=sparsity, fusion_type="weight", full_model = models[0], small_model=t, gpu_id = args.gpu_id, resnet = False, train_loader=None)
+                    results[layer_idx][sparsity][meta_prune_type][prune_type] = evaluate_performance_simple(fused_model_g, loaders, 0, eval=True)
+        print(pprint.pprint(results))
+    with open("results_SSF_per_layer_vgg11.json", "w") as outfile:
+        json.dump(results, outfile, indent=4)
+    exit()
     #fused_model_g = fusion_bn(models, model_name = args.model_name, fusion_type="activation", gpu_id=-1, resnet=True, train_loader=get_cifar_data_loader(shuffle=True)["train"])
     fused_model_g = wrapper_intra_fusion(model=models[0], model_name=args.model_name, resnet=True, sparsity=0.0, prune_iter_steps=0, num_epochs=0, loaders=loaders["train"], prune_type=PruneType.L2, meta_prune_type=MetaPruneType.IF, gpu_id=0)
     #fused_model_g = fusion(models, gpu_id=args.gpu_id, resnet=True)

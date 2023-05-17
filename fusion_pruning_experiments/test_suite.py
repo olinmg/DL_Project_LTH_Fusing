@@ -120,14 +120,13 @@ if __name__ == '__main__':
         print("Got cifar")
         loaders = get_cifar_data_loader()
     
-
     results = {}
 
-    train_epochs = 0
-    sparsities = [0.5, 0.6, 0.7, 0.8]
-    seeds = [0, 1, 2]
+    train_epochs = 10
+    sparsities = [0.4, 0.6, 0.7, 0.8]
+    seeds = [1]
     meta_prune_types = [MetaPruneType.DEFAULT, MetaPruneType.IF]
-    total_steps = 2
+    total_steps = 4
     for seed in seeds:
         torch.manual_seed(seed)
         np.random.seed(seed)
@@ -138,18 +137,25 @@ if __name__ == '__main__':
         for idx, model in enumerate(models):
             result[f"model_{idx}"] = {}
             for sparsity in sparsities:
+                if sparsity in [0.4, 0.5]:
+                    total_steps = 3
+                elif sparsity in [0.6, 0.7, 0.8]:
+                    total_steps = 4
+                else:
+                    total_steps = 5
                 result[f"model_{idx}"][sparsity] = {}
                 for meta_prune_type in meta_prune_types:
                         print("****************Sparsity: ", sparsity)
-                        fused_model_g = wrapper_intra_fusion(model=model, model_name=args.model_name, resnet=True, sparsity=sparsity, prune_iter_steps=total_steps, num_epochs=train_epochs, loaders=loaders, prune_type=PruneType.L1, meta_prune_type=meta_prune_type, gpu_id=0)
+                        fused_model_g, epoch_accuracies_interm = wrapper_intra_fusion(model=model, model_name=args.model_name, resnet=False, sparsity=sparsity, prune_iter_steps=total_steps, num_epochs=train_epochs, loaders=loaders, prune_type=PruneType.L1, meta_prune_type=meta_prune_type, gpu_id=0)
                         accuracy_fused_g = evaluate_performance_simple(fused_model_g, loaders, 0, eval=True)
                         print("fused: ", accuracy_fused_g)
-                        fused_model_g, epoch_accuracies = train_during_pruning(fused_model_g, loaders=loaders, num_epochs=0, gpu_id =0, prune=False, performed_epochs=0)
+                        fused_model_g, epoch_accuracies = train_during_pruning(fused_model_g, loaders=loaders, num_epochs=150-(total_steps*train_epochs), gpu_id =0, prune=False, performed_epochs=0)
                         print("Final fused is: ", epoch_accuracies[-1])
-                        result[f"model_{idx}"][sparsity][meta_prune_type] = epoch_accuracies
+                        epoch_accuracies_interm.extend(epoch_accuracies)
+                        result[f"model_{idx}"][sparsity][meta_prune_type] = epoch_accuracies_interm
 
                         pprint.pprint(results)
-    with open("results_intrafusion_resnet18_L1.json", "w") as outfile:
+    with open("results_intrafusion_resnet18_L1_2.json", "w") as outfile:
         json.dump(results, outfile, indent=4)
 
 

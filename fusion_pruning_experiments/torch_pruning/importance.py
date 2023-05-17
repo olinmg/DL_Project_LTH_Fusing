@@ -28,6 +28,7 @@ class MagnitudeImportance(Importance):
                 functional.prune_linear_out_channel,
             ]:
                 w = (layer.weight)[idxs]
+                #print("Flattened: ", torch.flatten(w, 1).shape)
                 this_importance = torch.norm(torch.flatten(w, 1), dim=1, p=self.p)
                 importance_mat.append(this_importance)
                 non_importance = False

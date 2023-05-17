@@ -97,7 +97,7 @@ def train(model, loaders, num_epochs, gpu_id):
     '''
 
     loss_func = nn.CrossEntropyLoss()   
-    #optimizer = optim.Adam(model.parameters(), lr = 0.05)
+    #optimizer = optim.Adam(model.parameters(), lr = 1e-4)
     optimizer = optim.SGD(model.parameters(), lr=0.05,momentum=0.9)
     model.train()
         
@@ -132,6 +132,7 @@ def train(model, loaders, num_epochs, gpu_id):
             
         
         this_epoch_acc = test(model, loaders=loaders, gpu_id=gpu_id)
+        print(this_epoch_acc)
         val_acc_per_epoch.append(this_epoch_acc)
         if this_epoch_acc > best_model_accuracy:
             best_model = copy.deepcopy(model)

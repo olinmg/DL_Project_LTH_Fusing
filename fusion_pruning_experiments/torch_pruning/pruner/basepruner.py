@@ -108,10 +108,14 @@ class MetaPruner(abc.ABC):
 
 class LocalPruner(MetaPruner):
 
-    def step(self):
+    def step(self, only_layer=None):
         if self.current_step == self.total_steps:
             return
-        for plan in self.get_all_plans():
+        for idx, plan in enumerate(self.get_all_plans()):
+            if only_layer != None:
+                assert isinstance(only_layer, int)
+                if idx != only_layer:
+                    continue
             # check pruning rate
             if self._is_valid(plan):
                 module = plan[0][0].target.module
@@ -125,10 +129,13 @@ class LocalPruner(MetaPruner):
                 if self.round_to:
                     n_pruned = n_pruned % self.round_to * self.round_to
                 imp_argsort = torch.argsort(imp)
+
                 pruning_idxs = imp_argsort[:n_pruned].tolist()
+
                 plan = self.DG.get_pruning_plan(module, pruning_fn, pruning_idxs)
                 if self.DG.check_pruning_plan(plan):
                     plan.exec()
+
         self.current_step += 1
 
     def _is_valid(self, plan):
