@@ -5,6 +5,9 @@ import os
 
 import torch
 import torchvision.transforms as transforms
+from torchvision import datasets
+from torchvision.transforms import ToTensor
+
 from fusion_utils import FusionType
 from model_caching import (
     ensure_folder_existence,
@@ -37,8 +40,6 @@ from performance_tester_utils import (
     wrapper_first_fusion,
     wrapper_structured_pruning,
 )
-from torchvision import datasets
-from torchvision.transforms import ToTensor
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -244,7 +245,19 @@ if __name__ == "__main__":
                     # this_pruned_model_accuracies = this_pruned_model_accuracies
                     # this_pruned_model_accuracies.extend(epoch_accuracy)
                     this_pruned_model_accuracies = epoch_accuracy
-                    this_pruned_model = this_pruned_model_lis[0]
+
+                    """
+                    print("------------------------------------")
+                    print(f"Performance of this model after retrain: {epoch_accuracy}")
+                    # PROBLEM: ARE WE CONTINUING TO USE THE UNTRAINED MODEL HERE?
+                    # PROBLEM BEFORE: this_pruned_model = this_pruned_model_lis[0]
+                    xx = evaluate_performance_simple(
+                        input_model=this_pruned_model, loaders=loaders, gpu_id=gpu_id, prune=False
+                    )
+                    print(f"Performance of the model handed over: {xx}")
+                    print("------------------------------------")
+                    """
+
                     if use_caching:
                         save_model(this_model_path, this_pruned_model)
                         save_model_trainHistory(this_model_path, this_pruned_model_accuracies)
@@ -327,7 +340,7 @@ if __name__ == "__main__":
                         num_epochs=0,
                         name=name,
                     )
-                    m, paf_accuracy = train_during_pruning(
+                    paf_model, paf_accuracy = train_during_pruning(
                         paf_model,
                         loaders=loaders,
                         num_epochs=num_epochs,
