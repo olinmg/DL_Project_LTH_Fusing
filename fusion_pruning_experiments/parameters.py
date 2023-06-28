@@ -41,7 +41,7 @@ def get_train_parameters():
     parser.add_argument(
         "--kfold",
         type=int,
-        default=4,
+        default=0,
         help="Split dataset into equal parts and train models on different halves of the data. Must be even and bigger than two.",
     )
     return parser.parse_args()
