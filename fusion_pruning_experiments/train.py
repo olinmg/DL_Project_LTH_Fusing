@@ -35,10 +35,9 @@ def get_mnist_data_loader(num_models, args):
         combinations_of_2_subsets = itertools.combinations(train_data_kfold, int(args.kfold / 2))
         combinations_of_2_subsets_lis = [combo for combo in combinations_of_2_subsets]
 
-        train_data_split = [
-            torch.utils.data.ConcatDataset([combo[0], combo[1]])
-            for combo in combinations_of_2_subsets_lis
-        ]
+        combo_list = [[subcom for subcom in combo] for combo in combinations_of_2_subsets_lis]
+        train_data_split = [torch.utils.data.ConcatDataset(subcom) for subcom in combo_list]
+        train_data_split = [torch.utils.data.ConcatDataset(subcom) for subcom in combo_list]
 
     print(f"Total dataset size: {len(train_data)}")
     print("Returning Datasets - sizes:")
@@ -103,10 +102,8 @@ def get_cifar_data_loader(num_models, args):
         combinations_of_2_subsets = itertools.combinations(train_data_kfold, int(args.kfold / 2))
         combinations_of_2_subsets_lis = [combo for combo in combinations_of_2_subsets]
 
-        train_data_split = [
-            torch.utils.data.ConcatDataset([combo[0], combo[1]])
-            for combo in combinations_of_2_subsets_lis
-        ]
+        combo_list = [[subcom for subcom in combo] for combo in combinations_of_2_subsets_lis]
+        train_data_split = [torch.utils.data.ConcatDataset(subcom) for subcom in combo_list]
 
     print(f"Total dataset size: {len(train_data)}")
     print("Returning Datasets - sizes:")
@@ -171,10 +168,8 @@ def get_cifar100_data_loader(num_models, args):
         combinations_of_2_subsets = itertools.combinations(train_data_kfold, int(args.kfold / 2))
         combinations_of_2_subsets_lis = [combo for combo in combinations_of_2_subsets]
 
-        train_data_split = [
-            torch.utils.data.ConcatDataset([combo[0], combo[1], combo[2]])
-            for combo in combinations_of_2_subsets_lis
-        ]
+        combo_list = [[subcom for subcom in combo] for combo in combinations_of_2_subsets_lis]
+        train_data_split = [torch.utils.data.ConcatDataset(subcom) for subcom in combo_list]
 
     print(f"Total dataset size: {len(train_data)}")
     print("Returning Datasets - sizes:")
