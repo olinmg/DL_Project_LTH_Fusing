@@ -85,6 +85,7 @@ def get_cifar_data_loader(num_models, args):
         ),
     )
 
+    torch.manual_seed(0)
     if args.kfold < 3:
         fraction = 1 / num_models
         train_data_split = (
@@ -152,6 +153,7 @@ def get_cifar100_data_loader(num_models, args):
         ),
     )
 
+    torch.manual_seed(0)
     if args.kfold < 3:
         fraction = 1 / num_models
         train_data_split = (
@@ -170,7 +172,7 @@ def get_cifar100_data_loader(num_models, args):
         combinations_of_2_subsets_lis = [combo for combo in combinations_of_2_subsets]
 
         train_data_split = [
-            torch.utils.data.ConcatDataset([combo[0], combo[1]])
+            torch.utils.data.ConcatDataset([combo[0], combo[1], combo[2]])
             for combo in combinations_of_2_subsets_lis
         ]
 
