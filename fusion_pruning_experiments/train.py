@@ -2,14 +2,15 @@ import copy
 
 import torch
 import torch.nn as nn
-from models import get_model
-from parameters import get_parameters, get_train_parameters
 from sklearn.model_selection import train_test_split
 from torch import optim
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from torchvision import datasets, models, transforms
 from torchvision.transforms import ToTensor
+
+from models import get_model
+from parameters import get_parameters, get_train_parameters
 from vgg import vgg11, vgg13
 
 
@@ -17,12 +18,32 @@ def get_mnist_data_loader(num_models, args):
     train_data = datasets.MNIST("data", train=True, transform=ToTensor(), download=True)
     test_data = datasets.MNIST("data", train=False, transform=ToTensor(), download=True)
 
-    fraction = 1 / num_models
-    train_data_split = (
-        torch.utils.data.random_split(train_data, [fraction] * num_models)
-        if not args.diff_weight_init
-        else [train_data] * num_models
-    )
+    if args.kfold < 3:
+        fraction = 1 / num_models
+        train_data_split = (
+            torch.utils.data.random_split(train_data, [fraction] * num_models)
+            if not args.diff_weight_init
+            else [train_data] * num_models
+        )
+    else:
+        import itertools
+
+        fraction = 1 / args.kfold
+        train_data_kfold = torch.utils.data.random_split(train_data, [fraction] * args.kfold)
+        # for args.kfold==4, we want the (4 choose 2) = 6 possibly pairings of the data subsets
+        # each model always gets half the data, since picking args.kfold/2 per set and kfold%2==0
+        combinations_of_2_subsets = itertools.combinations(train_data_kfold, args.kfold / 2)
+        combinations_of_2_subsets_lis = [combo for combo in combinations_of_2_subsets]
+
+        train_data_split = [
+            torch.utils.data.ConcatDataset([combo[0], combo[1]])
+            for combo in combinations_of_2_subsets_lis
+        ]
+
+    print(f"Total dataset size: {len(train_data)}")
+    print("Returning Datasets - sizes:")
+    for dat in train_data_split:
+        print(len(dat))
 
     return {
         "train": [
@@ -64,12 +85,32 @@ def get_cifar_data_loader(num_models, args):
         ),
     )
 
-    fraction = 1 / num_models
-    train_data_split = (
-        torch.utils.data.random_split(train_data, [fraction] * num_models)
-        if not args.diff_weight_init
-        else [train_data] * num_models
-    )
+    if args.kfold < 3:
+        fraction = 1 / num_models
+        train_data_split = (
+            torch.utils.data.random_split(train_data, [fraction] * num_models)
+            if not args.diff_weight_init
+            else [train_data] * num_models
+        )
+    else:
+        import itertools
+
+        fraction = 1 / args.kfold
+        train_data_kfold = torch.utils.data.random_split(train_data, [fraction] * args.kfold)
+        # for args.kfold==4, we want the (4 choose 2) = 6 possibly pairings of the data subsets
+        # each model always gets half the data, since picking args.kfold/2 per set and kfold%2==0
+        combinations_of_2_subsets = itertools.combinations(train_data_kfold, args.kfold / 2)
+        combinations_of_2_subsets_lis = [combo for combo in combinations_of_2_subsets]
+
+        train_data_split = [
+            torch.utils.data.ConcatDataset([combo[0], combo[1]])
+            for combo in combinations_of_2_subsets_lis
+        ]
+
+    print(f"Total dataset size: {len(train_data)}")
+    print("Returning Datasets - sizes:")
+    for dat in train_data_split:
+        print(len(dat))
 
     return {
         "train": [
@@ -111,12 +152,32 @@ def get_cifar100_data_loader(num_models, args):
         ),
     )
 
-    fraction = 1 / num_models
-    train_data_split = (
-        torch.utils.data.random_split(train_data, [fraction] * num_models)
-        if not args.diff_weight_init
-        else [train_data] * num_models
-    )
+    if args.kfold < 3:
+        fraction = 1 / num_models
+        train_data_split = (
+            torch.utils.data.random_split(train_data, [fraction] * num_models)
+            if not args.diff_weight_init
+            else [train_data] * num_models
+        )
+    else:
+        import itertools
+
+        fraction = 1 / args.kfold
+        train_data_kfold = torch.utils.data.random_split(train_data, [fraction] * args.kfold)
+        # for args.kfold==4, we want the (4 choose 2) = 6 possibly pairings of the data subsets
+        # each model always gets half the data, since picking args.kfold/2 per set and kfold%2==0
+        combinations_of_2_subsets = itertools.combinations(train_data_kfold, args.kfold / 2)
+        combinations_of_2_subsets_lis = [combo for combo in combinations_of_2_subsets]
+
+        train_data_split = [
+            torch.utils.data.ConcatDataset([combo[0], combo[1]])
+            for combo in combinations_of_2_subsets_lis
+        ]
+
+    print(f"Total dataset size: {len(train_data)}")
+    print("Returning Datasets - sizes:")
+    for dat in train_data_split:
+        print(len(dat))
 
     return {
         "train": [
@@ -282,6 +343,10 @@ def test(model, loaders, gpu_id):
 if __name__ == "__main__":
     args = get_train_parameters()
     num_models = args.num_models
+    if args.kfold % 2 == 1:
+        args.kfold = 0
+        print("args.kfold is not even - need even so can give every model 50% of the data.")
+        print("Reverting to default: args.kfold=0")
     loaders = None
     if args.dataset == "cifar10":
         loaders = get_cifar_data_loader(num_models, args)
@@ -315,9 +380,20 @@ if __name__ == "__main__":
 
         print("Test Accuracy of the model %d: %.2f" % (idx, accuracy))
         # store the trained model and performance
+        if args.kfold > 2:
+            kfold_text = args.kfold
+        else:
+            kfold_text = False
         torch.save(
             model,
-            "models/{}_diff_weight_init_{}_{}_{}.pth".format(
-                args.model_name, args.diff_weight_init, args.dataset, idx
+            "models/models_{}/{}_diffWeightInit{}_kfold{}_nrModels{}_{}_eps{}_{}.pth".format(
+                args.model_name,
+                args.model_name,
+                args.diff_weight_init,
+                kfold_text,
+                args.num_models,
+                args.dataset,
+                args.num_epochs,
+                idx,
             ),
         )
