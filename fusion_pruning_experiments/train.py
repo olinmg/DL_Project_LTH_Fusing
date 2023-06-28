@@ -32,7 +32,7 @@ def get_mnist_data_loader(num_models, args):
         train_data_kfold = torch.utils.data.random_split(train_data, [fraction] * args.kfold)
         # for args.kfold==4, we want the (4 choose 2) = 6 possibly pairings of the data subsets
         # each model always gets half the data, since picking args.kfold/2 per set and kfold%2==0
-        combinations_of_2_subsets = itertools.combinations(train_data_kfold, args.kfold / 2)
+        combinations_of_2_subsets = itertools.combinations(train_data_kfold, int(args.kfold / 2))
         combinations_of_2_subsets_lis = [combo for combo in combinations_of_2_subsets]
 
         train_data_split = [
@@ -99,7 +99,7 @@ def get_cifar_data_loader(num_models, args):
         train_data_kfold = torch.utils.data.random_split(train_data, [fraction] * args.kfold)
         # for args.kfold==4, we want the (4 choose 2) = 6 possibly pairings of the data subsets
         # each model always gets half the data, since picking args.kfold/2 per set and kfold%2==0
-        combinations_of_2_subsets = itertools.combinations(train_data_kfold, args.kfold / 2)
+        combinations_of_2_subsets = itertools.combinations(train_data_kfold, int(args.kfold / 2))
         combinations_of_2_subsets_lis = [combo for combo in combinations_of_2_subsets]
 
         train_data_split = [
@@ -166,7 +166,7 @@ def get_cifar100_data_loader(num_models, args):
         train_data_kfold = torch.utils.data.random_split(train_data, [fraction] * args.kfold)
         # for args.kfold==4, we want the (4 choose 2) = 6 possibly pairings of the data subsets
         # each model always gets half the data, since picking args.kfold/2 per set and kfold%2==0
-        combinations_of_2_subsets = itertools.combinations(train_data_kfold, args.kfold / 2)
+        combinations_of_2_subsets = itertools.combinations(train_data_kfold, int(args.kfold / 2))
         combinations_of_2_subsets_lis = [combo for combo in combinations_of_2_subsets]
 
         train_data_split = [
