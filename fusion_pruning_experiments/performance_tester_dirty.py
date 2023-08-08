@@ -5,9 +5,6 @@ import os
 
 import torch
 import torchvision.transforms as transforms
-from torchvision import datasets
-from torchvision.transforms import ToTensor
-
 from fusion_utils import FusionType
 from model_caching import (
     ensure_folder_existence,
@@ -37,6 +34,8 @@ from performance_tester import (
     wrapper_first_fusion,
     wrapper_structured_pruning,
 )
+from torchvision import datasets
+from torchvision.transforms import ToTensor
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -257,7 +256,7 @@ if __name__ == "__main__":
                     this_pruned_model_train_accuracies = this_load_trainhist[:-1]
                 else:
                     this_original_model = [models_original[k]]
-                    this_pruned_model_lis, _, _ = pruning_test_manager(
+                    this_pruned_model_lis, _, prune_iter_acc = pruning_test_manager(
                         input_model_list=this_original_model, prune_params=prune_params, **params
                     )
                     this_pruned_model, epoch_accuracy = train_during_pruning(
@@ -272,7 +271,8 @@ if __name__ == "__main__":
                         save_model(this_model_path, this_pruned_model)
                         save_model_trainHistory(this_model_path, epoch_accuracy)
                     this_pruned_model_accuracy = epoch_accuracy[-1]
-                    this_pruned_model_train_accuracies = epoch_accuracy[:-1]
+                    this_pruned_model_train_accuracies = prune_iter_acc
+                    this_pruned_model_train_accuracies.extend(epoch_accuracy[:-1])
 
                 # train for another num_epochs epochs to create the prune benchmark performance
                 pruned_model_further_trained_path = (

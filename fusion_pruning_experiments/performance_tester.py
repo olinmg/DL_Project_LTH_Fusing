@@ -390,7 +390,7 @@ def wrapper_structured_pruning(input_model, prune_params):
     train_function = train_during_pruning if use_iter_prune else None
     if "prune_iter_steps" in prune_params.keys():
         prune_iter_steps = prune_params.get("prune_iter_steps")
-        pruned_model = prune_structured(
+        pruned_model, prune_iter_acc = prune_structured(
             net=input_model,
             loaders=loaders,
             prune_iter_epochs=prune_iter_epochs,
@@ -403,7 +403,7 @@ def wrapper_structured_pruning(input_model, prune_params):
             train_fct=train_function,
         )
     else:
-        pruned_model = prune_structured(
+        pruned_model, prune_iter_acc= prune_structured(
             net=input_model,
             loaders=loaders,
             prune_iter_epochs=prune_iter_epochs,
@@ -421,7 +421,7 @@ def wrapper_structured_pruning(input_model, prune_params):
         "prune_type": prune_type,
     }
 
-    return pruned_model, description
+    return pruned_model, description, prune_iter_acc
 
 
 from fusion import MSF, fusion_bn
