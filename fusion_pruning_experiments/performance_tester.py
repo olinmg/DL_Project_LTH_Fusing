@@ -204,7 +204,7 @@ def pruning_test_manager(
     for i, input_model in enumerate(input_model_list):
         input_model_copy = copy.deepcopy(input_model)
         # Prune the individual networks (in place)
-        _, description_pruning = pruning_function(
+        _, description_pruning, iter_prune_acc = pruning_function(
             input_model=input_model_copy, prune_params=prune_params
         )
         # input_model_copy,_ = train_during_pruning(model=input_model_copy, loaders=loaders, num_epochs=5, gpu_id = gpu_id, prune=False)
@@ -213,6 +213,7 @@ def pruning_test_manager(
         acc_model_pruned = eval_function(
             input_model=pruned_models[i], loaders=loaders, gpu_id=gpu_id
         )
+        pruned_models_accuracies.extend(iter_prune_acc)
         pruned_models_accuracies.append(acc_model_pruned)
         print(f"Model {i} pruned:\t{acc_model_pruned}")
 
