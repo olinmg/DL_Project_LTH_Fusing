@@ -131,6 +131,82 @@ def get_cifar100_data_loader(num_models, args):
     }
 
 
+import os
+
+
+def get_imagenet_data_loader():
+    traindir = os.path.join("/local/home/stuff/imagenet", "train")
+    valdir = os.path.join("/local/home/stuff/imagenet", "val")
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+
+    train_dataset = datasets.ImageFolder(
+        traindir,
+        transforms.Compose(
+            [
+                transforms.RandomResizedCrop(224),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                normalize,
+            ]
+        ),
+    )
+
+    val_dataset = datasets.ImageFolder(
+        valdir,
+        transforms.Compose(
+            [
+                transforms.Resize(256),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                normalize,
+            ]
+        ),
+    )
+
+    fraction = 1 / num_models
+    original_seed = torch.initial_seed()
+    torch.manual_seed(99)
+    train_data_split = (
+        torch.utils.data.random_split(train_dataset, [fraction] * num_models)
+        if not args.diff_weight_init
+        else [train_dataset] * num_models
+    )
+    torch.manual_seed(original_seed)
+
+    if False:
+        # can turn this on
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+        val_sampler = torch.utils.data.distributed.DistributedSampler(
+            val_dataset, shuffle=False, drop_last=True
+        )
+    else:
+        train_sampler = None
+        val_sampler = None
+
+    train_loader = [
+        torch.utils.data.DataLoader(
+            train_data_subset,
+            batch_size=256,
+            shuffle=(train_sampler is None),
+            num_workers=4,
+            pin_memory=True,
+            sampler=train_sampler,
+        )
+        for train_data_subset in train_data_split
+    ]
+
+    val_loader = torch.utils.data.DataLoader(
+        val_dataset,
+        batch_size=256,
+        shuffle=False,
+        num_workers=4,
+        pin_memory=True,
+        sampler=val_sampler,
+    )
+
+    return {"train": train_loader, "test": val_loader}
+
+
 def train(model, loaders, num_epochs, gpu_id):
     """
     Has to be a function that loads a dataset.
@@ -138,8 +214,8 @@ def train(model, loaders, num_epochs, gpu_id):
     """
 
     loss_func = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.05)
-    # optimizer = optim.SGD(model.parameters(), lr=0.05, momentum=0.9)
+    # optimizer = optim.Adam(model.parameters(), lr = 0.05)
+    optimizer = optim.SGD(model.parameters(), lr=0.05, momentum=0.9)
     model.train()
 
     # Train the model
@@ -180,7 +256,7 @@ def train(model, loaders, num_epochs, gpu_id):
             best_model = copy.deepcopy(model)
             best_model_accuracy = this_epoch_acc
 
-    return best_model, best_model_accuracy
+    return best_model, best_model_accuracy, val_acc_per_epoch
 
 
 # define the testing function
@@ -201,6 +277,7 @@ def test(model, loaders, gpu_id):
             total += 1
     return accuracy_accumulated / total
 
+import json
 
 # actually execute the training and testing
 if __name__ == "__main__":
@@ -209,16 +286,13 @@ if __name__ == "__main__":
     loaders = None
     if args.dataset == "cifar10":
         loaders = get_cifar_data_loader(num_models, args)
-        output_dim = 10
     elif args.dataset == "cifar100":
         print("went in here!!")
         loaders = get_cifar100_data_loader(num_models, args)
-        output_dim = 100
     else:
         loaders = get_mnist_data_loader(num_models, args)
-        output_dim = 10
 
-    model_parent = get_model(args.model_name, output_dim=output_dim)
+    model_parent = get_model(args.model_name, output_dim=100 if args.dataset == "cifar100" else 10)
     for idx, ((layer0_name, fc_layer0_weight), (layer1_name, fc_layer1_weight)) in enumerate(
         zip(model_parent.named_parameters(), model_parent.named_parameters())
     ):
@@ -228,11 +302,11 @@ if __name__ == "__main__":
         model = (
             copy.deepcopy(model_parent)
             if not args.diff_weight_init
-            else get_model(args.model_name, output_dim=output_dim)
+            else get_model(args.model_name, output_dim=100 if args.dataset == "cifar100" else 10)
         )
         if args.gpu_id != -1:
             model = model.cuda(args.gpu_id)
-        model, _ = train(
+        model, _, train_acc_dev = train(
             model,
             {"train": loaders["train"][idx], "test": loaders["test"]},
             args.num_epochs,
@@ -248,3 +322,8 @@ if __name__ == "__main__":
                 args.model_name, args.diff_weight_init, args.dataset, idx
             ),
         )
+
+        with open("models/{}_diff_weight_init_{}_{}_{}.json".format(
+                args.model_name, args.diff_weight_init, args.dataset, idx
+        ), "w") as json_file:
+            json.dump(train_acc_dev, json_file)
