@@ -1,11 +1,11 @@
+import copy
+
 import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.nn.utils.prune as prune
 import torch_pruning as tp
 from torch import nn
-import copy
-
 
 ### TO-DO:
 ### RETURN MODEL
@@ -106,6 +106,8 @@ def prune_structured(
         ch_sparsity=sparsity,  # channel sparsity
         ignored_layers=ignored_layers,  # ignored_layers will not be pruned
     )
+
+    val_accs = []
     for i in range(prune_iter_steps):  # iterative pruning
         print(i)
         pruner.step()
@@ -118,9 +120,9 @@ def prune_structured(
         if train_fct is not None and prune_iter_epochs > 0:
             print(f"Doing iterative retraining for {prune_iter_epochs} epochs")
             model, val_acc_per_epoch = train_fct(model, loaders, prune_iter_epochs, gpu_id)
-
+            val_accs.extend(val_acc_per_epoch)
     # The model is returned, but the pruning is done in situ...
-    return model
+    return model, val_accs
 
 def prune_structured_intra(net, loaders, num_epochs, example_inputs, out_features, prune_type, gpu_id, sparsity=0.5, total_steps=1,train_fct=None):
 
@@ -189,7 +191,6 @@ def prune_structured_intra(net, loaders, num_epochs, example_inputs, out_feature
     #The model is returned, but the pruning is done in situ...
     return models
 
-from torch.autograd import Variable
 from torch import optim
 from torch.autograd import Variable
 
