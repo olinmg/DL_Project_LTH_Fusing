@@ -256,7 +256,7 @@ if __name__ == "__main__":
                     this_pruned_model_train_accuracies = this_load_trainhist[:-1]
                 else:
                     this_original_model = [models_original[k]]
-                    this_pruned_model_lis, _, prune_iter_acc = pruning_test_manager(
+                    this_pruned_model_lis, prune_iter_acc, _ = pruning_test_manager(
                         input_model_list=this_original_model, prune_params=prune_params, **params
                     )
                     this_pruned_model, epoch_accuracy = train_during_pruning(
