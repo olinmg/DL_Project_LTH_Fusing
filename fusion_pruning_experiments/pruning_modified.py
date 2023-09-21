@@ -96,11 +96,11 @@ def prune_structured_new(
     if next(model.parameters()).is_cuda:
         model.to("cpu")
 
-    pruner = tp_n.pruner.LocalMagnitudePruner(
+    pruner = tp_n.pruner.MagnitudePruner(
         model,
         example_inputs,
         importance=imp,
-        total_steps=prune_iter_steps,  # number of iterations
+        iterative_steps=prune_iter_steps,  # number of iterations
         ch_sparsity=sparsity,  # channel sparsity
         ignored_layers=ignored_layers,  # ignored_layers will not be pruned
         optimal_transport=optimal_transport,
@@ -175,7 +175,7 @@ def prune_structured(
     if next(model.parameters()).is_cuda:
         model.to("cpu")
 
-    pruner = tp.pruner.LocalMagnitudePruner(
+    pruner = tp.pruner.MagnitudePruner(
         model,
         example_inputs,
         importance=imp,
