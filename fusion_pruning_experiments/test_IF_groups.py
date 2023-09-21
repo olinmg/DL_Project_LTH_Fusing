@@ -1,5 +1,5 @@
 import copy
-from models import get_pretrained_models
+from train_2 import get_pretrained_model
 from pruning_modified import prune_structured_new
 from torch_pruning_new.optimal_transport import OptimalTransport
 import torch_pruning_new as tp
@@ -16,14 +16,26 @@ def find_ignored_layers(model_original, out_features):
 
 if __name__ == '__main__':
 
-    model_name = "vgg11_bn"
     example_inputs = torch.randn(1, 3, 32, 32)
     out_features = 10
-    file_name = "vgg11_bn_diff_weight_init_False_cifar10_eps300_A"
     gpu_id = -1
 
 
-    model_original = get_pretrained_models(model_name, file_name, gpu_id, 1, output_dim=out_features)[0]
+    config = dict(
+        dataset="Cifar10",
+        model="vgg11_bn",
+        optimizer="SGD",
+        optimizer_decay_at_epochs=[150, 250],
+        optimizer_decay_with_factor=10.0,
+        optimizer_learning_rate=0.1,
+        optimizer_momentum=0.9,
+        optimizer_weight_decay=0.0001,
+        batch_size=256,
+        num_epochs=300,
+        seed=42,
+    )
+
+    model_original,_ = get_pretrained_model(config, "./vgg11_bn_cifar10_300eps.checkpoint")
 
     DG = tp.DependencyGraph().build_dependency(model_original, example_inputs=example_inputs)
 
@@ -37,7 +49,6 @@ if __name__ == '__main__':
     meta_pruning_types = [None, ot]
     sparsities = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
     prune_types = ["l1"]
-
     groups = [i for i in range(num_groups)]
 
     for prune_type in prune_types:
