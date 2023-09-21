@@ -7,6 +7,9 @@ from pruning_modified import prune_structured_new
 from torch_pruning_new.optimal_transport import OptimalTransport
 import torch_pruning_new as tp
 import copy
+from collections import namedtuple
+
+
 
 #Utils
 def find_ignored_layers(model_original, out_features):
@@ -33,7 +36,9 @@ distance_metric = lambda x,y: np.sum(np.abs(x - y))
 
 #load the dataset
 if dataset_name == "cifar10":
-    loaders = get_cifar_data_loader()
+    Args = namedtuple('Args', ['diff_weight_init'])
+    args = Args(diff_weight_init=True)
+    loaders = get_cifar_data_loader(1,args)
     output_dim = 10
 elif dataset_name == "cifar100":
     loaders = get_cifar100_data_loader()
