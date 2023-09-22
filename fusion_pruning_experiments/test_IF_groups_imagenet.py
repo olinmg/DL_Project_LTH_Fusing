@@ -74,7 +74,7 @@ def get_imagenet_data_loader():
     valdir = os.path.join(folder, "val")
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
-    train_dataset = datasets.ImageFolder(
+    '''train_dataset = datasets.ImageFolder(
         traindir,
         transforms.Compose(
             [
@@ -85,7 +85,7 @@ def get_imagenet_data_loader():
             ]
         ),
     )
-
+    '''
     val_dataset = datasets.ImageFolder(
         valdir,
         transforms.Compose(
@@ -108,14 +108,14 @@ def get_imagenet_data_loader():
         train_sampler = None
         val_sampler = None
 
-    train_loader = torch.utils.data.DataLoader(
+    '''train_loader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=128,
         shuffle=(train_sampler is None),
         num_workers=4,
         pin_memory=True,
         sampler=train_sampler,
-    )
+    )'''
 
     val_loader = torch.utils.data.DataLoader(
         val_dataset,
@@ -126,7 +126,7 @@ def get_imagenet_data_loader():
         sampler=val_sampler,
     )
 
-    return {"train": train_loader, "test": val_loader}
+    return {"train": None, "test": val_loader}
 
 import torch.distributed as dist
 from enum import Enum
@@ -347,7 +347,7 @@ def evaluate(input_model, loaders, gpu_id):
 import json
 if __name__ == '__main__':
     
-    example_inputs = torch.randn(1, 3, 32, 32)
+    example_inputs = torch.randn(1, 3, 224, 224)
     out_features = 1000
     gpu_id = 0
     backward_pruning = True
@@ -356,7 +356,7 @@ if __name__ == '__main__':
 
 
     loaders = get_imagenet_data_loader()
-    model_original = get_pretrained_resnet50("./trained_models/resnet50_imagenet_0", gpu_id)
+    model_original = get_pretrained_resnet50("./trained_models/resnet50_imagenet/seed_0/resnet50_imagenet_pretrained_0", gpu_id)
 
     DG = tp.DependencyGraph().build_dependency(model_original, example_inputs=example_inputs)
 
