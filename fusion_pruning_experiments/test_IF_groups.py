@@ -133,8 +133,8 @@ if __name__ == '__main__':
     out_features = 10 if dataset == "Cifar10" else 100
     gpu_id = -1
     backward_pruning = True
-    model_name = "vgg11_bn"
-    file_name = "./vgg11_bn_cifar10_300eps.checkpoint"
+    model_name = "vgg11"
+    file_name = "./vgg11_nobn_cifar10.checkpoint"
 
 
     config = dict(
@@ -201,7 +201,9 @@ if __name__ == '__main__':
                         optimal_transport=meta_prune,
                         backward_pruning=backward_pruning,
                         group_idxs=[group_idx],
-                        train_fct=None)
+                        train_fct=None,
+                        dimensionality_preserving=False
+                        )
                     
                     for ((name_orig, module_orig), (name, module)) in list(zip(model_original.named_modules(), pruned_model.named_modules())):
                         if isinstance(module_orig, (torch.nn.Conv2d, torch.nn.Linear)):

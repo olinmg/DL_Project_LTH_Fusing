@@ -60,6 +60,7 @@ class MetaPruner:
         output_transform: typing.Callable = None,
         optimal_transport: typing.Callable = None,
         backward_pruning = True,
+        dimensionality_preserving = False,
     ):
         self.model = model
         self.importance = importance
@@ -73,6 +74,7 @@ class MetaPruner:
         self.round_to = round_to
 
         self.backward_pruning = backward_pruning #Added this
+        self.dimensionality_preserving = dimensionality_preserving #Added this
 
         # Build dependency graph
         self.DG = dependency.DependencyGraph().build_dependency(
@@ -210,7 +212,7 @@ class MetaPruner:
                 return self.prune_local()
             else:
                 for group in self.prune_local(group_idxs=group_idxs):
-                    group.prune()
+                    group.prune(dimensionality_preserving=self.dimensionality_preserving)
 
     def estimate_importance(self, group, ch_groups=1):
         return self.importance(group, ch_groups=ch_groups)

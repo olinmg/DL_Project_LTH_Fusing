@@ -106,12 +106,13 @@ class Dependency(Edge):
         self.target = target
         self.index_mapping = [None, None]
 
-    def __call__(self, idxs: list, ot_map):
+    def __call__(self, idxs: list, ot_map, dimensionality_preserving=False):
         self.handler.__self__.pruning_dim = self.target.pruning_dim
         result = self.handler(
             self.target.module,
             idxs,
-            ot_map
+            ot_map,
+            dimensionality_preserving=dimensionality_preserving
         )
         return result
 
@@ -156,7 +157,7 @@ class Group(object):
         self._DG = None # for group.prune(idxs=NEW_IDXS)
         self.ot_map = None # Added this
 
-    def prune(self, idxs=None, record_history=True):
+    def prune(self, idxs=None, record_history=True, dimensionality_preserving=False):
         """Prune all coupled layers in the group
         """
         if idxs is not None:
@@ -180,7 +181,7 @@ class Group(object):
                     self._DG.module2node[pruned_parameter] = self._DG.module2node.pop(old_parameter)
                     self._DG.module2node[pruned_parameter].module = pruned_parameter           
                 else:
-                    dep(idxs, self.ot_map)
+                    dep(idxs, self.ot_map, dimensionality_preserving=dimensionality_preserving)
         if record_history:
             root_module, pruning_fn, root_pruning_idx = self[0][0].target.module, self[0][0].trigger, self[0][1]
             root_module_name = self._DG._module2name[root_module]
