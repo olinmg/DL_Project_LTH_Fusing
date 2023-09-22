@@ -345,6 +345,8 @@ def evaluate(input_model, loaders, gpu_id):
 
 
 import json
+import torchvision.models as tvmodels
+
 if __name__ == '__main__':
     
     example_inputs = torch.randn(1, 3, 224, 224)
@@ -356,7 +358,11 @@ if __name__ == '__main__':
 
 
     loaders = get_imagenet_data_loader()
-    model_original = get_pretrained_resnet50("./trained_models/resnet50_imagenet/seed_0/resnet50_imagenet_pretrained_0", gpu_id)
+
+    # using the pretrained model from torchvision
+    model_original = tvmodels.resnet50(pretrained=True)
+
+    # model_original = get_pretrained_resnet50("./trained_models/resnet50_imagenet/seed_0/resnet50_imagenet_pretrained_0", gpu_id)
 
     print(evaluate_performance_imagenet(model_original, loaders, gpu_id=gpu_id))
 
