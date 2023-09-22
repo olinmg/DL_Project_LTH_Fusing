@@ -358,6 +358,8 @@ if __name__ == '__main__':
     loaders = get_imagenet_data_loader()
     model_original = get_pretrained_resnet50("./trained_models/resnet50_imagenet/seed_0/resnet50_imagenet_pretrained_0", gpu_id)
 
+    print(evaluate_performance_imagenet(model_original, loaders, gpu_id=gpu_id))
+
     DG = tp.DependencyGraph().build_dependency(model_original, example_inputs=example_inputs)
 
     ignored_layers = find_ignored_layers(model_original=model_original, out_features=out_features)
