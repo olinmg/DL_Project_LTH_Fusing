@@ -69,7 +69,7 @@ def get_pretrained_resnet50(model_file_path, gpu_id):
 
 import os
 def get_imagenet_data_loader():
-    folder = "/local/home/stuff/imagenet"  # "/local/home/gaf/coolvenv/testarea_imagenetIntegration/fake_imagenet" # "/local/home/stuff/imagenet"
+    folder = "/local/home/gaf/coolvenv/ICLR_env/DL_Project_LTH_Fusing/fusion_pruning_experiments/fake_imagenet" # "/local/home/stuff/imagenet"
     traindir = os.path.join(folder, "train")
     valdir = os.path.join(folder, "val")
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
