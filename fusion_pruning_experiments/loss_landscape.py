@@ -138,7 +138,7 @@ def create_2d_grid(point1, point2, point3, point4, n):
         
     return np.array(list(product(alpha, beta)))
 
-def get_grid(points, n_grid=6, margin=0.2, plot=False):
+def get_grid(points, model_shape, n_grid=6, margin=0.2, plot=False):
 
     #Create Basis
     basis = create_orthonormal_basis(points[0], points[1], points[2])
@@ -172,8 +172,22 @@ def get_grid(points, n_grid=6, margin=0.2, plot=False):
     #Compute the offset
     dif = points[0]-project_to_k_dim_space(two_dims[0], basis)
 
-    #return grid in k-dim space
-    return project_to_k_dim_space(grid, basis)+dif, grid
+    
+    grid_results_list = []
+    for vec_2D in grid:
+        # weight space representation from 2D vec
+        vec_nD = project_to_k_dim_space(vec_2D, basis)+dif
+        # transition nD vector to model
+        model_reconstructed = weight_vec_to_model(torch.from_numpy(vec_nD), model_shape)
+        # compute performance of specified model
+        perf = evaluate(model_reconstructed, loaders, gpu_id=gpu_id)
+        del model_reconstructed
+        torch.cuda.empty_cache()
+        # store results
+        print(perf)
+        this_result_dict = {"model_2D_vec": vec_2D.tolist(), "model_perf": perf}
+        grid_results_list.append(this_result_dict)
+    return grid_results_list
 
 def weight_vec_to_model(weight_vec, target_model_shape):
     new_model = copy.deepcopy(target_model_shape)
@@ -292,20 +306,22 @@ if __name__ == '__main__':
                         dimensionality_preserving=True)
     
     print("Original Model:")  
-    orig_perf = evaluate(model_original, loaders, gpu_id=gpu_id)
+    orig_perf = 0 #evaluate(model_original, loaders, gpu_id=gpu_id)
     orig_model_vec = model_to_weight_vec(model_original)
     print(orig_perf)
     
     print("Intra-Fusion Model:")
-    if_perf = evaluate(if_pruned_model, loaders, gpu_id=gpu_id)
+    if_perf = 0 #evaluate(if_pruned_model, loaders, gpu_id=gpu_id)
     if_model_vec = model_to_weight_vec(if_pruned_model)
     del if_pruned_model
+    torch.cuda.empty_cache()
     print(if_perf)
 
     print("Pruned Model:")
-    pr_perf = evaluate(pruned_model, loaders, gpu_id=gpu_id)
+    pr_perf = 0 # evaluate(pruned_model, loaders, gpu_id=gpu_id)
     pr_model_vec = model_to_weight_vec(pruned_model)
     del pruned_model
+    torch.cuda.empty_cache()
     print(pr_perf)
 
     # see where these nD models lie in the 2D subspace
@@ -319,22 +335,10 @@ if __name__ == '__main__':
     orig_dict = {"model_2D_vec": orig_model_2D.tolist(), "model_perf": orig_perf}
 
     results_dict = {"original": orig_dict, "pruned": pr_dict, "intra_fusion": if_dict}
-
-    grid_nD_list, grid_2D_list = get_grid([if_model_vec.numpy(), pr_model_vec.numpy(), orig_model_vec.numpy()], n_grid=n_grid)
+    results_of_grid = get_grid([if_model_vec.numpy(), pr_model_vec.numpy(), orig_model_vec.numpy()], model_original, n_grid=n_grid)
     
-    performance_list = []
-    grid_results_list = []
-    for idx, diff_vec in enumerate(grid_nD_list):
-        model_reconstructed = weight_vec_to_model(torch.from_numpy(diff_vec), model_original)
-        perf = evaluate(model_reconstructed, loaders, gpu_id=gpu_id)
-        del model_reconstructed
-        performance_list.append(perf)
-        print(perf)
-        this_result_dict = {"model_2D_vec": grid_2D_list[idx].tolist(), "model_perf": perf}
-        grid_results_list.append(this_result_dict)
-        #print("This grid sample: ", evaluate(model_reconstructed, loaders, gpu_id=gpu_id))
     print("Done with loop")
-    results_dict["grid"] = grid_results_list
+    results_dict["grid"] = results_of_grid
     with open(f"./results_of_loss_landscape_{dataset}_{model_name}_grid{n_grid}.json", "w") as json_file:
         json.dump(results_dict, json_file, indent=4)
     print("Done with loop saving")
