@@ -297,10 +297,12 @@ if __name__ == '__main__':
     
     print("Intra-Fusion Model")
     if_perf = evaluate(if_pruned_model, loaders, gpu_id=gpu_id)
+    del if_pruned_model
     print(if_perf)
 
     print("Pruned Model")
     pr_perf = evaluate(pruned_model, loaders, gpu_id=gpu_id)
+    del pruned_model
     print(pr_perf)
 
 
@@ -328,6 +330,7 @@ if __name__ == '__main__':
     for idx, diff_vec in enumerate(grid_nD_list):
         model_reconstructed = weight_vec_to_model(torch.from_numpy(diff_vec), model_original)
         perf = evaluate(model_reconstructed, loaders, gpu_id=gpu_id)
+        del model_reconstructed
         performance_list.append(perf)
         print(perf)
         this_result_dict = {"model_2D_vec": grid_2D_list[idx].tolist(), "model_perf": perf}
