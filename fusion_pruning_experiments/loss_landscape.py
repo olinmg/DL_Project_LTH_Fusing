@@ -41,7 +41,7 @@ def get_cifar10_data_loader():
         ),
         batch_size=128,
         shuffle=True,
-        num_workers=4,
+        num_workers=2,
         pin_memory=True,
     )
 
@@ -58,7 +58,7 @@ def get_cifar10_data_loader():
         ),
         batch_size=128,
         shuffle=False,
-        num_workers=4,
+        num_workers=2,
         pin_memory=True,
     )
 
@@ -87,6 +87,7 @@ def evaluate(input_model, loaders, gpu_id):
             accuracy_accumulated += accuracy
             total += 1
 
+    input_model = input_model.cpu()
     return accuracy_accumulated / total
 
 def model_to_weight_vec(model):
@@ -290,6 +291,10 @@ if __name__ == '__main__':
                         train_fct=None,
                         dimensionality_preserving=True)
     
+    print("Original Model:")  
+    orig_perf = evaluate(model_original, loaders, gpu_id=gpu_id)
+    print(orig_perf)
+    
     print("Intra-Fusion Model")
     if_perf = evaluate(if_pruned_model, loaders, gpu_id=gpu_id)
     print(if_perf)
@@ -298,9 +303,6 @@ if __name__ == '__main__':
     pr_perf = evaluate(pruned_model, loaders, gpu_id=gpu_id)
     print(pr_perf)
 
-    print("Original Model:")  
-    orig_perf = evaluate(model_original, loaders, gpu_id=gpu_id)
-    print(orig_perf)
 
     # transform the given models to nD vectors
     if_model_vec = model_to_weight_vec(if_pruned_model)
