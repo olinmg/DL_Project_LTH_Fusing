@@ -188,7 +188,7 @@ def weight_vec_to_model(weight_vec, target_model_shape):
         vec_idx_counter += layer_target_size
     return new_model
 
-
+import json
 if __name__ == '__main__':
 
 
@@ -205,16 +205,17 @@ if __name__ == '__main__':
         plt.show()
     '''
 
-    model_name = "vgg11_bn"
+    model_name = "vgg11"
+    dataset = "Cifar10"
     example_inputs = torch.randn(1, 3, 32, 32)
     out_features = 10
     file_name = "vgg11_bn_diff_weight_init_False_cifar10_eps300_A"
     gpu_id = -1
-
+    
 
     config = dict(
-        dataset="Cifar10",
-        model="vgg11",
+        dataset=dataset,
+        model=model_name,
         optimizer="SGD",
         optimizer_decay_at_epochs=[30, 60, 90, 120, 150, 180, 210, 240, 270],
         optimizer_decay_with_factor=2.0,
@@ -252,6 +253,7 @@ if __name__ == '__main__':
     meta_pruning_types = [None, ot]
     sparsities = [0.6]
     prune_types = ["l1"]
+    n_grid = 200
 
     print("Doing pruning...")
     if_pruned_model = copy.deepcopy(model_original)
@@ -288,46 +290,63 @@ if __name__ == '__main__':
                         train_fct=None,
                         dimensionality_preserving=True)
     
+    print("Intra-Fusion Model")
+    if_perf = evaluate(if_pruned_model, loaders, gpu_id=gpu_id)
+    print(if_perf)
+
+    print("Pruned Model")
+    pr_perf = evaluate(pruned_model, loaders, gpu_id=gpu_id)
+    print(pr_perf)
+
+    print("Original Model:")  
+    orig_perf = evaluate(model_original, loaders, gpu_id=gpu_id)
+    print(orig_perf)
+
+    # transform the given models to nD vectors
     if_model_vec = model_to_weight_vec(if_pruned_model)
     pr_model_vec = model_to_weight_vec(pruned_model)
     orig_model_vec = model_to_weight_vec(model_original)
 
+    # see where these nD models lie in the 2D subspace
+    basis = create_orthonormal_basis(if_model_vec.numpy(), pr_model_vec.numpy(), orig_model_vec.numpy())
+    if_model_2D = project_to_basis_space(if_model_vec.numpy(), basis)
+    pr_model_2D = project_to_basis_space(pr_model_vec.numpy(), basis)
+    orig_model_2D = project_to_basis_space(orig_model_vec.numpy(), basis)
 
+    if_dict = {"model_2D_vec": if_model_2D.tolist(), "model_perf": if_perf}
+    pr_dict = {"model_2D_vec": pr_model_2D.tolist(), "model_perf": pr_perf}
+    orig_dict = {"model_2D_vec": orig_model_2D.tolist(), "model_perf": orig_perf}
 
-    '''print("Intra-Fusion Model")
-    print(evaluate(if_pruned_model, loaders, gpu_id=gpu_id))
+    results_dict = {"original": orig_dict, "pruned": pr_dict, "intra_fusion": if_dict}
 
-    print("Pruned Model")
-    print(evaluate(pruned_model, loaders, gpu_id=gpu_id))
-
-    print("Original Model:")    
-    print(evaluate(model_original, loaders, gpu_id=gpu_id))'''
-
-    grid_nD_list, grid_2D_list = get_grid([if_model_vec.numpy(), pr_model_vec.numpy(), orig_model_vec.numpy()], n_grid=5)
+    grid_nD_list, grid_2D_list = get_grid([if_model_vec.numpy(), pr_model_vec.numpy(), orig_model_vec.numpy()], n_grid=n_grid)
+    
     performance_list = []
-    for diff_vec in grid_nD_list:
+    grid_results_list = []
+    for idx, diff_vec in enumerate(grid_nD_list):
         model_reconstructed = weight_vec_to_model(torch.from_numpy(diff_vec), model_original)
         perf = evaluate(model_reconstructed, loaders, gpu_id=gpu_id)
         performance_list.append(perf)
         print(perf)
+        this_result_dict = {"model_2D_vec": grid_2D_list[idx].tolist(), "model_perf": perf}
+        grid_results_list.append(this_result_dict)
         #print("This grid sample: ", evaluate(model_reconstructed, loaders, gpu_id=gpu_id))
+    print("Done with loop")
+    results_dict["grid"] = grid_results_list
+    with open(f"./results_of_loss_landscape_{dataset}_{model_name}_grid{n_grid}.json", "w") as json_file:
+        json.dump(results_dict, json_file, indent=4)
+    print("Done with loop saving")
 
-    plt.scatter(*zip(*grid_2D_list), c=performance_list, cmap='viridis', marker='o', s=50)
-    plt.show()
+    #performance_list.extend([if_perf, pr_perf, orig_perf])
+    #grid_2D_list = np.vstack((grid_2D_list, np.array([if_model_2D, pr_model_2D, orig_model_2D])))
 
-    print("Intra-Fusion Model")
-    print(evaluate(if_pruned_model, loaders, gpu_id=gpu_id))
-
-    print("Pruned Model")
-    print(evaluate(pruned_model, loaders, gpu_id=gpu_id))
-
-    print("Original Model:")    
-    print(evaluate(model_original, loaders, gpu_id=gpu_id))
+    #plt.scatter(*zip(*grid_2D_list), c=performance_list, cmap='viridis', marker='o', s=100)
+    #plt.show()
 
     #print("Original Model: ", evaluate(pruned_model, loaders, gpu_id=gpu_id))
     #print("Vec reconstruction: ", evaluate(model_reconstructed, loaders, gpu_id=gpu_id))
 
-    print(if_model_vec.shape)
+    """print(if_model_vec.shape)
     print(pr_model_vec.shape)
     print(orig_model_vec.shape)
 
@@ -340,7 +359,7 @@ if __name__ == '__main__':
 
     for ((name_orig, module_orig), (name, module)) in list(zip(model_original.named_modules(), pruned_model.named_modules())):
         if isinstance(module_orig, (torch.nn.Conv2d, torch.nn.Linear)):
-            print(f"{module_orig.weight.shape} -> {module.weight.shape}")
+            print(f"{module_orig.weight.shape} -> {module.weight.shape}")"""
 
 
 
