@@ -293,23 +293,20 @@ if __name__ == '__main__':
     
     print("Original Model:")  
     orig_perf = evaluate(model_original, loaders, gpu_id=gpu_id)
+    orig_model_vec = model_to_weight_vec(model_original)
     print(orig_perf)
     
     print("Intra-Fusion Model")
     if_perf = evaluate(if_pruned_model, loaders, gpu_id=gpu_id)
+    if_model_vec = model_to_weight_vec(if_pruned_model)
     del if_pruned_model
     print(if_perf)
 
     print("Pruned Model")
     pr_perf = evaluate(pruned_model, loaders, gpu_id=gpu_id)
+    pr_model_vec = model_to_weight_vec(pruned_model)
     del pruned_model
     print(pr_perf)
-
-
-    # transform the given models to nD vectors
-    if_model_vec = model_to_weight_vec(if_pruned_model)
-    pr_model_vec = model_to_weight_vec(pruned_model)
-    orig_model_vec = model_to_weight_vec(model_original)
 
     # see where these nD models lie in the 2D subspace
     basis = create_orthonormal_basis(if_model_vec.numpy(), pr_model_vec.numpy(), orig_model_vec.numpy())
