@@ -91,7 +91,7 @@ def evaluate(input_model, loaders, gpu_id):
     return accuracy_accumulated / total
 
 def model_to_weight_vec(model):
-    weights_dict = model.state_dict()
+    weights_dict = model.cpu().state_dict()
     layer_weights_vec = torch.Tensor([])
     for _, layer_weights in weights_dict.items():
         layer_weights_vec = torch.cat((layer_weights_vec,layer_weights.flatten()), dim=0)
@@ -296,13 +296,13 @@ if __name__ == '__main__':
     orig_model_vec = model_to_weight_vec(model_original)
     print(orig_perf)
     
-    print("Intra-Fusion Model")
+    print("Intra-Fusion Model:")
     if_perf = evaluate(if_pruned_model, loaders, gpu_id=gpu_id)
     if_model_vec = model_to_weight_vec(if_pruned_model)
     del if_pruned_model
     print(if_perf)
 
-    print("Pruned Model")
+    print("Pruned Model:")
     pr_perf = evaluate(pruned_model, loaders, gpu_id=gpu_id)
     pr_model_vec = model_to_weight_vec(pruned_model)
     del pruned_model
