@@ -163,7 +163,8 @@ class MetaPruner:
                     if isinstance(dep.source.module, (torch.nn.BatchNorm2d, torch.nn.BatchNorm1d)) and \
                         isinstance(dep.target.module, (torch.nn.Linear, torch.nn.Conv2d, torch.nn.Conv1d)):
                         conv = dep.target.module.weight
-                        conv_bias = dep.target.module.bias
+                        # conv_bias = dep.target.module.bias
+                        conv_bias = dep.target.module.bias if not dep.target.module.bias is None else 0.0
                         conv_mean = dep.source.module.running_mean# state_dict[f'{name_bn}.running_mean'].double()
                         conv_var = torch.sqrt(dep.source.module.running_var) #torch.sqrt(state_dict[f'bn1.running_var']).double()
                         conv_gamma = dep.source.module.weight #state_dict[f'bn1.weight'].double()
