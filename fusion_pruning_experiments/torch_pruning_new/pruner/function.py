@@ -93,8 +93,11 @@ class BasePruningFunc(ABC):
         layer = pruning_fn(layer, idxs)
         return layer
 
-    def _prune_parameter_and_grad(self, weight, keep_idxs, pruning_dim, ot_map=None):
+    def _prune_parameter_and_grad(self, weight, keep_idxs, pruning_dim, ot_map=None, dimensionality_preserving: bool = False):
         if ot_map != None:
+            if dimensionality_preserving:
+                ot_map = torch.cat((ot_map, torch.zeros(weight.shape[pruning_dim] - ot_map.shape[0], ot_map.shape[1])))
+
             w_shape = weight.shape
 
             einsum_str = f"{alc[len(w_shape)]}{alc[pruning_dim]}, {alc[:len(w_shape)]} -> {alc[:pruning_dim] if pruning_dim != 0 else ''}{alc[len(w_shape)]}{alc[pruning_dim+1:len(w_shape)] if pruning_dim != len(w_shape)-1 else ''}"
@@ -114,12 +117,22 @@ class BasePruningFunc(ABC):
                     weight, pruning_dim, torch.LongTensor(keep_idxs).to(weight.device)
                 )
             )
+            if dimensionality_preserving:
+                shape_new = list(pruned_weight.shape)
+                shape_new[pruning_dim] = weight.shape[pruning_dim] - pruned_weight.shape[pruning_dim]
+                pruned_weight = torch.nn.Parameter(torch.cat((pruned_weight, torch.zeros(shape_new)), pruning_dim))
+
             if weight.grad is not None:
                 pruned_weight.grad = torch.index_select(
                     weight.grad,
                     pruning_dim,
                     torch.LongTensor(keep_idxs).to(weight.device),
                 )
+                if dimensionality_preserving:
+                    shape_new = list(pruned_weight.grad.shape)
+                    shape_new[pruning_dim] = weight.grad.shape[pruning_dim] - pruned_weight.grad.shape[pruning_dim]
+                    pruned_weight.grad = torch.cat((pruned_weight.grad, torch.zeros(shape_new)), pruning_dim)
+        
         return pruned_weight.to(weight.device)
 
 
@@ -127,28 +140,28 @@ class ConvPruner(BasePruningFunc):
     TARGET_MODULE = ops.TORCH_CONV
 
     def prune_out_channels(
-        self, layer: nn.Module, idxs: Sequence[int], ot_map: torch.Tensor = None
+        self, layer: nn.Module, idxs: Sequence[int], ot_map: torch.Tensor = None, dimensionality_preserving: bool = False
     ) -> nn.Module:
         keep_idxs = list(set(range(layer.out_channels)) - set(idxs))
         keep_idxs.sort()
         layer.out_channels = layer.out_channels - len(idxs)
         if not layer.transposed:
             layer.weight = self._prune_parameter_and_grad(
-                layer.weight, keep_idxs, 0, ot_map
+                layer.weight, keep_idxs, 0, ot_map, dimensionality_preserving=dimensionality_preserving
             )
         else:
             layer.weight = self._prune_parameter_and_grad(
-                layer.weight, keep_idxs, 1, ot_map
+                layer.weight, keep_idxs, 1, ot_map, dimensionality_preserving=dimensionality_preserving
             )
 
         if layer.bias is not None:
             layer.bias = self._prune_parameter_and_grad(
-                layer.bias, keep_idxs, 0, ot_map
+                layer.bias, keep_idxs, 0, ot_map, dimensionality_preserving=dimensionality_preserving
             )
         return layer
 
     def prune_in_channels(
-        self, layer: nn.Module, idxs: Sequence[int], ot_map: torch.Tensor = None
+        self, layer: nn.Module, idxs: Sequence[int], ot_map: torch.Tensor = None, dimensionality_preserving: bool = False
     ) -> nn.Module:
         keep_idxs = list(set(range(layer.in_channels)) - set(idxs))
         keep_idxs.sort()
@@ -158,11 +171,11 @@ class ConvPruner(BasePruningFunc):
 
         if not layer.transposed:
             layer.weight = self._prune_parameter_and_grad(
-                layer.weight, keep_idxs, 1, ot_map
+                layer.weight, keep_idxs, 1, ot_map, dimensionality_preserving=dimensionality_preserving
             )
         else:
             layer.weight = self._prune_parameter_and_grad(
-                layer.weight, keep_idxs, 0, ot_map
+                layer.weight, keep_idxs, 0, ot_map, dimensionality_preserving=dimensionality_preserving
             )
         # no bias pruning because it does not change the output channels
         return layer
@@ -197,28 +210,28 @@ class LinearPruner(BasePruningFunc):
     TARGET_MODULES = ops.TORCH_LINEAR
 
     def prune_out_channels(
-        self, layer: nn.Module, idxs: Sequence[int], ot_map: torch.Tensor = None
+        self, layer: nn.Module, idxs: Sequence[int], ot_map: torch.Tensor = None, dimensionality_preserving: bool = False
     ) -> nn.Module:
         keep_idxs = list(set(range(layer.out_features)) - set(idxs))
         keep_idxs.sort()
         layer.out_features = layer.out_features - len(idxs)
         layer.weight = self._prune_parameter_and_grad(
-            layer.weight, keep_idxs, 0, ot_map
+            layer.weight, keep_idxs, 0, ot_map, dimensionality_preserving = dimensionality_preserving
         )
         if layer.bias is not None:
             layer.bias = self._prune_parameter_and_grad(
-                layer.bias, keep_idxs, 0, ot_map
+                layer.bias, keep_idxs, 0, ot_map, dimensionality_preserving= dimensionality_preserving
             )
         return layer
 
     def prune_in_channels(
-        self, layer: nn.Module, idxs: Sequence[int], ot_map: torch.Tensor = None
+        self, layer: nn.Module, idxs: Sequence[int], ot_map: torch.Tensor = None, dimensionality_preserving: bool = False
     ) -> nn.Module:
         keep_idxs = list(set(range(layer.in_features)) - set(idxs))
         keep_idxs.sort()
         layer.in_features = layer.in_features - len(idxs)
         layer.weight = self._prune_parameter_and_grad(
-            layer.weight, keep_idxs, 1, ot_map
+            layer.weight, keep_idxs, 1, ot_map, dimensionality_preserving = dimensionality_preserving
         )
         return layer
 
@@ -233,7 +246,7 @@ class BatchnormPruner(BasePruningFunc):
     TARGET_MODULES = ops.TORCH_BATCHNORM
 
     def prune_out_channels(
-        self, layer: nn.Module, idxs: Sequence[int], ot_map: torch.Tensor = None
+        self, layer: nn.Module, idxs: Sequence[int], ot_map: torch.Tensor = None, dimensionality_preserving: bool = False
     ) -> nn.Module:
         keep_idxs = list(set(range(layer.num_features)) - set(idxs))
         keep_idxs.sort()

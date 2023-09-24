@@ -59,7 +59,7 @@ class DummyPruner(object):
     def __call__(self, layer, *args, **kargs):
         return layer
 
-    def prune_out_channels(self, layer, idxs, ot_map=None):
+    def prune_out_channels(self, layer, idxs, ot_map=None, dimensionality_preserving=False):
         return layer
 
     prune_in_channels = prune_out_channels

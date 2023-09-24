@@ -61,6 +61,7 @@ def prune_structured_new(
     backward_pruning=True,
     group_idxs=None,
     train_fct=None,
+    dimensionality_preserving=False
 ):
     print(f"Structured pruning with type {prune_type} and channel sparsity {sparsity}")
     ori_size = tp_n.utils.count_params(model)
@@ -104,7 +105,8 @@ def prune_structured_new(
         ch_sparsity=sparsity,  # channel sparsity
         ignored_layers=ignored_layers,  # ignored_layers will not be pruned
         optimal_transport=optimal_transport,
-        backward_pruning=backward_pruning
+        backward_pruning=backward_pruning,
+        dimensionality_preserving=dimensionality_preserving
     )
 
     for i in range(prune_iter_steps):  # iterative pruning
