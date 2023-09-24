@@ -7,6 +7,9 @@ from pruning_modified import prune_structured_new
 from torch_pruning_new.optimal_transport import OptimalTransport
 import torch_pruning_new as tp
 import copy
+from collections import namedtuple
+
+
 
 #Utils
 def find_ignored_layers(model_original, out_features):
@@ -33,14 +36,54 @@ distance_metric = lambda x,y: np.sum(np.abs(x - y))
 
 #load the dataset
 if dataset_name == "cifar10":
-    loaders = get_cifar_data_loader()
+    Args = namedtuple('Args', ['diff_weight_init'])
+    args = Args(diff_weight_init=True)
+    loaders = get_cifar_data_loader(1,args)
     output_dim = 10
 elif dataset_name == "cifar100":
     loaders = get_cifar100_data_loader()
     output_dim = 100
 
 #get three types of models: original, pruned and Intra-Fusion
+    config = dict(
+        dataset="Cifar10",
+        model="vgg11_bn",
+        optimizer="SGD",
+        optimizer_decay_at_epochs=[150, 250],
+        optimizer_decay_with_factor=10.0,
+        optimizer_learning_rate=0.1,
+        optimizer_momentum=0.9,
+        optimizer_weight_decay=0.0001,
+        batch_size=256,
+        num_epochs=300,
+        seed=42,
+    )
+
+
 original_models = get_pretrained_models(None, original_model_basis_name, gpu_id, num_models, output_dim=output_dim)
+
+
+### loading model
+from train_2 import get_pretrained_model
+
+config = dict(
+    dataset="Cifar10",
+    model="vgg11_bn",
+    optimizer="SGD",
+    optimizer_decay_at_epochs=[150, 250],
+    optimizer_decay_with_factor=10.0,
+    optimizer_learning_rate=0.1,
+    optimizer_momentum=0.9,
+    optimizer_weight_decay=0.0001,
+    batch_size=256,
+    num_epochs=300,
+    seed=42,
+)
+model_original,_ = get_pretrained_model(config, "./vgg11_bn_cifar10_300eps.checkpoint")
+original_models=[model_original]
+###
+
+
 print("Got the models")
 
 results = {}
