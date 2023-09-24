@@ -7,6 +7,7 @@ import torch.nn.utils.prune as prune
 import torch_pruning as tp
 import torch_pruning_new as tp_n
 from torch import nn
+import json
 
 ### TO-DO:
 ### RETURN MODEL
@@ -47,6 +48,25 @@ def prune_unstructured(net, prune_type, amount=0.2):
     else:
         raise ValueError("Prune type not supported")
 
+def taylor_loss(model, loaders, gpu_id):
+
+    loss_func = torch.nn.CrossEntropyLoss() 
+    if gpu_id != -1:
+        model.cuda(gpu_id)
+
+    accuracy_accumulated = 0
+    total = 0
+
+    for images, labels in loaders["test"]:
+        if gpu_id != -1:
+            images, labels = images.cuda(), labels.cuda()
+        test_output = model(images)
+
+        loss = loss_func(test_output, labels)
+        loss.backward()   
+
+    model.cpu()
+
 def prune_structured_new(
     model,
     loaders,
@@ -77,8 +97,8 @@ def prune_structured_new(
         imp = tp_n.importance.MagnitudeImportance(2)
     elif prune_type == "l_inf":
         imp = tp_n.importance.MagnitudeImportance(np.inf)
-    elif prune_type == "hessian":
-        imp = tp_n.importance.HessianImportance()
+    elif prune_type == "taylor":
+        imp = tp_n.importance.TaylorImportance()
     elif prune_type == "bnscale":
         imp = tp_n.importance.BNScaleImportance()
     elif prune_type == "structural":
@@ -109,6 +129,10 @@ def prune_structured_new(
         dimensionality_preserving=dimensionality_preserving
     )
 
+    if prune_type == "taylor":
+        taylor_loss(model, loaders, gpu_id)
+
+
     for i in range(prune_iter_steps):  # iterative pruning
         print(i)
         pruner.step(group_idxs=group_idxs)
@@ -131,7 +155,7 @@ def prune_structured_new(
 # Train fct: a function that takes the model and the data loaders as input and trains the model
 def prune_structured(
     net,
-    loaders,
+    dataset: str,
     prune_iter_epochs,
     example_inputs,
     out_features,
@@ -198,7 +222,7 @@ def prune_structured(
 
         if train_fct is not None and prune_iter_epochs > 0:
             print(f"Doing iterative retraining for {prune_iter_epochs} epochs")
-            model, val_acc_per_epoch = train_fct(model, loaders, prune_iter_epochs, gpu_id)
+            model, val_acc_per_epoch = train_fct(model, dataset, prune_iter_epochs, gpu_id)
             val_accs.extend(val_acc_per_epoch)
     # The model is returned, but the pruning is done in situ...
     return model, val_accs
