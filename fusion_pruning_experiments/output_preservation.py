@@ -2,13 +2,13 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from train import get_cifar_data_loader, get_cifar100_data_loader
-from models import get_pretrained_models
+# from models import get_pretrained_models
 from pruning_modified import prune_structured_new
 from torch_pruning_new.optimal_transport import OptimalTransport
 import torch_pruning_new as tp
 import copy
 from collections import namedtuple
-
+import json
 
 
 #Utils
@@ -21,18 +21,17 @@ def find_ignored_layers(model_original, out_features):
     return ignored_layers
 
 #Parameters (specify via params later)
-original_model_basis_name = "vgg11_bn_diff_weight_init_False_cifar10_eps300_A"
+original_model_basis_name = "resnet18"
 gpu_id = -1
 num_models = 1
 dataset_name = "cifar10"
 prune_iter_epochs = 1
 example_inputs = torch.randn(1, 3, 32, 32)
-sparsities = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-prune_types = ["l1"]
+sparsities = [idx/10 for idx in range(1,10)]
+prune_types = ["l1", "l2"]
 create_plots = True
 #Parameters for histogram pruning
-distance_metric = lambda x,y: np.sum(np.abs(x - y))
-
+distance_metric = lambda x,y: (torch.sum((x - y)**2))**0.5
 
 #load the dataset
 if dataset_name == "cifar10":
@@ -47,7 +46,7 @@ elif dataset_name == "cifar100":
 #get three types of models: original, pruned and Intra-Fusion
     config = dict(
         dataset="Cifar10",
-        model="vgg11_bn",
+        model="resnet18",
         optimizer="SGD",
         optimizer_decay_at_epochs=[150, 250],
         optimizer_decay_with_factor=10.0,
@@ -60,7 +59,7 @@ elif dataset_name == "cifar100":
     )
 
 
-original_models = get_pretrained_models(None, original_model_basis_name, gpu_id, num_models, output_dim=output_dim)
+# original_models = get_pretrained_models(None, original_model_basis_name, gpu_id, num_models, output_dim=output_dim)
 
 
 ### loading model
@@ -68,7 +67,7 @@ from train_2 import get_pretrained_model
 
 config = dict(
     dataset="Cifar10",
-    model="vgg11_bn",
+    model="resnet18",
     optimizer="SGD",
     optimizer_decay_at_epochs=[150, 250],
     optimizer_decay_with_factor=10.0,
@@ -79,7 +78,7 @@ config = dict(
     num_epochs=300,
     seed=42,
 )
-model_original,_ = get_pretrained_model(config, "./vgg11_bn_cifar10_300eps.checkpoint")
+model_original,_ = get_pretrained_model(config, "models/resnet18_cifar10_0.checkpoint")
 original_models=[model_original]
 ###
 
@@ -125,7 +124,7 @@ for idx in range(num_models):
                 
                 if_model = copy.deepcopy(model_original)
                 prune_structured_new(
-                        pruned_model,
+                        if_model,
                         None,
                         None,
                         example_inputs,
@@ -154,19 +153,27 @@ for idx in range(num_models):
                 #compute the distances of the models
                 distances_pruned, distances_if = [], []
                 for i in range(len(outputs_original)):
-                    distances_pruned.append(distance_metric(outputs_original[i], output_pruned[i]))
-                    distances_if.append(distance_metric(outputs_original[i], output_if[i]))
+                    for idx in range(len(outputs_original[i])):
+                        distances_pruned.append(distance_metric(outputs_original[i][idx], output_pruned[i][idx]))
+                        distances_if.append(distance_metric(outputs_original[i][idx], output_if[i][idx]))
                 
                 key_tuple = (idx, prune_type, group_idx, sparsity, original_model_basis_name)
                 results[key_tuple] = (distances_pruned, distances_if)
 
                 if create_plots:
                     #plot the histograms in one single plot
+                    bin_edges = np.arange(min(distances_pruned), max(distances_pruned) + 0.5, 0.5)
                     plt.figure()
-                    plt.hist(distances_pruned, bins=20, alpha=0.5, label='Pruned')
-                    plt.hist(distances_if, bins=20, alpha=0.5, label='Intra-Fusion')
+                    plt.hist(distances_pruned, bins=bin_edges, alpha=0.5, label='Pruned')
+                    plt.hist(distances_if, bins=bin_edges, alpha=0.5, label='Intra-Fusion')
                     plt.legend(loc='upper right')
                     plt.title(f"Distance Histogram for {original_model_basis_name}")
                     plt.xlabel("Distance")
                     plt.ylabel("Frequency")
-                    plt.savefig(f"distance_histogram_{original_model_basis_name}_{idx}_{prune_type}_{group_idx}_{sparsity}.png")
+                    plt.savefig(f"distance_histogram_{original_model_basis_name}_Num{idx}_PruneType{prune_type}_GroupIdx{group_idx}_Sparsity{sparsity}.png")
+
+file_path = "output_preservation.json"
+
+# Write the dictionary to the JSON file
+with open(file_path, "w") as json_file:
+    json.dump(results, json_file)
