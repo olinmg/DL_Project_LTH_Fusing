@@ -320,6 +320,8 @@ def train_during_pruning(model, loaders, num_epochs, gpu_id, prune=True, perform
             predictions = model(images)
             loss = loss_func(predictions, labels)
 
+            #print("loss is: ", loss)
+
             # clear gradients for this training step
             optimizer.zero_grad()
 

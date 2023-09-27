@@ -627,6 +627,7 @@ def intrafusion_bn(network, fusion_type, sparsity, prune_type="l1", full_model =
         norm_layer = fusion_layer.get_norm(prune_type)
 
         _, indices = torch.topk(norm_layer, amount_pruned)
+        indices, _ = torch.sort(indices) # CHECK CHECK CHECK
 
         #indices, _= torch.sort(indices)
         #print("indices are: ", indices)
@@ -637,7 +638,6 @@ def intrafusion_bn(network, fusion_type, sparsity, prune_type="l1", full_model =
         for vec in comp_vec:
             basis_weight.append(torch.index_select(vec, 0, indices))
         
-
         M = [get_ground_metric(fusion_layer.create_comparison_vec()[0], basis_weight[0].view(basis_weight[0].shape[0], -1), None, None)]
         if len(comp_vec) > 1:
             for i in range(1, len(comp_vec)):
@@ -646,6 +646,9 @@ def intrafusion_bn(network, fusion_type, sparsity, prune_type="l1", full_model =
             M = torch.mean(M, dim=0)
         else:
             M = M[0]
+        
+        """print("comp_vecs: ", len(comp_vec))
+        print("cost; ", M[0,:])"""
 
         mu = get_histogram(basis_weight[0].shape[0], indices = None)
 
@@ -678,6 +681,9 @@ def intrafusion_bn(network, fusion_type, sparsity, prune_type="l1", full_model =
 
         T_var = torch.matmul(T_var, marginals)
         T_var = T_var / T_var.sum(dim=0)
+
+        """print("T_var shape: ", T_var.shape)
+        print(T_var.t()[0,:])"""
 
         #print("fusion layer before permute: ", fusion_layer.weight.view(fusion_layer.weight.shape[0], -1)[:,0])
         #fusion_layer.permute_parameters(T_var)

@@ -106,10 +106,11 @@ class Fusion_Layer():
     def align_weights(self,T_var):
         if self.skip_align != None:
             self.skip_align.align_weights(T_var)
-        if self.is_conv:
+        if self.is_conv:         
             weight_reshaped = self.weight.view(self.weight.shape[0], self.weight.shape[1], -1)
             T_var_conv = T_var.unsqueeze(0).repeat(weight_reshaped.shape[2], 1, 1)
             aligned_wt = torch.bmm(weight_reshaped.permute(2, 0, 1), T_var_conv).permute(1, 2, 0)
+
         else:
             if self.prev.is_conv:
                 # Handles the switch from convolutional layers to fc layers
@@ -196,12 +197,12 @@ class Fusion_Layer():
             self.skip_ot_2.permute_parameters(T_var)
         
         w_shape = self.weight.shape
+
         self.weight = torch.matmul(T_var.t(), self.weight.contiguous().view(self.weight.shape[0], -1))
         if len(w_shape) == 3:
             self.weight = self.weight.view(-1, w_shape[1], int(math.sqrt(w_shape[2])), int(math.sqrt(w_shape[2])))
         elif len(w_shape) == 4:
             self.weight = self.weight.view(-1, w_shape[1], w_shape[2], w_shape[3])
-
 
         if self.bias != None:
             self.bias = torch.matmul(T_var.t(), self.bias.view(self.bias.shape[0], -1)).flatten()
