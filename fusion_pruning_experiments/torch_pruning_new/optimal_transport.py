@@ -104,7 +104,7 @@ class OptimalTransport:
                         torch.cat((w, layer.bias), dim=1)
                 else:
                     w = layer.weight.data[idxs].flatten(1)
-                w / torch.mean((w - torch.mean(w, dim=0)) ** 2, dim=0)
+                #w / torch.mean((w - torch.mean(w, dim=0)) ** 2, dim=0)
                 w_all.append(w)
 
             # in_channels
@@ -116,7 +116,7 @@ class OptimalTransport:
                     w = (layer.weight)[idxs].flatten(1)
                 else:
                     w = (layer.weight).transpose(0, 1)[idxs].flatten(1)
-                w / torch.mean((w - torch.mean(w, dim=0)) ** 2, dim=0)
+                #w / torch.mean((w - torch.mean(w, dim=0)) ** 2, dim=0)
                 w_all.append(w)
 
             if keep_idxs == None:
