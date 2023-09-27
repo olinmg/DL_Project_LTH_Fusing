@@ -81,12 +81,13 @@ class OptimalTransport:
 
         weights0 = weights0.cpu()
         weights1 = weights1.cpu()
-        return self._normalize(distance, "mean").cpu()
+        return distance#self._normalize(distance, "mean").cpu()
 
     @torch.no_grad()
     def __call__(self, group, importance, pruning_idxs):
         keep_idxs = None
         w_all = []
+
         for dep, idxs in group:
             idxs.sort()
             layer = dep.target.module
@@ -99,8 +100,12 @@ class OptimalTransport:
             ]:
                 if hasattr(layer, "transposed") and layer.transposed:
                     w = layer.weight.data.transpose(1, 0)[idxs].flatten(1)
+                    if layer.bias:
+                        torch.cat((w, layer.bias), dim=1)
                 else:
                     w = layer.weight.data[idxs].flatten(1)
+                w / torch.mean((w - torch.mean(w, dim=0)) ** 2, dim=0)
+                w_all.append(w)
 
             # in_channels
             elif prune_fn in [
@@ -111,6 +116,8 @@ class OptimalTransport:
                     w = (layer.weight)[idxs].flatten(1)
                 else:
                     w = (layer.weight).transpose(0, 1)[idxs].flatten(1)
+                w / torch.mean((w - torch.mean(w, dim=0)) ** 2, dim=0)
+                w_all.append(w)
 
             if keep_idxs == None:
                 keep_idxs = list(
@@ -118,7 +125,7 @@ class OptimalTransport:
                     - set(int(i) for i in pruning_idxs)
                 )
 
-            w_all.append(w)
+            #w_all.append(w)
 
         if len(w_all) == 0:
             return
@@ -156,3 +163,20 @@ class OptimalTransport:
         ot_map = ot_map / ot_map.sum(dim=0)
 
         return ot_map.float()
+        """ot_map = ot.emd(
+                source_prob, target_prob, cost.detach().cpu().numpy()
+            )#.transpose()
+        
+        ot_map = torch.from_numpy(ot_map)
+        
+        ot_map *= self._probability(
+            self.coefficients, cost.shape[0], importance, keep_idxs
+        )[:,None]
+
+        marginals = torch.ones(ot_map.shape[1]) / ot_map.shape[0]
+        marginals = torch.diag(1.0/(marginals + 1e-7))  # take inverse
+
+        ot_map = torch.matmul(ot_map.float(), marginals)
+        ot_map = ot_map / ot_map.sum(dim=0)
+
+        return ot_map.t().float()"""

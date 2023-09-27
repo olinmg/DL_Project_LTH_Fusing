@@ -95,8 +95,14 @@ class BasePruningFunc(ABC):
 
     def _prune_parameter_and_grad(self, weight, keep_idxs, pruning_dim, ot_map=None, dimensionality_preserving: bool = False):
         if ot_map != None:
+            ot_map_new = torch.zeros(torch.cat((ot_map, torch.zeros(weight.shape[pruning_dim] - ot_map.shape[0], ot_map.shape[1]))).shape)
+            keep_idxs_counter = 0
             if dimensionality_preserving:
-                ot_map = torch.cat((ot_map, torch.zeros(weight.shape[pruning_dim] - ot_map.shape[0], ot_map.shape[1])))
+                for dim_idx in range(weight.shape[pruning_dim]):
+                    if dim_idx in keep_idxs:
+                        ot_map_new[dim_idx] = ot_map[keep_idxs_counter]
+                        keep_idxs_counter += 1
+                ot_map = ot_map_new
 
             w_shape = weight.shape
 
@@ -118,9 +124,15 @@ class BasePruningFunc(ABC):
                 )
             )
             if dimensionality_preserving:
-                shape_new = list(pruned_weight.shape)
-                shape_new[pruning_dim] = weight.shape[pruning_dim] - pruned_weight.shape[pruning_dim]
-                pruned_weight = torch.nn.Parameter(torch.cat((pruned_weight, torch.zeros(shape_new)), pruning_dim))
+                m = torch.eye(weight.shape[pruning_dim], weight.shape[pruning_dim])
+                prune_indices = list(set(range(weight.shape[pruning_dim])) - set(keep_idxs))
+
+                m[prune_indices] = torch.zeros([1, weight.shape[pruning_dim]])
+
+                w_shape = weight.shape
+                einsum_str = f"{alc[len(w_shape)]}{alc[pruning_dim]}, {alc[:len(w_shape)]} -> {alc[:pruning_dim] if pruning_dim != 0 else ''}{alc[len(w_shape)]}{alc[pruning_dim+1:len(w_shape)] if pruning_dim != len(w_shape)-1 else ''}"
+                pruned_weight = torch.nn.Parameter(torch.einsum(einsum_str, m, weight))
+
 
             if weight.grad is not None:
                 pruned_weight.grad = torch.index_select(
@@ -248,14 +260,15 @@ class BatchnormPruner(BasePruningFunc):
     def prune_out_channels(
         self, layer: nn.Module, idxs: Sequence[int], ot_map: torch.Tensor = None, dimensionality_preserving: bool = False
     ) -> nn.Module:
-        keep_idxs = list(set(range(layer.num_features)) - set(idxs))
-        keep_idxs.sort()
-        layer.num_features = layer.num_features - len(idxs)
-        layer.running_mean = layer.running_mean.data[keep_idxs]
-        layer.running_var = layer.running_var.data[keep_idxs]
-        if layer.affine:
-            layer.weight = self._prune_parameter_and_grad(layer.weight, keep_idxs, 0)
-            layer.bias = self._prune_parameter_and_grad(layer.bias, keep_idxs, 0)
+        if not dimensionality_preserving:
+            keep_idxs = list(set(range(layer.num_features)) - set(idxs))
+            keep_idxs.sort()
+            layer.num_features = layer.num_features - len(idxs)
+            layer.running_mean = layer.running_mean.data[keep_idxs]
+            layer.running_var = layer.running_var.data[keep_idxs]
+            if layer.affine:
+                layer.weight = self._prune_parameter_and_grad(layer.weight, keep_idxs, 0)
+                layer.bias = self._prune_parameter_and_grad(layer.bias, keep_idxs, 0)
         return layer
 
     prune_in_channels = prune_out_channels
