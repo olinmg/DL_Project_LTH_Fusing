@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 from train import get_cifar_data_loader, get_cifar100_data_loader
 # from models import get_pretrained_models
 from pruning_modified import prune_structured_new
@@ -74,6 +75,9 @@ def main(selected_model):
 
     original_models = [model_original]
 
+    model_str_name = {"vgg11_bn": "VGG11-BN",
+                      "resnet18": "ResNet18"}
+
     print("Got the models")
 
     results = {}
@@ -92,8 +96,8 @@ def main(selected_model):
         groups = [i for i in range(num_groups)]
 
         # Prune whole network
-        groups = [None]
-
+        groups = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+        softmax = torch.nn.Softmax(dim=1)
         for prune_type in prune_types:
             for group_idx in groups:
                 print(group_idx)
@@ -130,6 +134,10 @@ def main(selected_model):
                         backward_pruning=True,
                         group_idxs=None,
                         train_fct=None)
+                    
+                    if_model.cuda(0)
+                    pruned_model.cuda(0)
+                    model_original.cuda(0)
 
                     # Compare the outputs of the models
                     outputs_original, output_pruned, output_if = [], [], []
@@ -137,6 +145,7 @@ def main(selected_model):
                     with torch.no_grad():
 
                         for i, (inputs, _) in enumerate(loaders["test"]):
+                            inputs = inputs.cuda(0)
 
                             outputs_original.append(model_original(inputs))
                             output_pruned.append(pruned_model(inputs))
@@ -156,14 +165,26 @@ def main(selected_model):
                     if create_plots:
                         # Plot the histograms in one single plot
                         bin_edges = np.arange(min(distances_pruned), max(distances_pruned) + 0.5, 0.5)
+
+                        # Create a figure and axis
                         plt.figure()
-                        plt.hist(distances_pruned, bins=bin_edges, alpha=0.5, label='Pruned')
-                        plt.hist(distances_if, bins=bin_edges, alpha=0.5, label='Intra-Fusion')
-                        plt.legend(loc='upper right')
-                        plt.title(f"Distance Histogram for {original_model_basis_name}")
+                        ax = plt.gca()
+
+                        # Plot the histograms using Seaborn
+                        sns.histplot(distances_pruned, bins=bin_edges, label='Default', color='lightcoral', alpha=0.5)
+                        sns.histplot(distances_if, bins=bin_edges, label='Intra-Fusion', color='blue', alpha=0.5)
+
+                        plt.axvline(np.mean(distances_pruned), color='lightcoral', linestyle='dashed', linewidth=2, label=f'Mean (Default): {np.mean(distances_pruned):.2f}')
+                        plt.axvline(np.mean(distances_if), color='blue', linestyle='dashed', linewidth=2, label=f'Mean (Intra-Fusion): {np.mean(distances_if):.2f}')
+
+
+                        # Add labels and legend
+                        plt.title(f"Distance Histogram for {model_str_name[original_model_basis_name]}")
                         plt.xlabel("Distance to outputs of the original model")
                         plt.ylabel("Frequency")
-                        plt.savefig(f"plots_friedrich/distance_histogram_{original_model_basis_name}_Num{idx}_PruneType{prune_type}_GroupIdx{group_idx}_Sparsity{sparsity}_ds{dataset_name}.png")
+                        plt.legend(loc='upper right')
+                        # Save the plot
+                        plt.savefig(f"plots_friedrich/distance_histogram_{original_model_basis_name}_Num{idx}_PruneType{prune_type}_GroupIdx{group_idx}_Sparsity{sparsity}_ds{dataset_name}.svg", dpi=1600)
                     
                     # Release memory by setting variables to None
                     pruned_model = None
