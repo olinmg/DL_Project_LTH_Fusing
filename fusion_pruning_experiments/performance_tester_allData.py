@@ -3,6 +3,7 @@ import datetime
 import json
 import logging
 import math
+import time
 
 import torch
 import torchvision.transforms as transforms
@@ -153,9 +154,14 @@ if __name__ == "__main__":
                 pat_model = get_pretrained_model_by_name(pruned_model_path, gpu_id)
                 epoch_accuracy = get_model_trainHistory(pruned_model_path)
             else:
+                start_time_pruning = time.time()
                 pruned_models, pruned_model_accuracies, _ = pruning_test_manager(
                     input_model_list=models_original, prune_params=prune_params, **params
                 )
+                end_time_pruning = time.time()
+                prune_time = end_time_pruning - start_time_pruning
+
+                start_time_retrain = time.time()
                 pat_model, epoch_accuracy = train_during_pruning(
                     copy.deepcopy(pruned_models[0]),
                     loaders=loaders,
@@ -163,6 +169,13 @@ if __name__ == "__main__":
                     gpu_id=experiment_params["gpu_id"],
                     prune=False,
                 )
+                end_time_retrain = time.time()
+                retrain_time = end_time_retrain - start_time_retrain
+                
+                print("Time measurements")
+                print("Prune time: ", prune_time)
+                print("Fine-Tune time: ", retrain_time)
+
                 if use_caching:
                     save_model(pruned_model_path, pat_model)
                     save_model_trainHistory(pruned_model_path, epoch_accuracy)
