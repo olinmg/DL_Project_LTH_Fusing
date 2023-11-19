@@ -2,6 +2,7 @@ import copy
 import json
 import math
 import os
+import time
 
 import torch
 import torchvision.transforms as transforms
@@ -47,6 +48,14 @@ from fusion import MSF
 
 if __name__ == "__main__":
     # introducing logger
+    times_dict = {"fuse_time": None,
+                  "train_after_fuse_time": None, 
+                  "prune_time": None,
+                  "train_after_prune_time": None}
+    times_file_path = ""
+    with open(times_file_path, 'w') as json_file:
+        json.dump(times_dict, json_file)
+
     date = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     logging.basicConfig(
         format="[%(asctime)s %(name)s %(levelname)s] %(message)s",
@@ -335,6 +344,7 @@ if __name__ == "__main__":
                     logging.info(f"(FaT) Fusing the original models...")
                 else:
                     logging.info(f"(F) Fusing the original models...")
+                start_fuse_time = time.time()
                 fused_model, fused_model_accuracy, _ = fusion_test_manager(
                     input_model_list=models_original,
                     **params,
@@ -342,6 +352,13 @@ if __name__ == "__main__":
                     num_epochs=0,
                     name=name,
                 )
+                end_fuse_time = time.time()
+                fuse_time = end_fuse_time - start_fuse_time
+                times_dict["fuse_time"] = fuse_time
+                with open(times_file_path, 'w') as json_file:
+                    json.dump(times_dict, json_file)
+
+                start_train_after_fuse = time.time()
                 fused_model, fused_model_accuracy_re = train_during_pruning(
                     fused_model,
                     loaders=loaders,
@@ -349,6 +366,12 @@ if __name__ == "__main__":
                     gpu_id=gpu_id,
                     prune=False,
                 )
+                end_train_after_fuse = time.time()
+                train_after_fuse_time = end_train_after_fuse - start_train_after_fuse
+                times_dict["train_after_fuse_time"] = train_after_fuse_time
+                with open(times_file_path, 'w') as json_file:
+                    json.dump(times_dict, json_file)
+
                 if num_epochs > 0:
                     result[name]["accuracy_fused"] = float_format(fused_model_accuracy_re[-1])
                 else:
@@ -471,9 +494,17 @@ if __name__ == "__main__":
                     logging.info(f"(FaTaPaT) Pruning the fused model...")
                 else:
                     logging.info(f"(FaP) Pruning the fused model...")
+                start_prune_time = time.time()
                 fap_models, fap_model_accuracies, _ = pruning_test_manager(
                     input_model_list=[fused_model], prune_params=prune_params, **params
                 )
+                end_prune_time = time.time()
+                prune_time = end_prune_time - start_prune_time
+                times_dict["prune_time"] = prune_time
+                with open(times_file_path, 'w') as json_file:
+                    json.dump(times_dict, json_file)
+
+                start_train_after_prune = time.time()
                 m, epoch_accuracy = train_during_pruning(
                     fap_models[0],
                     loaders=loaders,
@@ -481,6 +512,12 @@ if __name__ == "__main__":
                     gpu_id=gpu_id,
                     prune=False,
                 )
+                end_train_after_prune = time.time()
+                train_after_prune_time = end_train_after_prune - start_train_after_prune
+                times_dict["train_after_prune_time"] = train_after_prune_time
+                with open(times_file_path, 'w') as json_file:
+                    json.dump(times_dict, json_file)
+
                 for idx, accuracy in enumerate(epoch_accuracy):
                     result[name]["accuracy_FaP"][idx] = float_format(accuracy)
 
@@ -571,6 +608,13 @@ if __name__ == "__main__":
 
     logging.info("")
     logging.info("All experiments completed.")
+
+
+    print("Fuse time: ", fuse_time)
+    print("Train after fuse time", train_after_fuse_time)
+    print("Prune time: ", prune_time)
+    print("Train after prune time: ", train_after_prune_time)
+
     save_experiment_results(
         f"./results_and_plots_o/fullDict_results_{experiment_params['fusion_type']}{fusion_add_numsamples}_{model_name}/results_{iterprune_text}sAll_re{experiment_params['num_epochs']}",
         result_final,
